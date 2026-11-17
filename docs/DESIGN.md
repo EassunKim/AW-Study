@@ -51,6 +51,15 @@ You set a time budget, not a card count; the app fills it with due reviews first
 
 **Exams:** later, a deck can have an exam date; cards then get scheduled to be reviewed at least once in the days before it, even if FSRS says they could wait.
 
+**Rules that keep FSRS honest** (FSRS learns only from grades and dates, so these protect its data):
+
+1. Only the user's confirmed grade reaches FSRS, never an AI-suggested one.
+2. The review log is never edited, only added to.
+3. Reading a card or its explanation is not a review.
+4. A small fix to a card (wording, a hint) keeps its FSRS state; a real change (a split, a different question) retires it and starts fresh cards, with the old history kept in the log.
+5. Practice questions stay outside FSRS and its optimizer.
+6. One fact per card and no duplicates: FSRS models one memory per card.
+
 ## Making cards
 
 AI writes drafts; nothing joins a deck until the user approves it. Bad AI cards are the main way apps like this fail, and approving them is itself a first pass over the material.
@@ -74,6 +83,64 @@ AI writes drafts; nothing joins a deck until the user approves it. Bad AI cards 
 | No AI | Nowhere | Cards made by hand |
 
 The API key is stored encrypted with the rest of the data. Cap the pages per run, and keep drafts so reopening a lecture never pays twice.
+
+## AI
+
+AI suggests and the user decides; FSRS stays in charge of scheduling. Every AI feature obeys the lecture's AI switch (off, local model, or provider), so a lecture kept private never reaches a provider.
+
+**Features:**
+
+| Feature | What it does | When |
+| --- | --- | --- |
+| Cards from slides | Drafts 0-3 single-fact cards per slide, each quoting its slide, for the user to approve | v1 |
+| Fix problem cards | For cards FSRS flags (difficulty near 10, repeated misses), suggests why and offers a rewrite or a split | v1 |
+| Explain this | After a miss, explains the answer from the original slide; follow-up questions allowed | v1 |
+| Spot duplicates | Flags drafts that repeat an existing card, and keeps sibling cards off the same day | v1 |
+| Exam practice | Practice questions on the topics with the lowest predicted recall on exam day; kept outside FSRS | later |
+| Typed answers | Compares a typed answer with the card and suggests a grade the user confirms | later, optional |
+| Rephrased questions | New wordings of a card, approved like drafts | later |
+| Lecture recordings | Whisper transcribes on the user's PC; cards are drafted from the transcript | much later |
+
+Ordering new cards with AI was considered and dropped: the lecturer's slide order is already a good teaching order.
+
+**Models per step** (Anthropic list prices, Nov 2026, per million input / output tokens: Claude Opus 5.5 $4 / $20, Sonnet 5.5 $2 / $10, Haiku 5.5 $0.10 / $0.50):
+
+| Step | Default | Cheaper candidate to test | Local option |
+| --- | --- | --- | --- |
+| Cards from slides | Claude Opus 5.5 (`claude-opus-5-5`), effort medium | Sonnet 5.5; effort low | A vision model through Ollama (7-12B); weaker on diagrams |
+| Fix problem cards | Opus 5.5 | none | A local text model |
+| Explain this | Opus 5.5, effort low, streamed | Haiku 5.5 | A local text model |
+| Spot duplicates | No chat model: a small embedding model in the browser (e.g. all-MiniLM through transformers.js) | none | Runs on phones too |
+| Exam practice | Opus 5.5 | none | Not recommended: wrong answers teach errors |
+| Typed answers | Haiku 5.5 | none | A small local model (3-4B) |
+| Rephrased questions | Opus 5.5 | Sonnet 5.5 | A local text model |
+| Lecture recordings | Whisper (whisper.cpp) on the user's PC, then the cards step | none | Only local |
+
+A step moves to a cheaper model only when the test set shows it holds up.
+
+**Keeping costs down** (estimate: from about $0.30 to $0.05-0.10 per 40-slide lecture on Opus 5.5, about half that overnight; to be measured):
+
+1. **Only slides worth reading:** collapse animation builds (consecutive pages whose text only grows), skip title, agenda and divider slides, and on a re-import send only the changed slides.
+2. **Text first:** send a slide's image only when the slide is mostly picture, shrunk to about 1000 px wide.
+3. **Short replies:** compact JSON, no explanations, short quotes, at most 3 cards per slide, and the lowest effort that holds quality (output costs 5x input).
+4. **Prompt caching** for the fixed instructions and example cards repeated in every chunk.
+5. **Never pay twice:** drafts, explanations and rephrasings are stored on the device and reused.
+6. **No AI where code does the job:** slide order for new cards, embeddings for duplicates.
+7. **Overnight (half price):** card-making through the Batch API, picked up the next time the app opens.
+8. **Cheaper models per step** only where the test set shows they hold up.
+9. **Free options:** Ollama and Whisper on the user's own PC.
+
+Before sending, the app counts the request's tokens and shows the cost.
+
+**Quality:**
+
+- Each draft must quote the slide text it comes from; the app checks the quote is on that slide and drops drafts that fail.
+- Replies use structured outputs (a JSON schema), so malformed drafts never reach the approve screen.
+- The prompt lives in the repo, versioned and reviewed like code.
+- A test set of 3-4 public lecture decks (e.g. from MIT OpenCourseWare) with the cards a good student would make scores every prompt or model change. It runs by hand, not in CI, because it costs money.
+- Which drafts users keep, edit or discard is recorded on the device, to learn what the AI gets wrong.
+
+**In code:** one `AiBackend` interface (`draftCards`, `explain`, `fixCard`, ...), one implementation per provider and one for Ollama, each declaring which steps it supports. The browser calls the provider with the official TypeScript SDK and the user's own key. Tests use a fake backend, so CI never spends money or sends data.
 
 ## Motivation
 
@@ -192,7 +259,7 @@ Each milestone is usable on its own and deployed before the next starts. No date
 2. **Study by hand:** decks, hand-made cards, FSRS reviews and the review log, in on-device storage, with the change log in place.
 3. **Lock it down:** encryption with a passkey or passphrase, the recovery key, persistent storage, backup and restore. Daily use starts here.
 4. **Time budget:** per-user timing, new-card pacing over 14 days, the daily ring and streak.
-5. **Slides to cards:** PDF in the browser, the AI choice per lecture (own key, local model, none), the approve screen, tap-through to the slide. Then PPTX.
+5. **Slides to cards:** PDF in the browser, the AI choice per lecture (own key, local model, none), drafts with quote checks, duplicate spotting, the approve screen, tap-through to the slide and the cost measures. Then Explain this, fixing problem cards, Overnight batches and PPTX.
 6. **Polish the reward loop:** combos, sounds, XP, stats.
 7. **v2, sync:** the sync server, encrypted log upload, QR pairing, the daily reminder.
 8. **Later:** Anki import, FSRS fitted per user, exam dates, classmates and shared decks.
@@ -204,7 +271,7 @@ Tick each once Matt and Nathan agree, and write the answer under it (then copy i
 - [x] **Stack:** it must run entirely in the browser. Plain JavaScript (like Yagoodle's pages) or TypeScript? A framework, or none? Whether it needs a build step decides static files or a small image.
 
     Decided Nov 17: TypeScript, React and Vite. Vitest tests the logic, Playwright tests real browsers at phone and desktop sizes. GitHub Actions builds the site and it ships as a small image, like the chess site.
-- [ ] **AI options:** own API key, local model, or both? Which provider(s) first?
+- [ ] **AI options:** recommended in the AI section: own key with Claude first, Ollama second. Confirm, and agree a small budget for running the test set.
 - [ ] **Encryption at rest:** encrypt the whole SQLite file, or field by field with slide images as separate encrypted files? Decide when building milestone 3.
 - [ ] **Slides in sync (v2):** sync slides too, or only cards and reviews, with slides staying on the device that imported them?
 - [ ] **Sync sign-in (v2):** Cloudflare Access for us two, or simple accounts so classmates can join?
