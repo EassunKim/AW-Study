@@ -1,0 +1,35 @@
+{
+  "name": "aw-study",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Spaced repetition for lecture content, with your data kept on your own device",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "serve": "node server/server.mjs --port 8091",
+    "icons": "node tools/make-icons.mjs",
+    "test": "npm run test:unit && npm run test:browsers",
+    "test:unit": "vitest run",
+    "test:browsers": "npm run build && playwright test"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,32 @@
+# Installed packages and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Test output
+test-results/
+playwright-report/
+coverage/
+
+# Secrets: API keys and anything like them never go in git (the repo is public)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Real study data: lecture files and local databases stay on your own machine
+lectures/
+private/
+*.db
+*.sqlite
+*.sqlite3
+.data/
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log

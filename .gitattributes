@@ -1,0 +1,7 @@
+# Every text file is stored and checked out with LF line endings, on every OS, so Windows and Mac
+# machines never produce whole-file "changes" that are only line endings. Git detects binary files
+# (images, fonts) by itself and leaves them alone.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.wasm binary
