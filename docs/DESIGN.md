@@ -142,7 +142,7 @@ flowchart LR
     class sync,other v2
 ```
 
-Dashed boxes come with sync in v2. The page and its service worker are cached on the device, so the app opens and works offline. The stack is still open (see Open questions), but it must run entirely in the browser: `ts-fsrs`, SQLite in WebAssembly, PDF.js and WebCrypto.
+Dashed boxes come with sync in v2. The page and its service worker are cached on the device, so the app opens and works offline. The stack is TypeScript, React and Vite, and everything runs in the browser: `ts-fsrs`, SQLite in WebAssembly, PDF.js and WebCrypto.
 
 **Main data (all on the device):**
 
@@ -163,7 +163,7 @@ The `reviews` table is the most valuable data: stats, streaks and per-user FSRS 
 
 The app is a static site, so hosting holds nothing private. Nathan's home server serves it, deployed like his other sites: merge to `main`, wait for the green tick, then press **Update from GitHub** at apps.pacificfish.ca.
 
-- **Deploy form:** the deploy copies a static site's files as they are in the repo, with no build step. If the chosen stack needs a build, the app ships as a small image instead (as the chess site does).
+- **Deploy form:** Vite builds the site, so GitHub Actions publishes it as a small image that serves the built files with the headers below, deployed by digest with a health check and rollback (as the chess site is).
 - **Address:** a subdomain such as study.pacificfish.ca, through the existing Cloudflare Tunnel. v1 needs no sign-in to protect data; keeping the site behind Cloudflare Access is a preference.
 - **Headers:** a strict Content-Security-Policy, `no-transform` (so Cloudflare injects nothing), and no-cache on the page so an update reaches everyone at once. SQLite's OPFS storage may also need cross-origin isolation headers, depending on which of its modes we use.
 - **Sync server (v2):** a small service that stores and returns encrypted blobs per user, with a size limit per user and a sign-in. It holds no keys and can't read anything.
@@ -201,7 +201,9 @@ Each milestone is usable on its own and deployed before the next starts. No date
 
 Tick each once Matt and Nathan agree, and write the answer under it (then copy it into `CLAUDE.md`).
 
-- [ ] **Stack:** it must run entirely in the browser. Plain JavaScript (like Yagoodle's pages) or TypeScript? A framework, or none? Whether it needs a build step decides static files or a small image.
+- [x] **Stack:** it must run entirely in the browser. Plain JavaScript (like Yagoodle's pages) or TypeScript? A framework, or none? Whether it needs a build step decides static files or a small image.
+
+    Decided Nov 17: TypeScript, React and Vite. Vitest tests the logic, Playwright tests real browsers at phone and desktop sizes. GitHub Actions builds the site and it ships as a small image, like the chess site.
 - [ ] **AI options:** own API key, local model, or both? Which provider(s) first?
 - [ ] **Encryption at rest:** encrypt the whole SQLite file, or field by field with slide images as separate encrypted files? Decide when building milestone 3.
 - [ ] **Slides in sync (v2):** sync slides too, or only cards and reviews, with slides staying on the device that imported them?
