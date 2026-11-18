@@ -86,6 +86,10 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   `ReviewScreen`, `CardText` (card text is always React text, never HTML), `ConfirmDialog` (never
   `confirm()`), `settings.ts` (day start 4 a.m., 20 new cards a day until milestone 4).
 - `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design.
+- `helper/`: the AI helper (milestone 6), its own image `ghcr.io/nandminc/aw-study-ai`: a Node
+  server (its own modules only) that checks the Cloudflare Access token, picks the person's own
+  Claude Code token and runs `claude -p` with no tools (`helper/claude.mjs`). Tests in
+  `tests/helper/` with a fake `claude`; never a real token in tests or CI.
 - `server/`: the production server (Node's own modules only): serves `dist/`, `/healthz`, and every
   security header (`server/headers.mjs`).
 - `tests/server.test.mjs`: the server. `tests/browsers/`: Playwright against the built app.
