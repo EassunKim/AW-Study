@@ -17,7 +17,7 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 | Encryption design and crypto core | #15 | Nathan's Claude | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | **Done** (PR #20 contract, PR #22 implementation) |
 | Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | Nathan's Claude | `src/db/` | **Done** (PR #23) |
 | Setup and unlock screens, recovery key, settings | #17 | Matt's Claude | `src/ui/`, `src/App.tsx`, `src/main.tsx` | **Done** (PR #21). Passkeys still to try by hand on an iPhone after deploy |
-| Persistent storage, backup and restore | #18 | Matt's Claude | `src/backup/`, the backup part of Settings, backup methods in `src/db/store.ts` | **Done** (PR #29) |
+| Persistent storage, backup and restore | #18 | Matt's Claude | `src/backup/`, the backup part of Settings, backup methods in `src/db/store.ts` | **Done** (PR #31) |
 
 Milestone 2 (#5, #6, #7) is done: see the log.
 
@@ -105,7 +105,7 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
-- **Nov 18:** #18 backups (PR #29): `.honed` backup files (the database as stored, no record
+- **Nov 18:** #18 backups (PR #31): `.honed` backup files (the database as stored, no record
   decrypted; format in SECURITY.md "Backups"), download or share from Settings, automatic backups
   to a folder on Chrome/Edge desktops (hourly at most, newest 5 kept), a reminder after a week,
   restore on the setup screen ("Moving from another device?") or in Settings, persistent storage
