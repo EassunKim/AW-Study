@@ -2,6 +2,7 @@
   "name": "aw-study",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Spaced repetition for lecture content, with your data kept on your own device",
   "type": "module",
   "engines": {

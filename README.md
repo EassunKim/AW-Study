@@ -21,3 +21,7 @@ npm test                                  # all tests
 ```
 
 Contributors: read [CLAUDE.md](CLAUDE.md) for the rules (it's written for Claude Code, and for people).
+
+## License
+
+Proprietary. All rights reserved. See [LICENSE](LICENSE).
