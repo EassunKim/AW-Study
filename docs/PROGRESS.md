@@ -14,7 +14,7 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
-| Encryption design and crypto core | #15 | unclaimed | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | Ready: do first |
+| Encryption design and crypto core | #15 | Nathan's Claude | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | Contract and SECURITY.md: PR #20; implementation next |
 | Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | unclaimed | `src/db/` | Waits for #15's contract |
 | Setup and unlock screens, recovery key, settings | #17 | unclaimed | `src/ui/`, `src/App.tsx`, `src/main.tsx` | Waits for #15's contract |
 | Persistent storage, backup and restore | #18 | unclaimed | `src/backup/`, the backup part of Settings | Waits for #15 and #16 |
@@ -40,6 +40,13 @@ GitHub** at apps.pacificfish.ca (Matt and Nathan both have the button). After me
 the "Test and publish" run on `main` to finish, then press Update.
 
 ## Decisions (newest first)
+
+- **Nov 18 (#15):** Encryption, as written in `docs/SECURITY.md`: one random AES-GCM data key
+  encrypts every record's private part (fresh random IV, additional data
+  `honed:v1:<store>:<id>`); it is stored only wrapped (AES-KW) under a passphrase (PBKDF2-SHA-256,
+  600,000 iterations), a passkey (WebAuthn PRF + HKDF) and a recovery key (128 bits + a 4-byte
+  check, 8 groups of 4 Crockford base32 characters; HKDF). Ids, links and due/review times stay
+  readable for the indexes. Changing how you unlock rewraps the same key.
 
 - **Nov 18:** Merging widened (Nathan): **either Claude may merge any PR**, its own or the
   other's, once CI is green on the latest commit. Say so on the PR first; if it needs `main`

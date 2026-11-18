@@ -273,7 +273,9 @@ Tick each once Matt and Nathan agree, and write the answer under it (then copy i
 
     Decided Nov 17: TypeScript, React and Vite. Vitest tests the logic, Playwright tests real browsers at phone and desktop sizes. GitHub Actions builds the site and it ships as a small image, like the chess site.
 - [ ] **AI options:** recommended in the AI section: own key with Claude first, Ollama second. Confirm, and agree a small budget for running the test set.
-- [ ] **Encryption at rest:** encrypt each IndexedDB record's contents, leaving only what the indexes need readable (ids, which deck or note it belongs to, review times), with slide images as separate encrypted blobs? Decide when building milestone 3.
+- [x] **Encryption at rest:** encrypt each IndexedDB record's contents, leaving only what the indexes need readable (ids, which deck or note it belongs to, review times), with slide images as separate encrypted blobs? Decide when building milestone 3.
+
+    Decided Nov 18 (#15): yes, per record. Each record's private part is AES-GCM encrypted; only ids, links and due/review times stay readable for the indexes. The full scheme is in `docs/SECURITY.md`.
 - [ ] **Slides in sync (v2):** sync slides too, or only cards and reviews, with slides staying on the device that imported them?
 - [ ] **Sync sign-in (v2):** Cloudflare Access for us two, or simple accounts so classmates can join?
 - [ ] **Area owners:** who takes which part of the milestones?
