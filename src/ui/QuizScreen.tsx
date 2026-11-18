@@ -19,7 +19,7 @@ import { messageOf, useLoad } from './useLoad';
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 
-interface Setting {
+export interface Setting {
   course: Course;
   section: Section;
   deck: SlideDeck;
@@ -91,16 +91,19 @@ export default function QuizScreen({ courseId, sectionId }: { courseId: string; 
 }
 
 /** Before a quiz: the bank, the last score, Start, and making (more) questions with AI. */
-function Start({
+export function Start({
   setting,
   questions,
   attempts,
+  size: wanted = QUIZ_SIZE,
   onStart,
   onBankChanged,
 }: {
   setting: Setting;
   questions: Question[];
   attempts: QuizAttempt[];
+  /** Questions the quiz asks (the planner's size in a study session). */
+  size?: number;
   onStart: () => void;
   onBankChanged: () => Promise<void>;
 }) {
@@ -131,7 +134,7 @@ function Start({
   };
 
   const last = attempts[0];
-  const size = Math.min(QUIZ_SIZE, questions.length);
+  const size = Math.min(wanted, questions.length);
 
   return (
     <div className="stack">
@@ -198,7 +201,22 @@ function Start({
 }
 
 /** The quiz itself, one question at a time; saves the attempt at the end. */
-function Quiz({ setting, items, startedAt, onAgain }: { setting: Setting; items: QuizItem[]; startedAt: string; onAgain: () => void }) {
+export function Quiz({
+  setting,
+  items,
+  startedAt,
+  onAgain,
+  doneLabel = 'Done',
+  backLink = true,
+}: {
+  setting: Setting;
+  items: QuizItem[];
+  startedAt: string;
+  onAgain: (attempt: QuizAttempt) => void;
+  doneLabel?: string;
+  /** "Back to <class>" beside Done (not in a study session, where Done goes on). */
+  backLink?: boolean;
+}) {
   const store = useStore();
   const [index, setIndex] = useState(0);
   const [answered, setAnswered] = useState<Answered[]>([]);
@@ -266,12 +284,14 @@ function Quiz({ setting, items, startedAt, onAgain }: { setting: Setting; items:
           </>
         )}
         <div className="row">
-          <button type="button" className="primary" onClick={onAgain} disabled={!saved}>
-            Done
+          <button type="button" className="primary" onClick={() => saved && onAgain(saved)} disabled={!saved}>
+            {doneLabel}
           </button>
-          <a className="button" href={href({ name: 'class', courseId: setting.course.id })}>
-            Back to {setting.course.name}
-          </a>
+          {backLink && (
+            <a className="button" href={href({ name: 'class', courseId: setting.course.id })}>
+              Back to {setting.course.name}
+            </a>
+          )}
         </div>
       </div>
     );

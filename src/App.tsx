@@ -17,6 +17,7 @@ import type { Vault, VaultStatus } from './ui/vault';
 // With PDF.js, so loaded only when slides are opened
 const SlidesScreen = lazy(() => import('./ui/SlidesScreen'));
 const QuizScreen = lazy(() => import('./ui/QuizScreen'));
+const PlayScreen = lazy(() => import('./ui/PlayScreen'));
 
 // The page frame: the name (back to the classes), the current screen, and a footer with today's
 // study day and whether the app is ready to work offline. Until the app is unlocked, the only
@@ -26,7 +27,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   const [status, setStatus] = useState<VaultStatus>(() => vault.status());
   const refresh = () => setStatus(vault.status());
   // The slides use the whole window (app.css .wide); header and footer line up with them
-  const wide = status === 'unlocked' && route.name === 'slides';
+  const wide = status === 'unlocked' && (route.name === 'slides' || route.name === 'play');
   const lock = () => {
     vault.lock();
     refresh();
@@ -76,6 +77,11 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
       {route.name === 'quiz' && (
         <Suspense fallback={<p className="muted">Opening the quiz…</p>}>
           <QuizScreen key={href(route)} courseId={route.courseId} sectionId={route.sectionId} />
+        </Suspense>
+      )}
+      {route.name === 'play' && (
+        <Suspense fallback={<p className="muted">Getting today ready…</p>}>
+          <PlayScreen />
         </Suspense>
       )}
       {route.name === 'settings' && <SettingsScreen onLock={onLock} />}
