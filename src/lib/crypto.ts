@@ -255,24 +255,38 @@ export function recordAad(store: string, id: string): string {
 export async function encryptRecord(dataKey: CryptoKey, aad: string, value: unknown): Promise<EncryptedRecord> {
   const json = JSON.stringify(value);
   if (json === undefined) throw new CryptoError('invalid', 'Only JSON values can be encrypted.');
-  const iv = random(12);
-  const ct = await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: utf8.encode(aad) }, dataKey, utf8.encode(json));
-  return { v: 1, iv, ct: new Uint8Array(ct) };
+  return encryptBytes(dataKey, aad, utf8.encode(json));
 }
 
 export async function decryptRecord<T>(dataKey: CryptoKey, aad: string, record: EncryptedRecord): Promise<T> {
-  if (record?.v !== 1 || !(record.iv instanceof Uint8Array) || record.iv.length !== 12 || !(record.ct instanceof Uint8Array)) {
-    throw new CryptoError('corrupt', 'This record is damaged.');
-  }
-  let plain: ArrayBuffer;
-  try {
-    plain = await subtle().decrypt({ name: 'AES-GCM', iv: bytes(record.iv), additionalData: utf8.encode(aad) }, dataKey, bytes(record.ct));
-  } catch {
-    throw new CryptoError('corrupt', 'This record can’t be decrypted: it was changed, moved, or the key is wrong.');
-  }
+  const plain = await decryptBytes(dataKey, aad, record);
   try {
     return JSON.parse(new TextDecoder().decode(plain)) as T;
   } catch {
     throw new CryptoError('corrupt', 'This record decrypted to something unreadable.');
+  }
+}
+
+/**
+ * Encrypts raw bytes (a PDF) the same way as a record: AES-GCM, a fresh IV, `aad` binding it to
+ * its place. (encryptRecord would JSON-encode the bytes, several times their size.)
+ */
+export async function encryptBytes(dataKey: CryptoKey, aad: string, data: Uint8Array): Promise<EncryptedRecord> {
+  const iv = random(12);
+  const ct = await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: utf8.encode(aad) }, dataKey, bytes(data));
+  return { v: 1, iv, ct: new Uint8Array(ct) };
+}
+
+/** Decrypts bytes from encryptBytes. Throws CryptoError 'corrupt' if changed, moved or the key is wrong. */
+export async function decryptBytes(dataKey: CryptoKey, aad: string, record: EncryptedRecord): Promise<Uint8Array> {
+  if (record?.v !== 1 || !(record.iv instanceof Uint8Array) || record.iv.length !== 12 || !(record.ct instanceof Uint8Array)) {
+    throw new CryptoError('corrupt', 'This record is damaged.');
+  }
+  try {
+    return new Uint8Array(
+      await subtle().decrypt({ name: 'AES-GCM', iv: bytes(record.iv), additionalData: utf8.encode(aad) }, dataKey, bytes(record.ct)),
+    );
+  } catch {
+    throw new CryptoError('corrupt', 'This record can’t be decrypted: it was changed, moved, or the key is wrong.');
   }
 }

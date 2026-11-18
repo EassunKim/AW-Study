@@ -3,7 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import { CryptoError, type Keyring, type KeyringEntry } from '../types/crypto';
 import {
+  decryptBytes,
   decryptRecord,
+  encryptBytes,
   encryptRecord,
   isRecoveryKey,
   newDataKey,
@@ -89,6 +91,31 @@ describe('records', () => {
 
   it('bind records to their store and id', () => {
     expect(recordAad('cards', 'abc')).toBe('honed:v1:cards:abc');
+  });
+});
+
+describe('bytes (PDFs)', () => {
+  it('round-trip exactly, at the size of the input plus the tag, with no JSON blow-up', async () => {
+    const key = await newDataKey();
+    const data = crypto.getRandomValues(new Uint8Array(65_536));
+    const sealed = await encryptBytes(key, recordAad('deckFiles', 'd1'), data);
+    expect(sealed.ct.length).toBe(data.length + 16); // AES-GCM adds a 16-byte tag, nothing more
+    expect(await decryptBytes(key, recordAad('deckFiles', 'd1'), sealed)).toEqual(data);
+  });
+
+  it('fail when changed, moved, or opened with another key', async () => {
+    const key = await newDataKey();
+    const sealed = await encryptBytes(key, 'a', new Uint8Array([1, 2, 3]));
+    const ct = new Uint8Array(sealed.ct);
+    ct[1] = ct[1]! ^ 1;
+    expect(await codeOf(decryptBytes(key, 'a', { ...sealed, ct }))).toBe('corrupt');
+    expect(await codeOf(decryptBytes(key, 'b', sealed))).toBe('corrupt');
+    expect(await codeOf(decryptBytes(await newDataKey(), 'a', sealed))).toBe('corrupt');
+  });
+
+  it('never contain the plaintext', async () => {
+    const sealed = await encryptBytes(await newDataKey(), 'x', new TextEncoder().encode('%PDF-1.7 MARKER-IN-A-PDF'));
+    expect(new TextDecoder().decode(sealed.ct)).not.toContain('MARKER');
   });
 });
 
