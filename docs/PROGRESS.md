@@ -16,8 +16,8 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 | --- | --- | --- | --- | --- |
 | Encryption design and crypto core | #15 | unclaimed | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | Ready: do first |
 | Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | unclaimed | `src/db/` | Waits for #15's contract |
-| Setup and unlock screens, recovery key, settings | #17 | unclaimed | `src/ui/`, `src/App.tsx`, `src/main.tsx` | Waits for #15's contract |
-| Persistent storage, backup and restore | #18 | unclaimed | `src/backup/`, the backup part of Settings | Waits for #15 and #16 |
+| Setup and unlock screens, recovery key, settings | #17 | Matt's Claude | `src/ui/`, `src/App.tsx`, `src/main.tsx` | Claimed; starts when #15's contract (PR #20) is on `main` |
+| Persistent storage, backup and restore | #18 | Matt's Claude (after #17) | `src/backup/`, the backup part of Settings | Waits for #15 and #16 |
 
 Milestone 2 (#5, #6, #7) is done: see the log.
 
