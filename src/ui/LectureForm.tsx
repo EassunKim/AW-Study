@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 import type { Course, LectureWithSections, SlideDeck } from '../types/lecture';
 import { carryOn, slidesLabel, titleFromFileName } from './classes';
 import { PdfProblem, readPdfFile, type PickedPdf } from './pdf-file';
+import { jobLabel, useBankJobs } from './bank-jobs';
 import { useStore } from './store-context';
 import { messageOf } from './useLoad';
 
@@ -46,6 +47,8 @@ export function LectureForm({
   ]);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [makeQuestions, setMakeQuestions] = useState(true);
+  const jobs = useBankJobs();
 
   const setPart = (i: number, change: Partial<Part>) => setParts((ps) => ps.map((p, j) => (j === i ? { ...p, ...change } : p)));
 
@@ -96,12 +99,17 @@ export function LectureForm({
           stored[i] = deck;
         } else if (p.source) stored[i] = p.source.deck;
       }
-      await store.recordLecture({
+      const { sections } = await store.recordLecture({
         courseId: course.id,
         date,
         minutes: length,
         sections: parts.map((p, i) => ({ deckId: stored[i]!.id, firstPage: Number(p.first), lastPage: Number(p.last) })),
       });
+      // The quiz questions, made in the background so they're ready the first time they're wanted
+      if (makeQuestions) {
+        const title = (deckId: string) => stored.find((d) => d.id === deckId)?.title ?? 'Slides';
+        jobs.enqueue(sections.map((s) => ({ sectionId: s.id, label: jobLabel(title(s.deckId), s.firstPage, s.lastPage) })));
+      }
       onSaved();
     } catch (err) {
       setProblem(messageOf(err));
@@ -198,6 +206,11 @@ export function LectureForm({
       <button type="button" onClick={() => setParts((ps) => [...ps, emptyPart()])}>
         Add slides from another deck
       </button>
+
+      <label className="check">
+        <input type="checkbox" checked={makeQuestions} onChange={(e) => setMakeQuestions(e.target.checked)} />
+        Make quiz questions now (uses AI, in the background)
+      </label>
 
       {problem && (
         <p className="error" role="alert">

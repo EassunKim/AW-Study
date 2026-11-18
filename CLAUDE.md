@@ -95,6 +95,7 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   (the viewer, loaded lazily with PDF.js), `pdf-file.ts` (reading a picked PDF) and `classes.ts`
   (pure helpers with tests: lecture times, the latest lecture, labels). Quizzes (#40): `QuizScreen` (making
   the bank, the quiz, loaded lazily), `ai-context.ts` (the `AiBackend` the screens use: `HttpAiBackend`).
+  `bank-jobs.tsx` (making question banks in the background after "What was covered?"; held by App).
   `CompareModels` (the same slides to Haiku, Sonnet and Opus, side by side; the helper allows only those
   three by name). Planner (#47): `Today` (the checklist on the home screen, Play, the daily minutes), `PlayScreen`
   (`#/play`: each item's session with its timer, the quiz offered at 80%, then the quiz), `planning.ts`

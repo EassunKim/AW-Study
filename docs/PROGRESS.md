@@ -108,6 +108,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** Questions made in the background (PR #52, Nathan's request): "What was covered?" has
+  **Make quiz questions now**, on by default; on saving, its sections join a queue (`src/ui/bank-jobs.tsx`,
+  held by App, so it carries on across screens) that fills each bank in turn, with a status line on
+  every screen. A lapsed sign-in pauses it (Sign in for AI, Try again); locking stops it. Not kept across
+  a reload: the Quiz page still has Make questions. 6 deliberate bugs caught. (Nathan's Claude)
+
 - **Nov 18:** Compare models (PR #51, Nathan's request): the helper takes an optional `model` on any
   job, only one of `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5` (`MODELS` in `helper/app.mjs`;
   anything else 400 before Claude Code runs), says which answered, and logs it (counts only). In the

@@ -92,6 +92,7 @@ test('after setup, nothing a person wrote is readable in the browser’s databas
   await page.getByLabel('First slide').fill('1');
   await page.getByLabel('Last slide').fill('2');
   await page.getByLabel('Minutes').fill('50');
+  await page.getByLabel(/Make quiz questions now/).uncheck(); // these tests don't answer /ai/
   await page.getByRole('button', { name: 'Save lecture' }).click();
   await expect(page.getByTestId('lecture-row')).toContainText('slides 1–2');
 

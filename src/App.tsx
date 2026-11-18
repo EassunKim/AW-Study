@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { BackupWatcher } from './backup/BackupWatcher';
+import { BankJobsProvider, BankJobsStatus, useBankJobs } from './ui/bank-jobs';
 import { APP_NAME } from './brand';
 import type { StudyStore } from './db/store';
 import { deviceTimeZone, studyDay } from './lib/studyDay';
@@ -37,6 +38,8 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   return (
     <VaultContext value={vault}>
       <StoreContext value={store}>
+        <BankJobsProvider store={store}>
+        <StopJobsWhenLocked unlocked={status === 'unlocked'} />
         <header className={wide ? 'top wide' : 'top'}>
           <h1>
             <a href={href({ name: 'classes' })}>{APP_NAME}</a>
@@ -56,9 +59,11 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
           {status === 'new' && <SetupScreen onDone={refresh} />}
           {status === 'locked' && <UnlockScreen onUnlocked={refresh} />}
           {status === 'unlocked' && <BackupWatcher store={store} />}
+          {status === 'unlocked' && <BankJobsStatus />}
           {status === 'unlocked' && <Screen route={route} onLock={lock} />}
         </main>
         <Footer wide={wide} />
+        </BankJobsProvider>
       </StoreContext>
     </VaultContext>
   );
@@ -93,6 +98,15 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
       )}
     </>
   );
+}
+
+/** Locking stops the background question-making: nothing can be saved while locked. */
+function StopJobsWhenLocked({ unlocked }: { unlocked: boolean }) {
+  const { stop } = useBankJobs();
+  useEffect(() => {
+    if (!unlocked) stop();
+  }, [unlocked]);
+  return null;
 }
 
 function Footer({ wide }: { wide: boolean }) {
