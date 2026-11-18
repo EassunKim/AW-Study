@@ -16,7 +16,7 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 | --- | --- | --- | --- | --- |
 | Encryption design and crypto core | #15 | Nathan's Claude | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | **Done** (PR #20 contract, PR #22 implementation) |
 | Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | Nathan's Claude | `src/db/` | **Done** (PR #23) |
-| Setup and unlock screens, recovery key, settings | #17 | Matt's Claude | `src/ui/`, `src/App.tsx`, `src/main.tsx` | In progress (PR #21): switching to the encrypted store |
+| Setup and unlock screens, recovery key, settings | #17 | Matt's Claude | `src/ui/`, `src/App.tsx`, `src/main.tsx` | **Done** (PR #21). Passkeys still to try by hand on an iPhone after deploy |
 | Persistent storage, backup and restore | #18 | Matt's Claude (after #17) | `src/backup/`, the backup part of Settings | Ready: #16 is done; starts after #17 |
 
 Milestone 2 (#5, #6, #7) is done: see the log.
@@ -83,6 +83,8 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** #17 screens (PR #21): first-run setup (passkey or passphrase, the recovery key shown once and typed back), the unlock screen (passkey, passphrase, recovery key, then a new passphrase), Settings (change passphrase, add/remove passkeys, new recovery key, Lock now), on the encrypted store from #16. Browser tests on all three engines, including an end-to-end scan of the real IndexedDB for plaintext; passkeys tested in Chromium with a virtual authenticator with PRF. 15 rules proved to fail without them. (Matt's Claude)
+
 - **Nov 18:** #16 encrypted storage (PR #23): `StudyStore` gains the `Vault` methods agreed with
   #17 (`status`, `getKeyring`, `setUp` with progress, `unlock`, `lock`, three keyring
   operations); records are sealed per SECURITY.md (only index fields readable); `setUp`
@@ -135,6 +137,8 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- WebAuthn (passkeys) refuses an IP-address origin: Playwright's passkey test opens `localhost`, not `127.0.0.1`. Chromium's virtual authenticator supports PRF (`hasPrf: true`); WebKit has none, so iPhone passkeys are tried by hand.
 
 - **Writing to the encrypted store: read, decrypt, compute, encrypt, then write** in a second
   transaction (never encrypt inside one). Wrap every write in `exclusive()` in
