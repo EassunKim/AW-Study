@@ -6,17 +6,20 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 
 ## Now (updated Nov 18, 2026)
 
-Milestone 2, **Study by hand**, is split into three tasks. Each has a GitHub issue labelled
-`agent-task`; questions about a task go in its issue's comments.
+Milestone 3, **Lock it down**: encryption, the recovery key, persistent storage, backup and
+restore. Four tasks, each a GitHub issue labelled `agent-task` in the GitHub milestone
+"M3: Lock it down". **#15 goes first**: it writes `docs/SECURITY.md` and the shared contract
+(`src/types/crypto.ts` + stubs, merged early like the M2 kickoff). Then #16 and #17 can run in
+parallel, and #18 follows #16. Claim a task with a comment on its issue.
 
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
-| Scheduler and cloze: FSRS, the daily queue, cloze parsing | #5 | Matt's Claude | `src/lib/scheduler.ts`, `src/lib/cloze.ts` + tests | **Done** (PR #12) |
-| Data layer: IndexedDB, schema, change log, `StudyStore` | #6 | Nathan's Claude | `src/db/` | **Done** (PR #9) |
-| Screens: decks, card editor, review | #7 | Nathan's Claude | `src/ui/`, `src/App.tsx` | **Done** (PR #14) |
+| Encryption design and crypto core | #15 | unclaimed | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | Ready: do first |
+| Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | unclaimed | `src/db/` | Waits for #15's contract |
+| Setup and unlock screens, recovery key, settings | #17 | unclaimed | `src/ui/`, `src/App.tsx`, `src/main.tsx` | Waits for #15's contract |
+| Persistent storage, backup and restore | #18 | unclaimed | `src/backup/`, the backup part of Settings | Waits for #15 and #16 |
 
-The contract all three code against: `src/types/study.ts`, plus the signatures in the
-`scheduler.ts` and `cloze.ts` stubs. Change it only in its own small PR, announced in the issues.
+Milestone 2 (#5, #6, #7) is done: see the log.
 
 ## Milestones
 
@@ -24,7 +27,7 @@ The contract all three code against: `src/types/study.ts`, plus the signatures i
 | --- | --- | --- |
 | 1 | Skeleton: installable offline PWA, server, tests, CI | **Done** (#2, #3). Live at https://honed.pacificfish.ca |
 | 2 | Study by hand: decks, hand-made cards, FSRS reviews, review log, change log | **Done** (#5, #6, #7). Deploy with Update after #14 merges |
-| 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | Not started |
+| 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | **In progress** (#15-#18) |
 | 4 | Time budget: pacing, daily ring, streak | Not started |
 | 5 | Slides to cards: PDF in the browser, AI drafts, approve screen | Not started |
 | 6 | Polish the reward loop | Not started |
@@ -72,6 +75,9 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** Milestone 3 planned: issues #15-#18 in the GitHub milestone "M3: Lock it down".
+  (Nathan's Claude)
 
 - **Nov 18:** #7 screens (PR #14): decks (counts, create, rename, delete with an in-page
   confirmation), a deck's notes (add, edit, delete; Basic or Cloze with live cloze checks and card
