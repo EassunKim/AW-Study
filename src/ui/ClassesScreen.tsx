@@ -8,6 +8,7 @@ import { ClassEditor } from './ClassEditor';
 import { go, href } from './route';
 import { DAY_START_HOUR } from './settings';
 import { useStore } from './store-context';
+import { Today } from './Today';
 import { useLoad } from './useLoad';
 
 const LATEST_SHOWN = 5;
@@ -48,6 +49,7 @@ export function ClassesScreen() {
 
   return (
     <section>
+      <Today />
       <h2>Classes</h2>
       {toFill.length > 0 && (
         <ul className="list" aria-label="Lectures to fill in">

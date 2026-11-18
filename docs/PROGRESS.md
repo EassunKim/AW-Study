@@ -35,7 +35,7 @@ slides" and "M6: AI helper and quizzes":
 | AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Done and live** (PR #33; server set up Nov 18, Matt's token still to add) |
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 | Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
-| Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | Contract PR #48; storage and planner PR #49; screens next |
+| Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | **Done** (contract #48, storage and planner #49, screens #50) |
 
 ## Milestones
 
@@ -45,7 +45,7 @@ slides" and "M6: AI helper and quizzes":
 | 2 | Study by hand (flashcards, FSRS) | **Done**, then **superseded** by the Nov 18 redesign; **removed** (PR #37) |
 | 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | **In progress** (#15-#18) |
 | 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Done** (#24-#26); not yet tried on a real phone |
-| 5 | Planner and the daily checklist with Play | **In progress** (#47) |
+| 5 | Planner and the daily checklist with Play | **Done** (#47); exams pulling sections forward come with 9 |
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
 | 7 | Viewer tools: highlights, notes, explain, ask | Not started |
 | 8 | First run (tutorial) and after-class prompts | Not started |
@@ -107,6 +107,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** #47 screens (PR #50): **Today** on the home screen (what fits today's minutes, minutes
+  done and planned, what's waiting beyond today, the daily minutes to change) and **Play** (`#/play`):
+  each study item is the section's slides with a timer; at 80% of its time the quiz is offered, *I'm
+  ready* starts it any time; then the quiz (questions can be made right there); extra study is slides
+  only; quizzes are the quiz only. Sessions and quizzes are saved as they end; *Stop for now* leaves the
+  rest on the list. Browser tests on a clock the test controls; 8 deliberate bugs each caught.
+  (Nathan's Claude)
 
 - **Nov 18:** #47 storage and planner (PR #49): schema step 6 (`studySessions`, `settings`) and
   `src/db/plan.ts`; `src/plan/planner.ts` works today's checklist out from the history each time. First
