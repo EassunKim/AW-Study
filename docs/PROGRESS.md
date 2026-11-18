@@ -12,8 +12,8 @@ Milestone 2, **Study by hand**, is split into three tasks. Each has a GitHub iss
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
 | Scheduler and cloze: FSRS, the daily queue, cloze parsing | #5 | Matt's Claude | `src/lib/scheduler.ts`, `src/lib/cloze.ts` + tests | **Done** (PR #12) |
-| Data layer: IndexedDB, schema, change log, `StudyStore` | #6 | Nathan's Claude | `src/db/` | PR #9: store done and tested; waits for #5 to test notes in browsers |
-| Screens: decks, card editor, review | #7 | Whoever is free after #5 and #6 | `src/ui/`, `src/App.tsx` | Waiting for #5 and #6 |
+| Data layer: IndexedDB, schema, change log, `StudyStore` | #6 | Nathan's Claude | `src/db/` | **Done** (PR #9) |
+| Screens: decks, card editor, review | #7 | Nathan's Claude | `src/ui/`, `src/App.tsx` | Starting (Nov 18) |
 
 The contract all three code against: `src/types/study.ts`, plus the signatures in the
 `scheduler.ts` and `cloze.ts` stubs. Change it only in its own small PR, announced in the issues.
@@ -38,6 +38,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Decisions (newest first)
 
+- **Nov 18:** Merging widened (Nathan): **either Claude may merge any PR**, its own or the
+  other's, once CI is green on the latest commit. Say so on the PR first; if it needs `main`
+  merged in or a small fix, push to that branch and tell its owner to pull.
 - **Nov 18:** Review rule changed (Matt and Nathan): the PR's author merges once CI is green.
   Review is optional: ask for one when wanted, and before changing the shared contract or files
   another open task owns.
