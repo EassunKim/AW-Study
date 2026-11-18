@@ -266,7 +266,7 @@ test('a device with milestone 2’s flashcards upgrades: the cards are dropped, 
         };
       }),
   );
-  expect(state.version).toBe(4);
+  expect(state.version).toBeGreaterThanOrEqual(4); // step 4 dropped the cards (later steps add stores)
   expect(state.stores.filter((s) => ['decks', 'notes', 'cards', 'reviews'].includes(s))).toEqual([]);
   expect(state.changes).toEqual(['course', 'course']); // the old class change stays; the new class's is added
   expect(await problems()).toEqual([]);

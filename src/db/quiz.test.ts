@@ -1,0 +1,251 @@
+// The quiz side of the store (#40): question banks and quiz attempts. Every store test runs twice,
+// before setup (plain records) and encrypted, like lectures.test.ts.
+import 'fake-indexeddb/auto';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { QuestionInput } from '../types/quiz';
+import { questionKey } from './quiz';
+import { openHonedDb, RECORD_STORES } from './schema';
+import { openStudyStore, type StudyStore } from './store';
+import { containsText, fakePdf, newDataKey, testKeyring } from './test-helpers';
+
+const MARKER = 'QUIZ-MARKER-19';
+const T1 = '2026-11-18T18:00:00.000Z';
+const T2 = '2026-11-18T18:05:00.000Z';
+
+let counter = 0;
+let name: string;
+let store: StudyStore;
+
+const q = (n: number, page = 21, extra: Partial<QuestionInput> = {}): QuestionInput => ({
+  page,
+  question: `What does slide ${page} say about bond ${n}?`,
+  options: [`Right ${n}`, `Wrong A ${n}`, `Wrong B ${n}`, `Wrong C ${n}`],
+  answer: 0,
+  explanation: `Slide ${page} says so.`,
+  ...extra,
+});
+
+/** A class with one lecture of two sections: slides 21-30 and 31-35 of one deck. */
+async function setting() {
+  const course = await store.createCourse({ name: 'CHEM 101', meetings: [], termStart: null, termEnd: null });
+  const deck = await store.addSlideDeck({ courseId: course.id, title: 'W4', fileName: 'w4.pdf', data: fakePdf(), pageTexts: Array(40).fill('t') });
+  const { lecture, sections } = await store.recordLecture({
+    courseId: course.id,
+    date: '2026-11-18',
+    minutes: 50,
+    sections: [
+      { deckId: deck.id, firstPage: 21, lastPage: 30 },
+      { deckId: deck.id, firstPage: 31, lastPage: 35 },
+    ],
+  });
+  const [a, b] = [...sections].sort((x, y) => x.firstPage - y.firstPage);
+  return { course, deck, lecture, a: a!, b: b! };
+}
+
+describe('questionKey', () => {
+  it('ignores case, spacing and end punctuation', () => {
+    expect(questionKey('  What  is ATP? ')).toBe(questionKey('what is atp'));
+    expect(questionKey('What is ATP?')).not.toBe(questionKey('What is ADP?'));
+  });
+});
+
+describe.each(['before setup (plain)', 'encrypted'] as const)('quiz store, %s', (mode) => {
+  beforeEach(async () => {
+    name = `quiz-${++counter}`;
+    store = await openStudyStore({ name });
+    if (mode === 'encrypted') {
+      const key = await newDataKey();
+      await store.setUp(await testKeyring(key), key);
+    }
+  });
+  afterEach(() => store.close());
+
+  describe('question banks', () => {
+    it('adds questions to a section, trimmed, and lists them oldest first', async () => {
+      const { a, deck, course } = await setting();
+      const made = await store.addQuestions(a.id, [q(1), { ...q(2, 30), question: '  Spaced out?  ' }]);
+      expect(made[0]).toMatchObject({ sectionId: a.id, courseId: course.id, deckId: deck.id, page: 21, answer: 0 });
+      expect(made[1]!.question).toBe('Spaced out?');
+      expect((await store.listQuestions(a.id)).map((x) => x.id)).toEqual(made.map((x) => x.id));
+      expect(await store.listQuestions('another-section')).toEqual([]);
+    });
+
+    it('refuses a malformed question, adding none of the batch', async () => {
+      const { a } = await setting();
+      const bad: [string, QuestionInput][] = [
+        ['slide before the section', q(1, 20)],
+        ['slide after the section', q(1, 31)],
+        ['not a whole slide', q(1, 21.5)],
+        ['empty question', q(1, 21, { question: '  ' })],
+        ['three options', q(1, 21, { options: ['a', 'b', 'c'] as never })],
+        ['an empty option', q(1, 21, { options: ['a', 'b', ' ', 'd'] })],
+        ['two options the same', q(1, 21, { options: ['Same', 'same', 'c', 'd'] })],
+        ['answer out of range', q(1, 21, { answer: 4 as never })],
+        ['answer not a number', q(1, 21, { answer: '0' as never })],
+        ['question too long', q(1, 21, { question: 'x'.repeat(1_001) })],
+        ['option too long', q(1, 21, { options: ['x'.repeat(501), 'b', 'c', 'd'] })],
+      ];
+      for (const [label, input] of bad) {
+        await expect(store.addQuestions(a.id, [q(99), input]), label).rejects.toMatchObject({ code: 'invalid' });
+      }
+      expect(await store.listQuestions(a.id)).toEqual([]);
+      await expect(store.addQuestions(a.id, [])).rejects.toMatchObject({ code: 'invalid' });
+      await expect(store.addQuestions('nope', [q(1)])).rejects.toMatchObject({ code: 'not-found' });
+    });
+
+    it('refuses repeats, within a batch or of the bank, ignoring case and punctuation', async () => {
+      const { a, b } = await setting();
+      await store.addQuestions(a.id, [q(1)]);
+      await expect(store.addQuestions(a.id, [q(2), { ...q(3), question: q(1).question.toUpperCase() }])).rejects.toThrow(/already in this section/);
+      await expect(store.addQuestions(a.id, [q(4), q(4)])).rejects.toThrow(/already in this section/);
+      await store.addQuestions(b.id, [{ ...q(1), page: 31 }]); // another section may ask the same
+      expect((await store.listQuestions(a.id)).length).toBe(1);
+    });
+
+    it('holds at most 100 a call and 500 a section', async () => {
+      const { a } = await setting();
+      const many = (from: number, n: number) => Array.from({ length: n }, (_, i) => q(from + i));
+      await expect(store.addQuestions(a.id, many(0, 101))).rejects.toThrow(/At most 100/);
+      for (let i = 0; i < 5; i++) await store.addQuestions(a.id, many(i * 100, 100));
+      await expect(store.addQuestions(a.id, many(1_000, 1))).rejects.toThrow(/at most 500/);
+    }, 60_000);
+
+    it('a bad question can be deleted', async () => {
+      const { a } = await setting();
+      const [first, second] = await store.addQuestions(a.id, [q(1), q(2)]);
+      await store.deleteQuestion(first!.id);
+      expect((await store.listQuestions(a.id)).map((x) => x.id)).toEqual([second!.id]);
+      await expect(store.deleteQuestion(first!.id)).rejects.toMatchObject({ code: 'not-found' });
+    });
+  });
+
+  describe('quiz attempts', () => {
+    it('are marked by the store against the stored answers, and scored', async () => {
+      const { a, course } = await setting();
+      const [q1, q2, q3] = await store.addQuestions(a.id, [q(1), q(2, 22, { answer: 2 }), q(3)]);
+      const attempt = await store.recordQuizAttempt({
+        sectionId: a.id,
+        startedAt: T1,
+        finishedAt: T2,
+        answers: [
+          { questionId: q1!.id, chosen: 0, ms: 4_200.4 }, // right
+          { questionId: q2!.id, chosen: 0, ms: 3_000 }, // wrong: the answer is 2
+          { questionId: q3!.id, chosen: 0, ms: -5 },
+        ],
+      });
+      expect(attempt).toMatchObject({ courseId: course.id, sectionId: a.id, right: 2, asked: 3, startedAt: T1, finishedAt: T2 });
+      expect(attempt.score).toBeCloseTo(2 / 3);
+      expect(attempt.answers.map((x) => [x.right, x.ms])).toEqual([
+        [true, 4_200],
+        [false, 3_000],
+        [true, 0],
+      ]);
+      expect(await store.listQuizAttempts(a.id)).toEqual([attempt]);
+    });
+
+    it('ignore a "right" sent by the screen', async () => {
+      const { a } = await setting();
+      const [q1] = await store.addQuestions(a.id, [q(1)]);
+      const attempt = await store.recordQuizAttempt({
+        sectionId: a.id,
+        startedAt: T1,
+        finishedAt: T2,
+        answers: [{ questionId: q1!.id, chosen: 3, ms: 1, right: true } as never],
+      });
+      expect(attempt).toMatchObject({ right: 0, score: 0 });
+    });
+
+    it('refuse answers to another section’s questions, repeats, bad choices or times, and empty quizzes', async () => {
+      const { a, b } = await setting();
+      const [q1] = await store.addQuestions(a.id, [q(1)]);
+      const [other] = await store.addQuestions(b.id, [q(1, 31)]);
+      const base = { sectionId: a.id, startedAt: T1, finishedAt: T2 };
+      const cases: [string, Parameters<StudyStore['recordQuizAttempt']>[0]][] = [
+        ['another section’s question', { ...base, answers: [{ questionId: other!.id, chosen: 0, ms: 1 }] }],
+        ['a question twice', { ...base, answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }, { questionId: q1!.id, chosen: 1, ms: 1 }] }],
+        ['choice 4', { ...base, answers: [{ questionId: q1!.id, chosen: 4 as never, ms: 1 }] }],
+        ['no answers', { ...base, answers: [] }],
+        ['ends before it starts', { ...base, startedAt: T2, finishedAt: T1, answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }] }],
+        ['not a time', { ...base, startedAt: 'yesterday', answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }] }],
+      ];
+      for (const [label, input] of cases) await expect(store.recordQuizAttempt(input), label).rejects.toMatchObject({ code: 'invalid' });
+      await expect(store.recordQuizAttempt({ ...base, sectionId: 'nope', answers: [] })).rejects.toMatchObject({ code: 'not-found' });
+      expect(await store.listQuizAttempts()).toEqual([]);
+    });
+
+    it('list newest first, for one section or all; a deleted question’s answers stay', async () => {
+      const { a, b } = await setting();
+      const [qa] = await store.addQuestions(a.id, [q(1)]);
+      const [qb] = await store.addQuestions(b.id, [q(1, 31)]);
+      const first = await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T1, answers: [{ questionId: qa!.id, chosen: 0, ms: 1 }] });
+      const second = await store.recordQuizAttempt({ sectionId: b.id, startedAt: T2, finishedAt: T2, answers: [{ questionId: qb!.id, chosen: 1, ms: 1 }] });
+      expect((await store.listQuizAttempts()).map((x) => x.id)).toEqual([second.id, first.id]);
+      expect((await store.listQuizAttempts(a.id)).map((x) => x.id)).toEqual([first.id]);
+      await store.deleteQuestion(qa!.id);
+      expect((await store.listQuizAttempts(a.id))[0]!.answers[0]!.questionId).toBe(qa!.id);
+    });
+  });
+
+  describe('deleting', () => {
+    it('a lecture takes its sections’ questions and attempts with it, and nothing else', async () => {
+      const { a, course, deck } = await setting();
+      const [q1] = await store.addQuestions(a.id, [q(1)]);
+      await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }] });
+      const other = await store.recordLecture({ courseId: course.id, date: '2026-11-20', minutes: 50, sections: [{ deckId: deck.id, firstPage: 36, lastPage: 40 }] });
+      const [kept] = await store.addQuestions(other.sections[0]!.id, [q(1, 36)]);
+      await store.deleteLecture(a.lectureId);
+      const db = await openHonedDb(name);
+      expect(await db.getAllKeys('questions')).toEqual([kept!.id]);
+      expect(await db.count('quizAttempts')).toBe(0);
+      db.close();
+      const log = (await store.changesSince(0)).filter((c) => c.op === 'delete').map((c) => c.entity);
+      expect(log).toEqual(expect.arrayContaining(['question', 'quizAttempt', 'section', 'lecture']));
+    });
+
+    it('a class takes all its questions and attempts', async () => {
+      const { a, course } = await setting();
+      const [q1] = await store.addQuestions(a.id, [q(1)]);
+      await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }] });
+      await store.deleteCourse(course.id);
+      const db = await openHonedDb(name);
+      expect([await db.count('questions'), await db.count('quizAttempts')]).toEqual([0, 0]);
+      db.close();
+    });
+  });
+
+  it('refuses everything while locked', async () => {
+    if (mode !== 'encrypted') return;
+    const { a } = await setting();
+    const [q1] = await store.addQuestions(a.id, [q(1)]);
+    store.lock();
+    for (const [label, call] of [
+      ['listQuestions', () => store.listQuestions(a.id)],
+      ['addQuestions', () => store.addQuestions(a.id, [q(2)])],
+      ['deleteQuestion', () => store.deleteQuestion(q1!.id)],
+      ['recordQuizAttempt', () => store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }] })],
+      ['listQuizAttempts', () => store.listQuizAttempts()],
+    ] as const) {
+      await expect((call as () => Promise<unknown>)(), label).rejects.toMatchObject({ code: 'locked' });
+    }
+  });
+});
+
+describe('encrypted, on disk', () => {
+  it('no question, option, explanation or answer is readable, and only SECURITY.md’s fields are', async () => {
+    name = `quiz-${++counter}`;
+    store = await openStudyStore({ name });
+    const key = await newDataKey();
+    await store.setUp(await testKeyring(key), key);
+    const { a } = await setting();
+    const [q1] = await store.addQuestions(a.id, [
+      { page: 21, question: `Q ${MARKER}`, options: [`A ${MARKER}`, 'b', 'c', 'd'], answer: 0, explanation: `E ${MARKER}` },
+    ]);
+    await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }] });
+    store.close();
+    const db = await openHonedDb(name);
+    for (const s of [...RECORD_STORES, 'meta'] as const) expect(containsText(await db.getAll(s), MARKER), s).toBe(false);
+    expect(Object.keys((await db.getAll('questions'))[0] as object).sort()).toEqual(['courseId', 'enc', 'id', 'sectionId']);
+    expect(Object.keys((await db.getAll('quizAttempts'))[0] as object).sort()).toEqual(['courseId', 'enc', 'id', 'sectionId']);
+    db.close();
+  });
+});

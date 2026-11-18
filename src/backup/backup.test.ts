@@ -289,6 +289,8 @@ describe('the file format', () => {
 
   it('describes what it holds', () => {
     expect(describeCounts({ classes: 1, 'slide decks': 2, lectures: 3, entries: 3 })).toBe('1 class, 2 slide decks, 3 lectures, 3 entries');
+    expect(describeCounts({ questions: 1, quizzes: 1 })).toBe('1 question, 1 quiz');
+    expect(describeCounts({ questions: 12, quizzes: 2 })).toBe('12 questions, 2 quizzes');
     expect(describeCounts({})).toBe('nothing yet');
   });
 });
