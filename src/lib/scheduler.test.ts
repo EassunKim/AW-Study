@@ -254,18 +254,19 @@ describe('buildQueue', () => {
     ];
     expect(buildQueue(utc, options())).toEqual(['before-4']);
 
-    // Vancouver is UTC-8 in November. At noon local on Nov 18 (20:00 UTC) the study day ends at
-    // 4 a.m. local on Nov 19, which is 12:00 UTC.
-    const vancouver = [
+    // Los Angeles is UTC-8 in November. (Not Vancouver: BC moved to permanent UTC-7 in 2026, and
+    // only newer time zone data knows that, so Vancouver's offset depends on the Node version.)
+    // At noon local on Nov 18 (20:00 UTC) the study day ends at 4 a.m. local on Nov 19, 12:00 UTC.
+    const losAngeles = [
       card('before-4', 'review', '2026-11-19T11:59:00Z'),
       card('at-4', 'review', '2026-11-19T12:00:00Z'),
     ];
-    const noonInVancouver = new Date('2026-11-18T20:00:00Z');
-    expect(buildQueue(vancouver, options({ now: noonInVancouver, timeZone: 'America/Vancouver' }))).toEqual([
+    const noonInLosAngeles = new Date('2026-11-18T20:00:00Z');
+    expect(buildQueue(losAngeles, options({ now: noonInLosAngeles, timeZone: 'America/Los_Angeles' }))).toEqual([
       'before-4',
     ]);
     // At 1 a.m. local (09:00 UTC) it is still the Nov 17 study day, which ended at 12:00 UTC on Nov 18
-    expect(buildQueue(vancouver, options({ timeZone: 'America/Vancouver' }))).toEqual([]);
+    expect(buildQueue(losAngeles, options({ timeZone: 'America/Los_Angeles' }))).toEqual([]);
   });
 
   it('limits new cards to what is left of the daily limit', () => {
