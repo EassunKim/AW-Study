@@ -5,8 +5,6 @@ import { expect, type Page } from '@playwright/test';
 
 export const PASSPHRASE = 'paper lantern river cobalt';
 
-const decksHeading = (page: Page) => page.getByRole('heading', { level: 2, name: 'Decks' });
-
 /** Sets up with a passphrase (from the setup screen) and returns the recovery key it showed. */
 export async function setUpWithPassphrase(page: Page, passphrase = PASSPHRASE): Promise<string> {
   await page.getByRole('button', { name: 'Use a passphrase' }).click();
@@ -16,7 +14,7 @@ export async function setUpWithPassphrase(page: Page, passphrase = PASSPHRASE): 
   const recoveryKey = await readRecoveryKey(page);
   await confirmRecoveryKey(page, recoveryKey);
   await page.getByRole('button', { name: /I’ve saved it/ }).click();
-  await expect(decksHeading(page)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible(); // unlocked, on any screen
   return recoveryKey;
 }
 

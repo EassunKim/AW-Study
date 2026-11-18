@@ -31,7 +31,7 @@ slides" and "M6: AI helper and quizzes":
 | --- | --- | --- | --- | --- |
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | **Done** (contract PR #29, storage PR #30) |
 | PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
-| Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Ready (#24 and #25 done) |
+| Class and lecture screens; remove the flashcard layer | #26 | Nathan's Claude | `src/ui/` (not #17's screens), routes, old flashcard files | Screens in PR #36; removing the flashcards next |
 | AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #33); Nathan sets up the server side (steps in the PR) |
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 
@@ -105,6 +105,16 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** #26 part 1, the screens (PR #36). Home is now the classes list, with reminders for
+  lectures not filled in yet and the latest lectures. A class page has its lecture times, "What was
+  covered?" (date and minutes default to the latest lecture that has started; one or more slide
+  ranges, each from a deck already added or a PDF picked then; it suggests carrying on from where
+  the last lecture stopped), lectures (edit date and minutes, delete), exams (midterm, final or
+  test; every lecture up to it or chosen ones) and slide decks (upload, rename, delete, open). A
+  section opens in the viewer at its first slide with its range marked (`#/class/<id>/slides/<deck>/<a>-<b>`).
+  The lock and backup browser tests now use classes; the old flashcard screens moved to `#/cards`.
+  (Nathan's Claude)
 
 - **Nov 18:** #34 the app's AI client (PR #35): `src/ai/` with the `AiBackend` interface
   (`makeQuestions`, `gradeAnswer`, `explain`, `ask`), `HttpAiBackend` (posts JSON to `/ai/` on our

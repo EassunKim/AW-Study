@@ -8,6 +8,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { PASSPHRASE, setUpWithPassphrase, unlockWithPassphrase } from './lock-helpers';
+import { addClassAndReturn } from './class-helpers';
 
 const MARKER = 'Quokka5Marker';
 
@@ -16,12 +17,6 @@ function watchErrors(page: Page): string[] {
   page.on('pageerror', (e) => errors.push(`page error: ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && errors.push(`console: ${m.text()}`));
   return errors;
-}
-
-async function addDeck(page: Page, name: string) {
-  await page.getByLabel('New deck').fill(name);
-  await page.getByRole('button', { name: 'Add deck' }).click();
-  await expect(page.getByTestId('deck-row').filter({ hasText: name })).toBeVisible();
 }
 
 /** From Settings: downloads a backup and returns the file's path. */
@@ -39,7 +34,7 @@ async function restore(page: Page, file: string, confirmLabel: string) {
   await expect(page.getByRole('alert')).toContainText('doesn’t unlock');
   await page.getByLabel('The backup’s passphrase').fill(PASSPHRASE);
   await page.getByRole('button', { name: 'Open backup' }).click();
-  await expect(page.getByTestId('backup-summary')).toContainText('1 deck');
+  await expect(page.getByTestId('backup-summary')).toContainText('1 class');
   await page.getByRole('button', { name: 'Restore this backup' }).click();
   await page.getByRole('button', { name: confirmLabel, exact: true }).click();
 }
@@ -48,7 +43,7 @@ test('download a backup with no plaintext in it, then restore it on a new device
   const errors = watchErrors(page);
   await page.goto('/');
   await setUpWithPassphrase(page);
-  await addDeck(page, `${MARKER} deck`);
+  await addClassAndReturn(page, `${MARKER} class`);
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByTestId('last-backup')).toHaveText('No backup yet.');
   await expect(page.getByTestId('storage-state')).toBeVisible();
@@ -66,12 +61,12 @@ test('download a backup with no plaintext in it, then restore it on a new device
   await fresh.goto('/');
   await fresh.getByRole('button', { name: /Restore a backup/ }).click();
   await restore(fresh, file, 'Restore');
-  await expect(fresh.getByTestId('deck-row').filter({ hasText: `${MARKER} deck` })).toBeVisible();
+  await expect(fresh.getByTestId('class-row').filter({ hasText: `${MARKER} class` })).toBeVisible();
 
   // It stays: a reload locks, and the backup's passphrase opens it
   await fresh.reload();
   await unlockWithPassphrase(fresh);
-  await expect(fresh.getByTestId('deck-row').filter({ hasText: `${MARKER} deck` })).toBeVisible();
+  await expect(fresh.getByTestId('class-row').filter({ hasText: `${MARKER} class` })).toBeVisible();
   await other.close();
   expect(errors).toEqual([]);
   expect(freshErrors).toEqual([]);
@@ -81,11 +76,11 @@ test('restoring in Settings replaces this device’s data; a file that isn’t a
   const errors = watchErrors(page);
   await page.goto('/');
   await setUpWithPassphrase(page);
-  await addDeck(page, 'In the backup');
+  await addClassAndReturn(page, 'In the backup');
   await page.getByRole('link', { name: 'Settings' }).click();
   const file = await downloadBackup(page);
-  await page.getByRole('link', { name: /Back to your decks/ }).click();
-  await addDeck(page, 'Added later');
+  await page.getByRole('link', { name: /Back to your classes/ }).click();
+  await addClassAndReturn(page, 'Added later');
 
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Restore from a backup…' }).click();
@@ -94,8 +89,8 @@ test('restoring in Settings replaces this device’s data; a file that isn’t a
 
   await restore(page, file, 'Replace with the backup');
   await expect(page.getByRole('status').filter({ hasText: 'Backup restored.' })).toBeVisible();
-  await page.getByRole('link', { name: /Back to your decks/ }).click();
-  await expect(page.getByTestId('deck-row').filter({ hasText: 'In the backup' })).toBeVisible();
-  await expect(page.getByTestId('deck-row').filter({ hasText: 'Added later' })).toHaveCount(0);
+  await page.getByRole('link', { name: /Back to your classes/ }).click();
+  await expect(page.getByTestId('class-row').filter({ hasText: 'In the backup' })).toBeVisible();
+  await expect(page.getByTestId('class-row').filter({ hasText: 'Added later' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

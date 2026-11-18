@@ -1,9 +1,14 @@
-// Which screen to show, from the URL's hash: #/ (decks), #/deck/<id>, #/review/<deckId>.
+// Which screen to show, from the URL's hash: #/ (classes), #/class/<id>, #/class/<id>/slides/<deckId>
+// (a deck in the viewer, optionally .../<first>-<last> for a section), #/settings. The old
+// flashcard screens live under #/cards until they're removed (#26).
 // The hash keeps everything on one page (the service worker serves it offline) while the back
 // button and reloads still work. No router library.
 import { useEffect, useState } from 'react';
 
 export type Route =
+  | { name: 'classes' }
+  | { name: 'class'; courseId: string }
+  | { name: 'slides'; courseId: string; deckId: string; first?: number; last?: number }
   | { name: 'decks' }
   | { name: 'deck'; deckId: string }
   | { name: 'review'; deckId: string }
@@ -11,29 +16,47 @@ export type Route =
   | { name: 'not-found' };
 
 const ID = '([A-Za-z0-9-]{1,64})';
-const PATTERNS: [RegExp, (m: RegExpMatchArray) => Route][] = [
-  [/^#?\/?$/, () => ({ name: 'decks' })],
-  [new RegExp(`^#/deck/${ID}$`), (m) => ({ name: 'deck', deckId: m[1]! })],
-  [new RegExp(`^#/review/${ID}$`), (m) => ({ name: 'review', deckId: m[1]! })],
+const PAGE = '([1-9][0-9]{0,3})';
+const PATTERNS: [RegExp, (m: RegExpMatchArray) => Route | null][] = [
+  [/^#?\/?$/, () => ({ name: 'classes' })],
+  [new RegExp(`^#/class/${ID}$`), (m) => ({ name: 'class', courseId: m[1]! })],
+  [new RegExp(`^#/class/${ID}/slides/${ID}$`), (m) => ({ name: 'slides', courseId: m[1]!, deckId: m[2]! })],
+  [
+    new RegExp(`^#/class/${ID}/slides/${ID}/${PAGE}-${PAGE}$`),
+    (m) =>
+      Number(m[3]) <= Number(m[4]) ? { name: 'slides', courseId: m[1]!, deckId: m[2]!, first: Number(m[3]), last: Number(m[4]) } : null,
+  ],
+  [/^#\/cards$/, () => ({ name: 'decks' })],
+  [new RegExp(`^#/cards/deck/${ID}$`), (m) => ({ name: 'deck', deckId: m[1]! })],
+  [new RegExp(`^#/cards/review/${ID}$`), (m) => ({ name: 'review', deckId: m[1]! })],
   [/^#\/settings$/, () => ({ name: 'settings' })],
 ];
 
 export function parseRoute(hash: string): Route {
   for (const [pattern, make] of PATTERNS) {
     const m = hash.match(pattern);
-    if (m) return make(m);
+    const route = m && make(m);
+    if (route) return route;
   }
   return { name: 'not-found' };
 }
 
 export function href(route: Exclude<Route, { name: 'not-found' }>): string {
   switch (route.name) {
-    case 'decks':
+    case 'classes':
       return '#/';
+    case 'class':
+      return `#/class/${route.courseId}`;
+    case 'slides': {
+      const deck = `#/class/${route.courseId}/slides/${route.deckId}`;
+      return route.first && route.last ? `${deck}/${route.first}-${route.last}` : deck;
+    }
+    case 'decks':
+      return '#/cards';
     case 'deck':
-      return `#/deck/${route.deckId}`;
+      return `#/cards/deck/${route.deckId}`;
     case 'review':
-      return `#/review/${route.deckId}`;
+      return `#/cards/review/${route.deckId}`;
     case 'settings':
       return '#/settings';
   }

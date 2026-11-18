@@ -89,9 +89,14 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   (our helper at `/ai/`), `FakeAiBackend` (tests and development), and `check.ts` (replies are
   checked on the device before use).
 - `src/ui/`: the screens (React). `route.ts` (hash routes, no router library), `store-context.ts`
-  (the store reaches screens through React context), `DecksScreen`, `DeckScreen`, `NoteEditor`,
-  `ReviewScreen`, `CardText` (card text is always React text, never HTML), `ConfirmDialog` (never
-  `confirm()`), `settings.ts` (day start 4 a.m., 20 new cards a day until milestone 4).
+  (the store reaches screens through React context). Classes (#26): `ClassesScreen` (home for now),
+  `ClassScreen`, `ClassEditor`, `ExamEditor`, `LectureForm` ("What was covered?"), `SlidesScreen`
+  (the viewer, loaded lazily with PDF.js), `pdf-file.ts` (reading a picked PDF) and `classes.ts`
+  (pure helpers with tests: lecture times, the latest lecture, labels). Forms use `noValidate` and
+  show our own messages; no `<select>` (WebKit's pulls in a stylesheet the CSP blocks). The old
+  flashcard screens (`DecksScreen`, `DeckScreen`, `NoteEditor`, `ReviewScreen`, `CardText`) are
+  under `#/cards` until #26 removes them. `ConfirmDialog` (never `confirm()`), `settings.ts` (day
+  start 4 a.m.).
 - `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design.
 - `helper/`: the AI helper (milestone 6), its own image `ghcr.io/nandminc/aw-study-ai`: a Node
   server (its own modules only) that checks the Cloudflare Access token, picks the person's own

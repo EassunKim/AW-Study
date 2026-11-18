@@ -65,7 +65,7 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
   return (
     <section className="settings" aria-labelledby="settings-title">
       <h2 id="settings-title">Settings</h2>
-      <a href={href({ name: 'decks' })}>← Back to your decks</a>
+      <a href={href({ name: 'classes' })}>← Back to your classes</a>
 
       <h3>How you unlock</h3>
       <ul className="list" aria-label="Ways to unlock">
