@@ -157,7 +157,7 @@ export function RecoveryKeySheet({
         <button type="button" onClick={copy}>
           Copy
         </button>
-        <button type="button" onClick={() => downloadText(`${APP_NAME} recovery key.txt`, recoveryKeyFile(APP_NAME, recoveryKey, new Date()))}>
+        <button type="button" onClick={() => downloadText(`${APP_NAME}-recovery-key.txt`, recoveryKeyFile(APP_NAME, recoveryKey, new Date()))}>
           Download
         </button>
         <button type="button" onClick={() => window.print()}>

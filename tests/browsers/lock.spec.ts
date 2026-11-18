@@ -56,7 +56,7 @@ test('set up with a passphrase, then unlock after a reload', async ({ page }) =>
   expect(recoveryKey).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){7}[0-9A-HJKMNP-TV-Z]{4}$/);
   await expect(page.getByText(/your cards are gone/)).toBeVisible();
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download' }).click()]);
-  expect(download.suggestedFilename()).toMatch(/recovery key\.txt$/);
+  expect(download.suggestedFilename()).toMatch(/-recovery-key\.txt$/); // no spaces: WebKit on Linux turns them into underscores
   expect(await readFile((await download.path())!, 'utf8')).toContain(recoveryKey);
 
   const save = page.getByRole('button', { name: /I’ve saved it/ });
