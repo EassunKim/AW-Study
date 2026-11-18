@@ -32,7 +32,8 @@ slides" and "M6: AI helper and quizzes":
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | **Done** (contract PR #29, storage PR #30) |
 | PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
 | Class and lecture screens; remove the flashcard layer | #26 | Nathan's Claude | `src/ui/` (not #17's screens), routes, old flashcard files | Screens in PR #36; removing the flashcards next |
-| AI helper on the server | #27 | unclaimed | `helper/`, its CI job | Ready (independent) |
+| AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #33); Nathan sets up the server side (steps in the PR) |
+| AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 
 ## Milestones
 
@@ -114,6 +115,25 @@ the "Test and publish" run on `main` to finish, then press Update.
   section opens in the viewer at its first slide with its range marked (`#/class/<id>/slides/<deck>/<a>-<b>`).
   The lock and backup browser tests now use classes; the old flashcard screens moved to `#/cards`.
   (Nathan's Claude)
+
+- **Nov 18:** #34 the app's AI client (PR #35): `src/ai/` with the `AiBackend` interface
+  (`makeQuestions`, `gradeAnswer`, `explain`, `ask`), `HttpAiBackend` (posts JSON to `/ai/` on our
+  own site only, the Access cookie only same-site, never follows redirects, so a lapsed Access
+  sign-in shows as `'signed-out'` and the screen can open `signInUrl()`), every reply checked again
+  on the device (`check.ts`), and `FakeAiBackend` for tests and screens. 10 tests on a fake fetch;
+  14 of 16 deliberate bugs caught (the other two are covered by another check). (Matt's Claude)
+
+- **Nov 18:** #27 AI helper (PR #33): `helper/`, a Node server (its own modules only) for
+  `POST /ai/questions`, `/ai/grade`, `/ai/explain`, `/ai/ask` (and `GET /ai/whoami` for setup). It checks the Cloudflare Access
+  token itself (signature, team, audience, expiry), maps the email to that person's own Claude
+  Code token, and runs `claude -p` with **no tools** (`--tools ""`, `--disallowedTools "*"`), no
+  MCP, no skills, no saved session, one turn, our own system prompt, the prompt on stdin, a fresh
+  home folder deleted after each run, and a time limit. User text goes in one JSON block between
+  nonce markers, marked as data. Replies are checked (4 distinct options, an answer among them, a
+  slide that was given; marks in range) and retried once. Limits: per person per day, one at a
+  time, sizes. Logs are counts only. Image `ghcr.io/nandminc/aw-study-ai`, checked in CI running
+  read-only as an unprivileged user. 55 tests with a fake `claude`; 32 of 34 deliberate bugs caught (the other two are covered by another check).
+  (Matt's Claude)
 
 - **Nov 18:** #24 storage (PR #30): schema step 3 (`courses`, `exams`, `slideDecks`, `deckFiles`,
   `deckPages`, `lectures`, `sections`) and `src/db/lectures.ts`, every `LectureStore` method. PDFs are
