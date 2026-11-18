@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { APP_NAME } from './brand';
 import { deviceTimeZone, studyDay } from './lib/studyDay';
 
 // The first screen. For now it proves the skeleton works: the app loads, knows today's study day,
@@ -21,7 +22,7 @@ export default function App() {
 
   return (
     <main className="app">
-      <h1>AW-Study</h1>
+      <h1>{APP_NAME}</h1>
       <p className="tagline">Lecture content, a little every day, at the right moment.</p>
       <dl className="facts">
         <dt>Study day</dt>

@@ -1,21 +1,29 @@
 // Vite builds the app into dist/ (`npm run build`) and runs it while you work (`npm run dev`).
 // The PWA plugin writes the web app manifest and a service worker that caches the whole app, so it
 // installs to a phone's Home Screen and opens with no network. Vitest reads the `test` part.
-import { defineConfig } from 'vitest/config';
+import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { APP_DESCRIPTION, APP_NAME } from './src/brand';
+
+// Fills %APP_NAME% and %APP_DESCRIPTION% in index.html from src/brand.ts
+const brandHtml = (): Plugin => ({
+  name: 'brand-html',
+  transformIndexHtml: (html) => html.replaceAll('%APP_NAME%', APP_NAME).replaceAll('%APP_DESCRIPTION%', APP_DESCRIPTION),
+});
 
 export default defineConfig({
   plugins: [
+    brandHtml(),
     react(),
     VitePWA({
       registerType: 'autoUpdate', // a new version takes over on the next open, no prompt
       injectRegister: false, // registered from src/main.tsx (no inline script: the CSP forbids those)
       includeAssets: ['icons/icon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'AW-Study',
-        short_name: 'AW-Study',
-        description: 'Spaced repetition for lecture content, with your data kept on your own device',
+        name: APP_NAME,
+        short_name: APP_NAME,
+        description: APP_DESCRIPTION,
         start_url: '/',
         scope: '/',
         display: 'standalone',
