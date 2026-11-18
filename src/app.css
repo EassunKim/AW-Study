@@ -196,7 +196,9 @@ kbd {
   justify-content: flex-end;
 }
 
-.row input {
+/* Only an input placed straight in a row: one inside a stacked label (label.inline) would take
+   the 12rem as its height, not its width */
+.row > input {
   flex: 1 1 12rem;
   width: auto;
 }

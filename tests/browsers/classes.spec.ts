@@ -271,3 +271,14 @@ test('a device with milestone 2’s flashcards upgrades: the cards are dropped, 
   expect(state.changes).toEqual(['course', 'course']); // the old class change stays; the new class's is added
   expect(await problems()).toEqual([]);
 });
+
+test('the time, minutes and date fields are one line tall, like the other fields', async ({ page }) => {
+  await openUnlocked(page);
+  await page.getByRole('button', { name: 'Add a class' }).click();
+  const form = page.getByRole('form', { name: 'New class' });
+  const nameHeight = (await form.getByLabel('Class name').boundingBox())!.height;
+  for (const label of ['Starts at', 'Minutes', 'Starts', 'Ends']) {
+    const box = (await form.getByLabel(label, { exact: true }).boundingBox())!;
+    expect(box.height, label).toBeLessThan(nameHeight * 1.5); // they were about 4x as tall (Nov 18)
+  }
+});
