@@ -42,7 +42,7 @@ async function addCloze(page: Page, text: string) {
 
 test('make, rename and delete a deck', async ({ page }) => {
   const errors = watchErrors(page);
-  await openUnlocked(page);
+  await openUnlocked(page, '/#/cards');
   await expect(page.getByText('No decks yet')).toBeVisible();
   await addDeck(page, 'Biology');
   await expect(deckRow(page, 'Biology')).toContainText('0 due');
@@ -69,7 +69,7 @@ test('make, rename and delete a deck', async ({ page }) => {
 
 test('write basic and cloze notes; cloze problems show as you type; card text is never HTML', async ({ page }) => {
   const errors = watchErrors(page);
-  await openUnlocked(page);
+  await openUnlocked(page, '/#/cards');
   await addDeck(page, 'Biology');
   await openDeck(page, 'Biology');
 
@@ -97,7 +97,7 @@ test('write basic and cloze notes; cloze problems show as you type; card text is
 
 test('study a deck by tapping and by keys; a sibling waits; everything survives a reload', async ({ page }) => {
   const errors = watchErrors(page);
-  await openUnlocked(page);
+  await openUnlocked(page, '/#/cards');
   await addDeck(page, 'Biology');
   await openDeck(page, 'Biology');
   await addBasic(page, 'What carries energy in cells?', 'ATP');
@@ -135,7 +135,7 @@ test('study a deck by tapping and by keys; a sibling waits; everything survives 
 
 test('edit and delete a note', async ({ page }) => {
   const errors = watchErrors(page);
-  await openUnlocked(page);
+  await openUnlocked(page, '/#/cards');
   await addDeck(page, 'Chemistry');
   await openDeck(page, 'Chemistry');
   await addBasic(page, 'Symbol for sodium?', 'Na');
@@ -151,10 +151,10 @@ test('edit and delete a note', async ({ page }) => {
 });
 
 test('a missing deck or page says so', async ({ page }) => {
-  await openUnlocked(page);
-  await page.goto('/#/deck/does-not-exist');
+  await openUnlocked(page, '/#/cards');
+  await page.goto('/#/cards/deck/does-not-exist');
   await expect(page.getByRole('heading', { name: 'Deck not found' })).toBeVisible();
-  await page.goto('/#/review/does-not-exist');
+  await page.goto('/#/cards/review/does-not-exist');
   await expect(page.getByRole('heading', { name: 'Deck not found' })).toBeVisible();
   await page.goto('/#/nonsense');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
@@ -163,7 +163,7 @@ test('a missing deck or page says so', async ({ page }) => {
 test('works offline: make a deck and a note with no connection', async ({ page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'offline mode with service workers is Chromium-only in Playwright');
   const errors = watchErrors(page);
-  await openUnlocked(page);
+  await openUnlocked(page, '/#/cards');
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
   await context.setOffline(true);
   await reloadUnlocked(page);

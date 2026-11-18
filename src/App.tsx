@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BackupWatcher } from './backup/BackupWatcher';
 import { APP_NAME } from './brand';
 import type { StudyStore } from './db/store';
 import { deviceTimeZone, studyDay } from './lib/studyDay';
+import { ClassesScreen } from './ui/ClassesScreen';
+import { ClassScreen } from './ui/ClassScreen';
 import { DeckScreen } from './ui/DeckScreen';
 import { DecksScreen } from './ui/DecksScreen';
 import { VaultContext } from './ui/lock-parts';
@@ -15,8 +17,11 @@ import { StoreContext } from './ui/store-context';
 import { UnlockScreen } from './ui/UnlockScreen';
 import type { Vault, VaultStatus } from './ui/vault';
 
-// The page frame: the name (back to the decks), the current screen, and a footer with today's
-// study day and whether the app is ready to work offline. Until the cards are unlocked, the only
+// With PDF.js, so loaded only when slides are opened
+const SlidesScreen = lazy(() => import('./ui/SlidesScreen'));
+
+// The page frame: the name (back to the classes), the current screen, and a footer with today's
+// study day and whether the app is ready to work offline. Until the app is unlocked, the only
 // screen is setup (first run) or unlock.
 export default function App({ store, vault }: { store: StudyStore; vault: Vault }) {
   const route = useRoute();
@@ -25,7 +30,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   const lock = () => {
     vault.lock();
     refresh();
-    go({ name: 'decks' });
+    go({ name: 'classes' });
   };
 
   return (
@@ -33,7 +38,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
       <StoreContext value={store}>
         <header className="top">
           <h1>
-            <a href={href({ name: 'decks' })}>{APP_NAME}</a>
+            <a href={href({ name: 'classes' })}>{APP_NAME}</a>
           </h1>
           {status === 'unlocked' && (
             <nav className="row" aria-label="App">
@@ -61,6 +66,13 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
 function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock: () => void }) {
   return (
     <>
+      {route.name === 'classes' && <ClassesScreen />}
+      {route.name === 'class' && <ClassScreen key={route.courseId} courseId={route.courseId} />}
+      {route.name === 'slides' && (
+        <Suspense fallback={<p className="muted">Opening the slides…</p>}>
+          <SlidesScreen key={href(route)} courseId={route.courseId} deckId={route.deckId} first={route.first} last={route.last} />
+        </Suspense>
+      )}
       {route.name === 'decks' && <DecksScreen />}
       {route.name === 'deck' && <DeckScreen key={route.deckId} deckId={route.deckId} />}
       {route.name === 'review' && <ReviewScreen key={route.deckId} deckId={route.deckId} />}
@@ -68,7 +80,7 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
       {route.name === 'not-found' && (
         <section>
           <h2>Page not found</h2>
-          <a href={href({ name: 'decks' })}>← Back to your decks</a>
+          <a href={href({ name: 'classes' })}>← Back to your classes</a>
         </section>
       )}
     </>
@@ -95,7 +107,7 @@ function Footer() {
         Study day <span data-testid="study-day">{studyDay(now, deviceTimeZone(), DAY_START_HOUR)}</span>
       </span>
       <span data-testid="offline-status">{offlineReady ? 'Ready: works without a connection' : 'Getting ready…'}</span>
-      <span>Your cards stay on this device.</span>
+      <span>Your classes and slides stay on this device.</span>
     </footer>
   );
 }
@@ -105,7 +117,7 @@ export function StorageProblem({ message }: { message: string }) {
   return (
     <main className="app">
       <h1>{APP_NAME}</h1>
-      <p className="error">This browser won’t let {APP_NAME} store your cards on this device.</p>
+      <p className="error">This browser won’t let {APP_NAME} store your classes and slides on this device.</p>
       <p className="muted">
         Private or incognito windows sometimes block storage. Try a normal window. ({message})
       </p>

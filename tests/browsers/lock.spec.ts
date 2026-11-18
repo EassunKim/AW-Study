@@ -13,6 +13,8 @@ import {
   setUpWithPassphrase,
   unlockWithPassphrase,
 } from './lock-helpers';
+import { makePdf } from '../../src/viewer/test-pdf';
+import { addClass, addClassAndReturn, pdfFile } from './class-helpers';
 
 function watchErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -23,12 +25,6 @@ function watchErrors(page: Page): string[] {
 
 const unlockHeading = (page: Page) => page.getByRole('heading', { name: /^Unlock/ });
 const alert = (page: Page) => page.getByRole('alert');
-
-async function addDeck(page: Page, name: string) {
-  await page.getByLabel('New deck').fill(name);
-  await page.getByRole('button', { name: 'Add deck' }).click();
-  await expect(page.getByTestId('deck-row').filter({ hasText: name })).toBeVisible();
-}
 
 test('set up with a passphrase, then unlock after a reload', async ({ page }) => {
   const errors = watchErrors(page);
@@ -65,8 +61,8 @@ test('set up with a passphrase, then unlock after a reload', async ({ page }) =>
   await expect(save).toBeDisabled();
   await confirmRecoveryKey(page, recoveryKey);
   await save.click();
-  await expect(page.getByRole('heading', { level: 2, name: 'Decks' })).toBeVisible();
-  await addDeck(page, 'Biology');
+  await expect(page.getByRole('heading', { level: 2, name: 'Classes' })).toBeVisible();
+  await addClassAndReturn(page, 'Biology');
 
   // A reload locks; a wrong passphrase is refused; the right one opens the same cards
   await page.reload();
@@ -76,7 +72,7 @@ test('set up with a passphrase, then unlock after a reload', async ({ page }) =>
   await page.getByRole('button', { name: 'Unlock', exact: true }).click();
   await expect(alert(page)).toContainText('doesn’t unlock');
   await unlockWithPassphrase(page);
-  await expect(page.getByTestId('deck-row').filter({ hasText: 'Biology' })).toBeVisible();
+  await expect(page.getByTestId('class-row').filter({ hasText: 'Biology' })).toBeVisible();
 
   // Lock from the header
   await page.getByRole('button', { name: 'Lock', exact: true }).click();
@@ -89,13 +85,15 @@ test('after setup, nothing a person wrote is readable in the browser’s databas
   await page.goto('/');
   await setUpWithPassphrase(page);
   const marker = 'Zebrafish7Marker';
-  await addDeck(page, `${marker} deck`);
-  await page.getByTestId('deck-row').filter({ hasText: marker }).getByRole('link').first().click();
-  await page.getByRole('button', { name: 'Add a note' }).click();
-  await page.getByLabel('Front (the question)').fill(`What is ${marker}?`);
-  await page.getByLabel('Back (the answer)').fill(`${marker} answer`);
-  await page.getByRole('button', { name: 'Add note' }).click();
-  await expect(page.getByTestId('note-row').filter({ hasText: marker })).toBeVisible();
+  // A class, a PDF whose bytes and page text hold the marker, and a lecture covering it
+  await addClass(page, `${marker} class`);
+  await page.getByRole('button', { name: 'What was covered?' }).click();
+  await page.getByLabel('Upload the slides (PDF)').setInputFiles(pdfFile(`${marker}.pdf`, makePdf([{ title: `${marker} slide` }, { title: 'Two' }])));
+  await page.getByLabel('First slide').fill('1');
+  await page.getByLabel('Last slide').fill('2');
+  await page.getByLabel('Minutes').fill('50');
+  await page.getByRole('button', { name: 'Save lecture' }).click();
+  await expect(page.getByTestId('lecture-row')).toContainText('slides 1–2');
 
   // Every record of every store in every database, bytes decoded as text, searched for the marker
   const dump = await page.evaluate(async () => {
@@ -120,7 +118,8 @@ test('after setup, nothing a person wrote is readable in the browser’s databas
     }
     return text.join('\n');
   });
-  expect(dump).toContain('/decks:'); // the scan really read the stores
+  expect(dump).toContain('/courses:'); // the scan really read the stores
+  expect(dump).toContain('/deckFiles:');
   expect(dump).not.toContain(marker);
   expect(errors).toEqual([]);
 });
@@ -129,7 +128,7 @@ test('recover with the recovery key and choose a new passphrase', async ({ page 
   const errors = watchErrors(page);
   await page.goto('/');
   const recoveryKey = await setUpWithPassphrase(page);
-  await addDeck(page, 'History');
+  await addClassAndReturn(page, 'History');
   await page.reload();
 
   await page.getByRole('button', { name: 'Use your recovery key' }).click();
@@ -148,7 +147,7 @@ test('recover with the recovery key and choose a new passphrase', async ({ page 
   await page.getByLabel('New passphrase', { exact: true }).fill(fresh);
   await page.getByLabel('Type it again').fill(fresh);
   await page.getByRole('button', { name: 'Save and open' }).click();
-  await expect(page.getByTestId('deck-row').filter({ hasText: 'History' })).toBeVisible();
+  await expect(page.getByTestId('class-row').filter({ hasText: 'History' })).toBeVisible();
 
   // From now on, the new passphrase opens it and the old one doesn't
   await page.reload();
@@ -234,13 +233,13 @@ test.describe('passkeys (Chromium, virtual authenticator)', () => {
     const recoveryKey = await readRecoveryKey(page);
     await confirmRecoveryKey(page, recoveryKey);
     await page.getByRole('button', { name: /I’ve saved it/ }).click();
-    await addDeck(page, 'Physics');
+    await addClassAndReturn(page, 'Physics');
 
     // A reload locks; the passkey opens it (no passphrase was ever set)
     await page.reload();
     await expect(unlockHeading(page)).toBeVisible();
     await page.getByRole('button', { name: 'Unlock with a passkey' }).click();
-    await expect(page.getByTestId('deck-row').filter({ hasText: 'Physics' })).toBeVisible();
+    await expect(page.getByTestId('class-row').filter({ hasText: 'Physics' })).toBeVisible();
 
     // Settings: add a second passkey (proved with the first), then remove the first
     await page.getByRole('link', { name: 'Settings' }).click();
