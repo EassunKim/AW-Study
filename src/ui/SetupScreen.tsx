@@ -128,8 +128,9 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
       {step === 'saving' && (
         <div className="stack" aria-live="polite">
           <p>Encrypting your cards…</p>
-          <progress max={progress?.total ?? 1} value={progress?.done ?? 0} aria-label="Encrypting" />
-          {progress && (
+          {/* total is 0 on a fresh device: nothing to encrypt */}
+          <progress max={Math.max(1, progress?.total ?? 1)} value={progress?.done ?? 0} aria-label="Encrypting" />
+          {progress && progress.total > 0 && (
             <p className="muted small">
               {progress.done} of {progress.total}
             </p>

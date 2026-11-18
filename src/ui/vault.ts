@@ -1,7 +1,7 @@
 // The lock side of the store, as the screens use it: is it set up, locked or unlocked; set it up;
-// unlock and lock; change the ways of unlocking. This is the shape proposed for #16 in issue #16
-// (comment of Nov 18). Until #16 lands, src/ui/fakeVault.ts provides it over the unencrypted M2
-// store, so the screens can be built and tested.
+// unlock and lock; change the ways of unlocking. Agreed in issue #16; StudyStore (src/db/store.ts)
+// implements it, so main.tsx passes the store as the vault. Store errors are StoreError codes:
+// 'locked', 'wrong-key', 'invalid' (e.g. removing the last way in), 'not-found'.
 //
 // The crypto calls (unlock, the wrapWith* functions) happen in the screens, through ./keys: the
 // store never sees a passphrase, a recovery key or a passkey's PRF output, only wrapped keys and

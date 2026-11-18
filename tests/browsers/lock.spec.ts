@@ -84,6 +84,47 @@ test('set up with a passphrase, then unlock after a reload', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
+test('after setup, nothing a person wrote is readable in the browser’s database', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/');
+  await setUpWithPassphrase(page);
+  const marker = 'Zebrafish7Marker';
+  await addDeck(page, `${marker} deck`);
+  await page.getByTestId('deck-row').filter({ hasText: marker }).getByRole('link').first().click();
+  await page.getByRole('button', { name: 'Add a note' }).click();
+  await page.getByLabel('Front (the question)').fill(`What is ${marker}?`);
+  await page.getByLabel('Back (the answer)').fill(`${marker} answer`);
+  await page.getByRole('button', { name: 'Add note' }).click();
+  await expect(page.getByTestId('note-row').filter({ hasText: marker })).toBeVisible();
+
+  // Every record of every store in every database, bytes decoded as text, searched for the marker
+  const dump = await page.evaluate(async () => {
+    const text: string[] = [];
+    const decode = (v: unknown): unknown =>
+      v instanceof Uint8Array || v instanceof ArrayBuffer ? new TextDecoder().decode(v) : v;
+    for (const { name } of await indexedDB.databases()) {
+      const db = await new Promise<IDBDatabase>((ok, fail) => {
+        const req = indexedDB.open(name!);
+        req.onsuccess = () => ok(req.result);
+        req.onerror = () => fail(req.error);
+      });
+      for (const store of db.objectStoreNames) {
+        const rows = await new Promise<unknown[]>((ok, fail) => {
+          const req = db.transaction(store).objectStore(store).getAll();
+          req.onsuccess = () => ok(req.result);
+          req.onerror = () => fail(req.error);
+        });
+        text.push(`${name}/${store}: ${JSON.stringify(rows, (_k, v) => decode(v))}`);
+      }
+      db.close();
+    }
+    return text.join('\n');
+  });
+  expect(dump).toContain('/decks:'); // the scan really read the stores
+  expect(dump).not.toContain(marker);
+  expect(errors).toEqual([]);
+});
+
 test('recover with the recovery key and choose a new passphrase', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');

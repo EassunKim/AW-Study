@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App, { StorageProblem } from './App';
 import { openStudyStore } from './db/store';
-import { fakeVault } from './ui/fakeVault';
 import { messageOf } from './ui/useLoad';
 import './app.css';
 
@@ -16,8 +15,7 @@ openStudyStore().then(
   (store) =>
     root.render(
       <StrictMode>
-        {/* TEMPORARY: the fake vault until #16's encrypted store provides the real one */}
-        <App store={store} vault={fakeVault()} />
+        <App store={store} vault={store} />
       </StrictMode>,
     ),
   (err: unknown) => root.render(<StorageProblem message={messageOf(err)} />),
