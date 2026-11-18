@@ -243,7 +243,7 @@ Nathan sets up the server side (app entry, subdomain) once the skeleton exists.
 Matt and Nathan each work with Claude Code on their own PC, so the repo itself must hold the rules both Claudes follow.
 
 - **`CLAUDE.md` in the repo:** the stack, how to run and test, the rules below, and decisions made. Personal notes stay in each person's own Claude memory, not the repo.
-- **Branches and PRs only:** nobody pushes to `main`. CI runs every test on each PR; the other person reviews and merges. `main` deploys only when someone presses Update.
+- **Branches and PRs only:** nobody pushes to `main`. CI runs every test on each PR; once it's green, the PR's author merges it. Review by the other person is optional, asked for when wanted (agreed Nov 18). `main` deploys only when someone presses Update.
 - **Owners by area** to avoid colliding PRs (to be agreed): for example Matt on slide import and AI, Nathan on scheduling, review screen, storage and hosting.
 - **Small PRs, merged often.** A PR open for days drifts from `main` and conflicts.
 - **Tests are the contract:** the scheduler and pacing get unit tests with fixed dates; the review screen gets browser tests on phone and desktop sizes. A new rule is proved by a test that fails without it.

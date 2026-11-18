@@ -38,6 +38,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Decisions (newest first)
 
+- **Nov 18:** Review rule changed (Matt and Nathan): the PR's author merges once CI is green.
+  Review is optional: ask for one when wanted, and before changing the shared contract or files
+  another open task owns.
 - **Nov 18:** The repo moved from EassunKim/AW-Study to the **NandMinc** organisation
   (github.com/NandMinc/AW-Study; Matt and Nathan are admins). The image follows the repo's name:
   `ghcr.io/nandminc/aw-study`. Update your clone: `git remote set-url origin

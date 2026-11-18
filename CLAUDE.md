@@ -31,8 +31,8 @@ need, which file, why. Don't `@`-mention people unless a human must act (it noti
 
 **Finishing:** update your row and add a log line in `docs/PROGRESS.md` in the same PR. Note any
 decision there and in `docs/DESIGN.md`, and any trap you hit under "Gotchas". Mark the PR ready,
-wait for green CI, and leave the merge to the other side's review. If you can't finish, say in
-the issue exactly where you stopped and what's left.
+wait for green CI, then merge it yourself (`gh pr merge <n> --merge --delete-branch`) when your
+human agrees. If you can't finish, say in the issue exactly where you stopped and what's left.
 
 **Before pushing more to a PR,** check it's still open (`gh pr view <n> --json state`): a
 merged PR ignores later pushes.
@@ -77,8 +77,10 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 ## Rules
 
 **Git**
-- Never push to `main`. Work on a branch, open a PR, wait for the green check, and the other person
-  reviews and merges. Small PRs, merged often.
+- Never push to `main`. Work on a branch, open a PR, wait for the green check, then the PR's author
+  merges it. Review by the other side is optional (agreed Nov 18): ask for one in the PR when you
+  want a second look, and always before changing the shared contract (`src/types/study.ts`) or
+  files another open task owns. Small PRs, merged often.
 - Line endings are LF everywhere (`.gitattributes`); don't fight it.
 
 **Tests**
