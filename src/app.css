@@ -616,3 +616,17 @@ button.link {
 .bank-jobs p {
   margin: 0;
 }
+
+/* --- Maths (MathText, KaTeX) --- */
+
+/* A little larger than the text around it: fractions in a line are small otherwise, on phones especially */
+.math .katex {
+  font-size: 1.15em;
+}
+
+/* A long formula on its own line scrolls sideways rather than widening the page */
+.math.display {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+}

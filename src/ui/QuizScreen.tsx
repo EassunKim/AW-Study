@@ -12,6 +12,7 @@ import type { Course, Section, SlideDeck } from '../types/lecture';
 import type { OptionIndex, Question, QuizAttempt } from '../types/quiz';
 import { SlideViewer } from '../viewer/SlideViewer';
 import { useAi } from './ai-context';
+import { MathText } from './MathText';
 import { CompareModels } from './CompareModels';
 import { slidesLabel } from './classes';
 import { href } from './route';
@@ -284,9 +285,11 @@ export function Quiz({
               {missed.map((a) => (
                 <li key={a.item.question.id} className="item">
                   <div className="item-main">
-                    <span>{a.item.question.question}</span>
+                    <span>
+                      <MathText text={a.item.question.question} />
+                    </span>
                     <span className="small">
-                      Answer: {a.item.question.options[a.item.question.answer]}{' '}
+                      Answer: <MathText text={a.item.question.options[a.item.question.answer]} />{' '}
                       <a href={href({ name: 'slides', courseId: setting.course.id, deckId: setting.deck.id, first: a.item.question.page, last: a.item.question.page })}>
                         slide {a.item.question.page}
                       </a>
@@ -343,13 +346,15 @@ export function Quiz({
       <p className="muted small" data-testid="quiz-position">
         Question {index + 1} of {items.length}
       </p>
-      <p className="question">{question.question}</p>
+      <p className="question">
+        <MathText text={question.question} />
+      </p>
       <div className="options" role="group" aria-label="Answers">
         {item.order.map((stored, shown) => {
           const state = !current ? '' : stored === question.answer ? 'right' : shown === current.shown ? 'wrong' : 'other';
           return (
             <button key={stored} type="button" className={`option ${state}`} disabled={!!current} aria-pressed={current?.shown === shown} onClick={() => choose(shown)}>
-              <span className="letter">{LETTERS[shown]}</span> {question.options[stored]}
+              <span className="letter">{LETTERS[shown]}</span> <MathText text={question.options[stored]} />
             </button>
           );
         })}
@@ -357,9 +362,19 @@ export function Quiz({
       {current && (
         <div className="stack feedback" role="status" data-testid="quiz-feedback">
           <p className={current.right ? 'verdict right' : 'verdict wrong'}>
-            {current.right ? 'Right.' : `Not quite. The answer is ${LETTERS[item.order.indexOf(question.answer)]}: ${question.options[question.answer]}.`}
+            {current.right ? (
+              'Right.'
+            ) : (
+              <>
+                Not quite. The answer is {LETTERS[item.order.indexOf(question.answer)]}: <MathText text={question.options[question.answer]} />.
+              </>
+            )}
           </p>
-          {question.explanation && <p>{question.explanation}</p>}
+          {question.explanation && (
+            <p>
+              <MathText text={question.explanation} />
+            </p>
+          )}
           <div className="row">
             <button type="button" className="primary" onClick={goOn} autoFocus>
               {index + 1 < items.length ? 'Next question' : 'See your score'}

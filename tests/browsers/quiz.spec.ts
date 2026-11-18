@@ -297,3 +297,48 @@ test('locking stops the background work: a late answer writes nothing', async ({
   await quizLink(page).click();
   await expect(page.getByTestId('bank-size')).toContainText('No questions yet');
 });
+
+test('maths in questions is drawn with KaTeX, within the security policy, with fonts from our own site', async ({ page, baseURL }) => {
+  const problems = await watchProblems(page);
+  const offSite: string[] = [];
+  page.on('request', (r) => {
+    if (!r.url().startsWith(baseURL!) && !r.url().startsWith('data:')) offSite.push(r.url());
+  });
+  const fonts: string[] = [];
+  page.on('response', (r) => r.url().includes('KaTeX_') && fonts.push(`${r.status()} ${new URL(r.url()).pathname}`));
+  await page.route('**/ai/questions', async (route) => {
+    const body = route.request().postDataJSON() as AskedFor;
+    const questions = Array.from({ length: body.count }, (_, i) => ({
+      question: String.raw`Which formula is integration by parts for \(\int u\,\frac{dv}{dx}\,dx\)? (${i + 1})`,
+      options: [
+        String.raw`\(uv - \int v\,\frac{du}{dx}\,dx\)`,
+        String.raw`\(uv + \int v\,\frac{du}{dx}\,dx\)`,
+        String.raw`\(\frac{du}{dx}\frac{dv}{dx} - uv\)`,
+        `It costs $5 (${i + 1})`, // a dollar stays plain text
+      ],
+      answer: 0,
+      page: body.pages[0]!.page,
+      explanation: String.raw`Integrate \[\frac{d}{dx}(uv) = u\frac{dv}{dx} + v\frac{du}{dx}\] and rearrange.`,
+    }));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ questions }) });
+  });
+  await classWithLecture(page);
+  await quizLink(page).click();
+  await page.getByRole('button', { name: 'Make questions' }).click();
+  await page.getByRole('button', { name: /Start the quiz/ }).click();
+
+  const question = page.getByTestId('quiz-question');
+  await expect(question.locator('.question .katex')).toHaveCount(1); // drawn, not shown as source
+  // What's drawn; the LaTeX source stays only in KaTeX's hidden MathML, for screen readers
+  await expect(question.locator('.question .katex-html')).toBeVisible();
+  expect(await question.locator('.question').innerText()).not.toContain(String.raw`\frac`);
+  await expect(question.getByRole('group', { name: 'Answers' }).locator('.katex')).toHaveCount(3);
+  await expect(question.getByRole('group', { name: 'Answers' })).toContainText('It costs $5');
+  await question.getByRole('group', { name: 'Answers' }).getByRole('button').first().click();
+  await expect(page.getByTestId('quiz-feedback').locator('.katex-display')).toHaveCount(1); // \[ \] on its own line
+  // KaTeX's fonts load, from our own site; nothing broke the CSP
+  await expect.poll(() => fonts.length).toBeGreaterThan(0);
+  expect(fonts.every((f) => f.startsWith('200 /assets/'))).toBe(true);
+  expect(offSite).toEqual([]);
+  expect(await problems()).toEqual([]);
+});

@@ -47,6 +47,9 @@ const pdfjsAssets = (): Plugin => ({
 
 export default defineConfig({
   build: {
+    // Fonts are never inlined as data: URLs (Vite inlines small files): the CSP allows fonts from our
+    // own site only (font-src 'self'), so KaTeX's small fonts would be blocked. Other small files: Vite's default.
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/i.test(file) ? false : undefined),
     rollupOptions: {
       // The app, and a page that shows the slide viewer on its own (src/viewer/demo.tsx) until the
       // lecture screens use it (#26); the browser tests drive it.
