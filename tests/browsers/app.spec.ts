@@ -65,14 +65,16 @@ test('opens with no connection once it has been visited', async ({ page, context
   expect(errors).toEqual([]);
 });
 
-test('the service worker leaves /ai/ to the network, so Cloudflare Access can ask you to sign in', async ({ page, browserName }) => {
+test('the service worker leaves /ai/ and Cloudflare’s /cdn-cgi/ to the network, so Access can sign you in', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'service workers are only driven reliably in Chromium by Playwright');
   await page.goto('/');
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
   // The test server has no helper behind /ai/, so the network answers 404; the app would answer 200
-  const ai = await page.goto('/ai/whoami');
-  expect(ai?.status()).toBe(404);
-  expect(ai?.fromServiceWorker()).toBe(false);
+  for (const path of ['/ai/whoami', '/ai', '/cdn-cgi/access/authorized?nonce=x']) {
+    const res = await page.goto(path);
+    expect(res?.status(), path).toBe(404);
+    expect(res?.fromServiceWorker(), path).toBe(false);
+  }
   // Every other address still gets the app from the service worker, even one it has never seen
   const other = await page.goto('/some/page');
   expect(other?.fromServiceWorker()).toBe(true);
