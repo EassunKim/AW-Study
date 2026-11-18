@@ -4,7 +4,7 @@
 import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-import { APP_DESCRIPTION, APP_NAME } from './src/brand';
+import { APP_DESCRIPTION, APP_NAME } from './src/brand.ts';
 
 // Fills %APP_NAME% and %APP_DESCRIPTION% in index.html from src/brand.ts
 const brandHtml = (): Plugin => ({

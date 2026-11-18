@@ -163,7 +163,7 @@ Everything is encrypted on the device with a key only the user holds, so our ser
 
 **Storage on the device:**
 
-- The collection is a SQLite database (WebAssembly build) in the browser's private file storage (OPFS), with its contents encrypted.
+- The collection lives in IndexedDB, the browser's built-in database, with each record's contents encrypted (milestone 3). SQLite on OPFS was tried first and dropped on Nov 18: Playwright's WebKit has no working OPFS, so it could never be tested for iPhones (details in `PROGRESS.md`).
 - The app asks the browser to keep its storage permanently (`navigator.storage.persist()`) and asks to be installed to the Home Screen, where Safari is much less likely to clear it.
 - Backups: on Chrome and Edge on a computer, the app automatically writes an encrypted backup into a folder the user picks (e.g. in OneDrive). Elsewhere it reminds the user to save one (on iPhone, to Files). Restore takes the same file.
 
@@ -192,7 +192,7 @@ A static web app, installable as a PWA, that does all its work in the browser; t
 flowchart LR
     subgraph device["Your device: the installed app"]
         app["App code<br/>Reviews, FSRS, slide reader; works offline"]
-        storage["Encrypted storage (OPFS)<br/>SQLite: decks, cards, reviews, slides"]
+        storage["Encrypted storage (IndexedDB)<br/>decks, notes, cards, reviews, slides"]
         key["Key unlock<br/>Passkey (Face ID, Hello) or passphrase"]
     end
     site["Static site<br/>Serves the app's files only"]
@@ -209,7 +209,7 @@ flowchart LR
     class sync,other v2
 ```
 
-Dashed boxes come with sync in v2. The page and its service worker are cached on the device, so the app opens and works offline. The stack is TypeScript, React and Vite, and everything runs in the browser: `ts-fsrs`, SQLite in WebAssembly, PDF.js and WebCrypto.
+Dashed boxes come with sync in v2. The page and its service worker are cached on the device, so the app opens and works offline. The stack is TypeScript, React and Vite, and everything runs in the browser: `ts-fsrs`, IndexedDB (through the small `idb` library), PDF.js and WebCrypto.
 
 **Main data (all on the device):**
 
@@ -219,7 +219,8 @@ Dashed boxes come with sync in v2. The page and its service worker are cached on
 | decks | Name, optional exam date |
 | lectures | Original file, title, slide count, deck |
 | slides | Lecture, page number, text, notes, rendered image |
-| cards | Deck, type, front/back, source slide, FSRS state, due date |
+| notes | What the user writes: deck, kind (basic or cloze), front, back |
+| cards | What gets reviewed, one or more per note: note, deck, cloze number, new-card order, suspended, FSRS state (incl. due date) |
 | drafts | AI-made cards waiting for approval, per slide |
 | reviews | Card, grade, seconds taken, time, device; never edited, only added |
 | changes | Every change with its device id and time: the log that v2 syncs |
@@ -232,7 +233,7 @@ The app is a static site, so hosting holds nothing private. Nathan's home server
 
 - **Deploy form:** Vite builds the site, so GitHub Actions publishes it as a small image that serves the built files with the headers below, deployed by digest with a health check and rollback (as the chess site is).
 - **Address:** a subdomain such as study.pacificfish.ca, through the existing Cloudflare Tunnel. v1 needs no sign-in to protect data; keeping the site behind Cloudflare Access is a preference.
-- **Headers:** a strict Content-Security-Policy, `no-transform` (so Cloudflare injects nothing), and no-cache on the page so an update reaches everyone at once. SQLite's OPFS storage may also need cross-origin isolation headers, depending on which of its modes we use.
+- **Headers:** a strict Content-Security-Policy, `no-transform` (so Cloudflare injects nothing), and no-cache on the page so an update reaches everyone at once.
 - **Sync server (v2):** a small service that stores and returns encrypted blobs per user, with a size limit per user and a sign-in. It holds no keys and can't read anything.
 - **No secrets on the server:** each user's AI key stays on their own device.
 
@@ -272,7 +273,7 @@ Tick each once Matt and Nathan agree, and write the answer under it (then copy i
 
     Decided Nov 17: TypeScript, React and Vite. Vitest tests the logic, Playwright tests real browsers at phone and desktop sizes. GitHub Actions builds the site and it ships as a small image, like the chess site.
 - [ ] **AI options:** recommended in the AI section: own key with Claude first, Ollama second. Confirm, and agree a small budget for running the test set.
-- [ ] **Encryption at rest:** encrypt the whole SQLite file, or field by field with slide images as separate encrypted files? Decide when building milestone 3.
+- [ ] **Encryption at rest:** encrypt each IndexedDB record's contents, leaving only what the indexes need readable (ids, which deck or note it belongs to, review times), with slide images as separate encrypted blobs? Decide when building milestone 3.
 - [ ] **Slides in sync (v2):** sync slides too, or only cards and reviews, with slides staying on the device that imported them?
 - [ ] **Sync sign-in (v2):** Cloudflare Access for us two, or simple accounts so classmates can join?
 - [ ] **Area owners:** who takes which part of the milestones?

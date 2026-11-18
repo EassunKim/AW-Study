@@ -12,7 +12,7 @@ Milestone 2, **Study by hand**, is split into three tasks. Each has a GitHub iss
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
 | Scheduler and cloze: FSRS, the daily queue, cloze parsing | #5 | Matt's Claude | `src/lib/scheduler.ts`, `src/lib/cloze.ts` + tests | Ready to start once the kickoff PR is merged |
-| Data layer: SQLite in a worker, schema, change log, `StudyStore` | #6 | Nathan's Claude | `src/db/` | Starting after the kickoff PR |
+| Data layer: IndexedDB, schema, change log, `StudyStore` | #6 | Nathan's Claude | `src/db/` | PR #9: store done and tested; waits for #5 to test notes in browsers |
 | Screens: decks, card editor, review | #7 | Whoever is free after #5 and #6 | `src/ui/`, `src/App.tsx` | Waiting for #5 and #6 |
 
 The contract all three code against: `src/types/study.ts`, plus the signatures in the
@@ -50,9 +50,16 @@ the "Test and publish" run on `main` to finish, then press Update.
   message each other directly (different accounts and machines).
 - **Nov 18:** Notes and cards are separate, as in Anki: a note is what you write, a card is what
   you review. A basic note makes one card, a cloze note one per cloze number ("siblings").
+- **Nov 18 (replaces the SQLite decision below):** Storage is **IndexedDB** through `idb` (ISC,
+  ~1 KB, no dependencies); tests use `fake-indexeddb` (Apache-2.0). The #6 spike showed SQLite on
+  OPFS working in Chromium, but **Playwright's WebKit has no working OPFS at all**
+  (`navigator.storage.getDirectory()` fails with "UnknownError", on Windows and on Linux in CI,
+  with a throwaway or a saved profile), so its iPhone behaviour could never be tested. IndexedDB
+  works in every engine, needs no worker or 860 KB WebAssembly download, and suits per-record
+  encryption in milestone 3. `@sqlite.org/sqlite-wasm` is removed.
 - **Nov 18:** FSRS through **ts-fsrs 6** (MIT). Storage: **SQLite** (`@sqlite.org/sqlite-wasm`,
   Apache-2.0) in a Web Worker on OPFS (`opfs-sahpool`). To be confirmed by the #6 spike in WebKit;
-  IndexedDB is the fallback.
+  IndexedDB is the fallback. *(Storage part replaced, see above.)*
 - **Nov 17:** Licence: proprietary, all rights reserved (Matt, #4).
 - **Nov 17:** Name: **Honed** (working name), only in `src/brand.ts`. The repo, package and image
   stay `aw-study`.
@@ -63,6 +70,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** #6 data layer (PR #9): `src/db/schema.ts` (IndexedDB, migration step 1),
+  `src/db/store.ts` (`StudyStore`: decks, notes and their cards, suspend, study queue, answers,
+  change log), 18 Vitest tests (each key rule proved to fail without it) and browser tests in all
+  three engines (persistence across reload, offline). SQLite tried and dropped (see Decisions).
+  The store is at `globalThis.__honedStore` (a promise) until the screens (#7) use it.
+  (Nathan's Claude)
 - **Nov 18:** Repo moved to NandMinc (Matt). References updated; the server switches to
   `ghcr.io/nandminc/aw-study` after the first publish from the new home. (Nathan's Claude)
 - **Nov 18:** Kickoff for milestone 2: shared types, scheduler and cloze stubs, ts-fsrs and
@@ -74,6 +87,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **Playwright's WebKit has no OPFS** (the browser's private file system): anything built on it
+  can't be tested for iPhones here. Real Safari has it; our tests can't show it.
+- **IndexedDB transactions commit as soon as nothing is pending.** Inside one, await only
+  IndexedDB requests; do other async work (fetch, crypto.subtle, timers) before opening it.
+- **Aborting an IndexedDB transaction rejects `tx.done`**: unless something catches that, the
+  browser logs an unhandled rejection (which fails our "no errors" tests). Use `abort()` in
+  `src/db/store.ts`.
 - The image name comes from the repo's owner (`ghcr.io/${GITHUB_REPOSITORY,,}` in the workflow).
   Moving or renaming the repo moves the image, and the home server keeps deploying the old name
   until Nathan switches its compose file and `apps.json`. Tell Nathan before any such move.
