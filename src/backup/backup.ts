@@ -2,7 +2,7 @@
 // opening one unlocks its keyring, then decrypts every record once to prove the file is whole,
 // before anything on this device is touched.
 import type { SealedSnapshot, StudyStore } from '../db/store';
-import { decryptRecord, recordAad } from '../lib/crypto';
+import { decryptBytes, recordAad } from '../lib/crypto';
 import type { EncryptedRecord } from '../types/crypto';
 import { BackupError, encodeBackup, type Backup } from './format';
 
@@ -22,6 +22,11 @@ export async function makeBackup(store: BackupStore, now: Date): Promise<{ text:
   return { text: encodeBackup({ createdAt: now.toISOString(), snapshot }), upTo };
 }
 
+/** Stores left out of a backup's summary (they aren't things a person counts). */
+const HIDDEN_FROM_COUNTS = new Set(['changes', 'deckFiles', 'deckPages']);
+/** Store names in people's words, for describeCounts. */
+const COUNT_NAMES: Record<string, string> = { courses: 'classes', slideDecks: 'slide decks' };
+
 /**
  * Checks that `dataKey` opens every record in the backup (each with its own additional data, so a
  * record moved or swapped fails too). Throws BackupError 'damaged' if one doesn't.
@@ -31,12 +36,14 @@ export async function openBackup(backup: Backup, dataKey: CryptoKey): Promise<Ba
   for (const [name, rows] of Object.entries(backup.snapshot.stores)) {
     for (const row of rows as { id: string; enc: EncryptedRecord }[]) {
       try {
-        await decryptRecord(dataKey, recordAad(name, row.id), row.enc);
+        // Only that it decrypts (authentic, in its place): PDFs (deckFiles) are raw bytes, not JSON
+        await decryptBytes(dataKey, recordAad(name, row.id), row.enc);
       } catch {
         throw new BackupError('damaged', 'That backup is damaged: part of it won’t decrypt.');
       }
     }
-    if (name !== 'changes') counts[name] = rows.length;
+    // What a person would count: no change log, no PDF/page-text stores (they mirror the decks), no zeros
+    if (!HIDDEN_FROM_COUNTS.has(name) && rows.length > 0) counts[COUNT_NAMES[name] ?? name] = rows.length;
   }
   return { createdAt: backup.createdAt, counts };
 }

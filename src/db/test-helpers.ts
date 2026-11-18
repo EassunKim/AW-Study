@@ -25,3 +25,17 @@ export function containsText(value: unknown, needle: string): boolean {
   if (value && typeof value === 'object') return Object.values(value).some((v) => containsText(v, needle));
   return false;
 }
+
+/**
+ * Bytes that pass the store's PDF check ("%PDF-" first), with `text` inside and random padding up
+ * to `size` bytes. Not a renderable PDF: for storage tests only (the viewer's tests use real ones).
+ */
+export function fakePdf(text = 'slides', size = 1_000): Uint8Array {
+  const head = new TextEncoder().encode(`%PDF-1.7\n% ${text}\n`);
+  const data = new Uint8Array(Math.max(size, head.length));
+  data.set(head);
+  for (let i = head.length; i < data.length; i += 65_536) {
+    globalThis.crypto.getRandomValues(data.subarray(i, Math.min(i + 65_536, data.length)));
+  }
+  return data;
+}

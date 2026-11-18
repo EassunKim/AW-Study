@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openHonedDb, RECORD_STORES } from '../db/schema';
 import { openStudyStore, StoreError, type StudyStore } from '../db/store';
-import { containsText, newDataKey, TEST_PASSPHRASE, testKeyring } from '../db/test-helpers';
+import { containsText, fakePdf, newDataKey, TEST_PASSPHRASE, testKeyring } from '../db/test-helpers';
 import { unlock } from '../lib/crypto';
 import { describeCounts, makeBackup, openBackup, restoreBackup } from './backup';
 import { BackupError, decodeBackup, encodeBackup, fromBase64Url, toBase64Url } from './format';
@@ -54,6 +54,28 @@ async function raw(name: string) {
 const passphrase = { method: 'passphrase', passphrase: TEST_PASSPHRASE } as const;
 
 describe('making a backup', () => {
+  it('carries classes, slide decks (with their PDFs), lectures and sections, and names them in its summary', async () => {
+    const from = await open();
+    await setUp(from);
+    const course = await from.createCourse({ name: `Chem ${MARKER}`, meetings: [], termStart: null, termEnd: null });
+    const pdf = fakePdf(MARKER, 50_000);
+    const pageTexts = ['one', `two ${MARKER}`];
+    const deck = await from.addSlideDeck({ courseId: course.id, title: '', fileName: 'Week 1.pdf', data: pdf, pageTexts });
+    await from.recordLecture({ courseId: course.id, date: '2026-11-18', minutes: 50, sections: [{ deckId: deck.id, firstPage: 1, lastPage: 2 }] });
+    const { text } = await makeBackup(from, T0);
+    expect(text).not.toContain(MARKER);
+
+    const to = await open();
+    const backup = decodeBackup(text);
+    const key = await unlock(backup.snapshot.keyring, passphrase);
+    const summary = await openBackup(backup, key); // a PDF is raw bytes: this must not call it damaged
+    expect(summary.counts).toEqual({ classes: 1, 'slide decks': 1, lectures: 1, sections: 1 });
+    expect(describeCounts(summary.counts)).toBe('1 class, 1 slide deck, 1 lecture, 1 section');
+    await restoreBackup(to, backup.snapshot, key);
+    expect(await to.getSlideDeckFile(deck.id)).toEqual(pdf);
+    expect(await to.getSlideDeckPages(deck.id)).toEqual(pageTexts);
+  });
+
   it('round trip: back up, restore on a fresh device, and every record is the same', async () => {
     const fromName = freshName();
     const from = await open(fromName);
