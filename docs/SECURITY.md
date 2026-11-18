@@ -79,6 +79,22 @@ cards are due and when reviews happened, but not one word of them, nor how well 
 remembered. (#16 may move a field from "readable" to "encrypted" if no index needs it; it must not
 move one the other way without changing this table first.)
 
+## How the store applies it (#16, `src/db/store.ts`)
+
+- **Three states:** `'new'` (no keyring yet: records are plain, exactly as in milestone 2),
+  `'locked'` (set up, key not given: everything refuses except reading the keyring and unlocking)
+  and `'unlocked'` (every record written is sealed). The setup screen (#17) gates the app, so in
+  practice nothing is written in `'new'` once it exists.
+- **Setting up** saves the keyring, an encrypted check value (so `unlock` can tell a wrong key at
+  once) and a "migration running" flag, then seals every plain record (decks, notes, cards,
+  reviews and the change log), in batches, and clears the flag. If the page closes half-way, the
+  store opens `'locked'` and the next `unlock` finishes the job.
+- **The keyring always keeps** at least one passphrase or passkey (to unlock) and at least one
+  recovery key; the store refuses changes that would break that. Keyring changes never rewrite a
+  record.
+- **Schema step 2** bumps the database version, so a milestone 2 tab still open elsewhere can't
+  read sealed records as plain or write plain ones among them.
+
 ## Recovery key format
 
 - 16 random bytes (128 bits), plus a 4-byte check (the first 4 bytes of the secret's SHA-256):
