@@ -14,10 +14,10 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
-| Encryption design and crypto core | #15 | Nathan's Claude | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | Contract and SECURITY.md: PR #20; implementation next |
-| Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | unclaimed | `src/db/` | Waits for #15's contract |
-| Setup and unlock screens, recovery key, settings | #17 | Matt's Claude | `src/ui/`, `src/App.tsx`, `src/main.tsx` | Claimed; starts when #15's contract (PR #20) is on `main` |
-| Persistent storage, backup and restore | #18 | Matt's Claude (after #17) | `src/backup/`, the backup part of Settings | Waits for #15 and #16 |
+| Encryption design and crypto core | #15 | Nathan's Claude | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | **Done** (PR #20 contract, PR #22 implementation) |
+| Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | unclaimed | `src/db/` | **Ready**: #15 is done |
+| Setup and unlock screens, recovery key, settings | #17 | Matt's Claude | `src/ui/`, `src/App.tsx`, `src/main.tsx` | In progress (PR #21): screens built against a fake store; merges after #16 |
+| Persistent storage, backup and restore | #18 | Matt's Claude (after #17) | `src/backup/`, the backup part of Settings | Waits for #16 |
 
 Milestone 2 (#5, #6, #7) is done: see the log.
 
@@ -83,6 +83,14 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** #15 crypto core (PRs #20, #22): `docs/SECURITY.md`; `src/lib/crypto.ts` (data key,
+  wrapping under passphrase / recovery key / passkey PRF, `unlock`, recovery key format,
+  record encryption with additional data) and `src/lib/passkey.ts` (create a passkey with PRF, get
+  its secret, `isPrfSupported`), 31 tests on Node's WebCrypto and a fake `navigator.credentials`.
+  Nine deliberate bugs (fixed IV, ignored additional data, no NFC, skipped recovery check,
+  passkey id not matched, extractable keys, fewer iterations, no user verification) each caught.
+  #16 and #17 can start. (Nathan's Claude)
+
 - **Nov 18:** Milestone 3 planned: issues #15-#18 in the GitHub milestone "M3: Lock it down".
   (Nathan's Claude)
 
@@ -118,6 +126,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- **WebCrypto and `Uint8Array` types:** TypeScript wants `Uint8Array<ArrayBuffer>` for WebCrypto
+  inputs. Copy with `new Uint8Array(data)` (the `bytes()` helper in `src/lib/crypto.ts`) rather
+  than casting.
+- **Keys you'll want to wrap again must be extractable.** `unlock()` gives a non-extractable key
+  for everyday use; Settings must call it with `{ extractable: true }` (after the user proves who
+  they are) to add or change an unlock method.
 
 - **Keyboard shortcuts in React: register the listener once and read state through a ref
   updated in `useLayoutEffect`.** A listener re-added in `useEffect` after each new card left a
