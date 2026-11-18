@@ -4,7 +4,7 @@ Nov 17, 2026 · Nathan, with Claude. Exported from the shared design doc; edit h
 
 ## Summary
 
-AW-Study is a spaced-repetition app for lecture content that keeps each user's data on their own devices. You give it a daily time budget (say 60 minutes); it shows you new material and reviews at the right intervals, and never lets the review pile grow past that budget. Lecture slides often aren't meant to be shared, so slides and cards are stored encrypted on the device, and anything that syncs between devices is encrypted before it leaves. Cards come from slides (AI drafts you approve) or are written by hand, and reviewing should feel rewarding without rewarding fake progress.
+Honed (working name; the repo is AW-Study) is a spaced-repetition app for lecture content that keeps each user's data on their own devices. You give it a daily time budget (say 60 minutes); it shows you new material and reviews at the right intervals, and never lets the review pile grow past that budget. Lecture slides often aren't meant to be shared, so slides and cards are stored encrypted on the device, and anything that syncs between devices is encrypted before it leaves. Cards come from slides (AI drafts you approve) or are written by hand, and reviewing should feel rewarding without rewarding fake progress.
 
 Goals for the first version:
 
@@ -278,4 +278,6 @@ Tick each once Matt and Nathan agree, and write the answer under it (then copy i
 - [ ] **Area owners:** who takes which part of the milestones?
 - [ ] **Subdomain name:** study.pacificfish.ca, or something else?
 - [ ] **Card types beyond Q/A and fill-in-the-blank:** image occlusion (hide part of a diagram)? Worth it in the first version?
-- [ ] **App name:** keep AW-Study?
+- [x] **App name:** keep AW-Study?
+
+    Decided Nov 17: **Honed**, as a working name that may change ("academic weapon" was the idea; "weapon" trips filters). It lives only in `src/brand.ts`; the repo, package and image stay `aw-study`.

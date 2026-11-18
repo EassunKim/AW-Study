@@ -1,4 +1,6 @@
-# AW-Study
+# Honed
+
+*(Working name; the repository stays AW-Study.)*
 
 Spaced repetition for lecture content. Set a daily time budget, turn lecture slides into cards
 (written by hand, or drafted by AI and approved by you), and review them at the right moments with

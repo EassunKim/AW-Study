@@ -1,4 +1,4 @@
-# AW-Study
+# Honed (repo: AW-Study)
 
 Spaced repetition for lecture content, built by Matt and Nathan, each working with Claude Code on
 their own PC. This file is shared: both Claudes follow it. Keep personal notes in your own Claude
@@ -27,6 +27,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 
 ## Layout
 
+- `src/brand.ts`: the app's name (**Honed**, a working name). Every user-visible name comes from
+  here: never type the name anywhere else. The repo, npm package and image stay `aw-study`.
 - `src/`: the app. Pure logic in `src/lib/` with a `*.test.ts` beside each file.
 - `server/`: the production server (Node's own modules only): serves `dist/`, `/healthz`, and every
   security header (`server/headers.mjs`).
