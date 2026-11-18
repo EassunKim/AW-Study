@@ -151,7 +151,7 @@ export const JOBS = {
         [
           `Write ${input.count} multiple-choice questions that test understanding of the slides in DATA.pages (each has a slide number "page" and its "text").`,
           'Each question has exactly 4 different options and exactly one right answer. Wrong options must be plausible. Ask about the ideas, not about the wording of the slides.',
-          'Each question comes from one slide: give that slide\'s number as "page". Spread the questions over the slides that have something to learn; skip title or empty slides.',
+          'Each question comes from one slide: give that slide\'s number as "page". Spread the questions over the slides that have something to learn, giving more to slides with more to learn. Never ask about slides that only organise the lecture: title, agenda or contents, section dividers, "thank you", "questions?", references or credits; put those questions on the other slides instead.',
           'Don\'t repeat or closely rephrase any question in DATA.avoid.',
           'Reply with: {"questions": [{"question": string, "options": [4 strings], "answer": index of the right option (0-3), "page": slide number, "explanation": one sentence on why it\'s right}]}',
         ].join('\n'),

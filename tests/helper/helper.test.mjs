@@ -471,3 +471,13 @@ describe('maths', () => {
     expect(body.questions[0].options[0]).toBe(String.raw`\(uv - \int v\,du\)`);
   });
 });
+
+describe('which slides get questions', () => {
+  it('the questions prompt says to skip title, contents, divider, thank-you and reference slides', async () => {
+    await start([reply({ questions: [goodQuestion()] })]);
+    await post('questions', { pages: SLIDES, count: 1 });
+    const prompt = calls()[0].stdin;
+    for (const kind of ['title', 'agenda or contents', 'section dividers', '"thank you"', 'references']) expect(prompt).toContain(kind);
+    expect(prompt).toContain('put those questions on the other slides instead');
+  });
+});

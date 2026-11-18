@@ -115,7 +115,7 @@ export function Start({
   const ai = useAi();
   const store = useStore();
   const slides = sectionSlides(setting.section, setting.pageTexts);
-  const target = bankTarget(slides.length);
+  const target = bankTarget(slides);
   const [progress, setProgress] = useState<BankProgress | null>(null);
   const [problem, setProblem] = useState<{ message: string; signIn: boolean } | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -149,7 +149,7 @@ export function Start({
       ) : (
         <p data-testid="bank-size">
           {questions.length === 0
-            ? `No questions yet. Honed’s AI makes about ${target} from the text of these ${slides.length} slides; it takes a minute or two, once.`
+            ? `No questions yet. Honed’s AI makes about ${target} from the text of these ${slides.length} ${slides.length === 1 ? 'page' : 'pages'} (more for pages with more text); it takes a minute or two, once.`
             : `${questions.length} question${questions.length === 1 ? '' : 's'} in this section’s bank.`}
         </p>
       )}
