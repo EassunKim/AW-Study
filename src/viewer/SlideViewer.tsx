@@ -1,12 +1,12 @@
 // The slide viewer (DESIGN, "The slide viewer"): one slide at a time, fitted to the screen, exactly
 // as the PDF draws it. Arrow keys, swipes, the buttons or the thumbnail strip move between slides;
 // pinch, the +/− buttons or the + and − keys zoom. The section's range is marked; the rest of the
-// deck stays reachable. A text layer (invisible, selectable text over the slide) is there for
-// highlights in milestone 7.
+// deck stays reachable. A text layer (invisible, selectable text over the slide) lets words be
+// selected; `overlay` draws on top of the slide (notes and highlights, #56: ./AnnotatedViewer.tsx).
 //
 // Only what's needed is drawn: the current slide at screen size, and thumbnails as they scroll
 // into view, so a 200-page deck stays quick.
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { RenderingCancelledException, TextLayer, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { openPdf } from './pdf';
 import './viewer.css';
@@ -29,6 +29,10 @@ export interface SlideViewerProps {
   range?: SlideRange;
   /** Called when the user moves to another slide. */
   onPageChange?: (page: number) => void;
+  /** Drawn over the current slide, in a box exactly its size (positions in % line up at any zoom). */
+  overlay?: (page: number) => ReactNode;
+  /** More controls at the end of the viewer's bar. */
+  barExtra?: ReactNode;
 }
 
 export const ZOOM_MAX = 4;
@@ -36,7 +40,7 @@ const ZOOM_STEP = 1.25;
 const SWIPE_PX = 50;
 const MAX_CANVAS_PIXELS = 16_000_000; // browsers refuse bigger canvases (iPhones especially)
 
-export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange }: SlideViewerProps) {
+export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange, overlay, barExtra }: SlideViewerProps) {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [page, setPage] = useState(wanted);
@@ -158,13 +162,14 @@ export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange }: Slid
             </button>
           )}
         </span>
+        {barExtra}
       </div>
 
       <div ref={stageRef} className={`sv-stage ${zoom > 1 ? 'zoomed' : ''}`} {...gestures} data-testid="slide-stage">
         {problem ? (
           <p className="error">{problem}</p>
         ) : (
-          doc && size.width > 0 && <Slide doc={doc} page={shown} width={size.width} height={size.height} zoom={zoom} onProblem={setProblem} />
+          doc && size.width > 0 && <Slide doc={doc} page={shown} width={size.width} height={size.height} zoom={zoom} onProblem={setProblem} overlay={overlay} />
         )}
       </div>
 
@@ -182,6 +187,7 @@ function Slide({
   height,
   zoom,
   onProblem,
+  overlay,
 }: {
   doc: PDFDocumentProxy;
   page: number;
@@ -189,6 +195,7 @@ function Slide({
   height: number;
   zoom: number;
   onProblem: (message: string) => void;
+  overlay?: (page: number) => ReactNode;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -236,6 +243,7 @@ function Slide({
     <div ref={boxRef} className="sv-page" data-testid="slide-page">
       <canvas ref={canvasRef} aria-label={`Slide ${page}`} role="img" />
       <div ref={textRef} className="textLayer" />
+      {overlay?.(page)}
     </div>
   );
 }
@@ -347,7 +355,7 @@ function useGestures({
   previous: () => void;
 }) {
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const start = useRef<{ x: number; y: number } | null>(null);
+  const start = useRef<{ x: number; y: number; onWords: boolean } | null>(null);
   const pinch = useRef<{ distance: number; zoom: number } | null>(null);
 
   const distance = () => {
@@ -358,7 +366,11 @@ function useGestures({
   return {
     onPointerDown(e: PointerEvent) {
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointers.current.size === 1) start.current = { x: e.clientX, y: e.clientY };
+      if (pointers.current.size === 1) {
+        // A mouse pressed on words selects them: that drag is never a swipe
+        const onWords = e.pointerType === 'mouse' && !!(e.target as Element).closest?.('.textLayer span');
+        start.current = { x: e.clientX, y: e.clientY, onWords };
+      }
       if (pointers.current.size === 2) {
         start.current = null; // a pinch, not a swipe
         pinch.current = { distance: distance(), zoom };
@@ -378,6 +390,7 @@ function useGestures({
       if (!from || pointers.current.size > 0) return;
       start.current = null;
       if (zoom > 1) return; // zoomed in, a drag moves around the slide
+      if (from.onWords || selectingText()) return; // a drag that selected words, not a swipe
       const dx = e.clientX - from.x;
       const dy = e.clientY - from.y;
       if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) {
@@ -394,6 +407,12 @@ function useGestures({
 }
 
 // --- Helpers ---
+
+/** Whether some words on the page are selected (a drag over the text layer selects, it doesn't swipe). */
+function selectingText(): boolean {
+  const selection = globalThis.getSelection?.();
+  return !!selection && !selection.isCollapsed && selection.toString().trim() !== '';
+}
 
 /** The element's content size, kept up to date. */
 function useElementSize(ref: RefObject<HTMLElement | null>) {

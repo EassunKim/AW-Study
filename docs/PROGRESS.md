@@ -36,7 +36,7 @@ slides" and "M6: AI helper and quizzes":
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 | Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
 | Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | **Done** (contract #48, storage and planner #49, screens #50) |
-| Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **In progress**: contract and storage (PR #57), then the viewer tools |
+| Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **In progress**: contract and storage (PR #57), viewer tools (PR #58) |
 
 ## Milestones
 
@@ -108,6 +108,16 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** Viewer tools (#56, PR #58): `src/viewer/AnnotatedViewer.tsx` over `SlideViewer` (which gained
+  an `overlay` and `barExtra`) and `src/ui/DeckSlides.tsx` (store + AI), on the Slides and Play screens.
+  A Notes panel (beside the slides; under them on phones) with Box, Pin a note and Ask about this slide;
+  selecting words offers four colours, Explain this and Ask about this; answers can be kept as notes.
+  Explain sends the selection (or a box's words) and the slide with its neighbours, nothing more. Traps
+  found by WebKit and Android: opening the panel resized the slide, whose redraw dropped a selection being
+  made (now the slide keeps its height on phones and the panel opens when the press ends), and a mouse
+  drag over words counted as a swipe. 9 of 10 deliberate bugs caught (the 10th is a doubled guard).
+  (Matt's Claude)
 
 - **Nov 18:** Notes and highlights, contract and storage (#56, PR #57): `src/types/annotation.ts` and
   `src/db/annotations.ts`, schema step 7 (store `annotations`, by course and by deck). An annotation
@@ -300,6 +310,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **Anything that resizes the slide redraws its text layer, which drops the user's selection.** Don't
+  change the viewer's size while words may be selected (the notes panel waits for the press to end).
+  Mouse drags that start on words are never swipes (`SlideViewer` gestures).
 - **PDF.js: use the legacy build** (`pdfjs-dist/legacy/build/pdf.mjs`, and its worker). The
   modern build of PDF.js 6 needs `Uint8Array.prototype.toHex` (Chrome 140, Safari 18.2, Node 25)
   and `Promise.try`, so it fails in Node 24 and on older iPhones. In v6, `destroy()` is on the
