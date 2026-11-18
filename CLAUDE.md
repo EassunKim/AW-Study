@@ -66,6 +66,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - `src/types/study.ts`: the shared contract (decks, notes, cards, FSRS state, review log). Plain
   JSON types only; changes go in their own PR, announced in the task issues.
 - `src/lib/scheduler.ts` (the only file importing ts-fsrs), `src/lib/cloze.ts`: FSRS and cloze.
+- `src/lib/crypto.ts`, `src/lib/passkey.ts`, `src/types/crypto.ts`: encryption, exactly as
+  `docs/SECURITY.md` describes. Change SECURITY.md first, in its own PR, then the code.
 - `src/db/`: storage. `schema.ts` (IndexedDB stores and numbered migrations) and `store.ts` (the
   `StudyStore` the screens call; the only code that touches the database). Read the top of
   `store.ts` before changing it: inside an IndexedDB transaction, await only IndexedDB requests.
