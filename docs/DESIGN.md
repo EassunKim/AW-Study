@@ -116,6 +116,8 @@ The first gap after week one is 7 days. These numbers are a starting point, kept
 3. Fill today's minutes in that order. What doesn't fit moves to the next days, spread so no day goes over budget.
 4. Time estimates: a study item uses its planned minutes; a quiz is counted at about 40 seconds a question until Honed has measured your own pace.
 
+**How it's built (#47):** nothing the planner works out is stored. Each time, it reads the lectures, the study sessions done and the quiz attempts, and works out every section's state and today's list from them, so it stays right after an edit or a delete, and the rules can be retuned against the real history later. Exams pulling sections forward come with milestone 9.
+
 The day starts at 4 a.m. (`src/lib/studyDay.ts`), so late-night studying counts for the evening before. Missed days simply roll forward into the next days' plans; a proper *catch up* mode is a future idea.
 
 ## Study sessions and quizzes
@@ -285,6 +287,7 @@ Tick a question once Matt and Nathan agree, and write the answer under it.
 - [ ] **After-class prompts:** a real notification on your phone needs the server to send pushes (and to know your class times). For the prototype, is asking *when you next open the app* enough, with push later?
 - [ ] **Motivation:** the first design had a daily ring, streaks and combos. Keep those ideas for the checklist and Play (e.g. the ring fills as today's list gets done), or leave them for later with leaderboards?
 - [ ] **Default daily minutes:** 60? And should some classes get more of the time than others (e.g. a weight per class)?
+    - For now (Nov 18, #47): 60, changed in Settings. No weights per class yet.
 - [ ] **Tuning numbers:** the 80% point for the quiz, about 3 questions per slide, the score table and the day 1/3/7 first week are guesses. Fine to start with and adjust after a few weeks of use?
 - [x] **Anthropic's terms:** confirm that running Claude Code headless on the server for your own studying, each on your own subscription, is within them, before the helper goes live.
     - Nathan checked (Nov 18): allowed for each person's own use, on their own subscription, with the official Claude Code CLI, as long as nobody else can run Claude on that login (Access and the helper make sure of that). Headless `claude -p` runs draw on the plan's separate monthly credit for programmatic use, not the normal chat limits.

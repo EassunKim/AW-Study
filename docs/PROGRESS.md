@@ -35,6 +35,7 @@ slides" and "M6: AI helper and quizzes":
 | AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Done and live** (PR #33; server set up Nov 18, Matt's token still to add) |
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 | Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
+| Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | Contract in PR #48; storage, planner and screens next |
 
 ## Milestones
 
@@ -44,7 +45,7 @@ slides" and "M6: AI helper and quizzes":
 | 2 | Study by hand (flashcards, FSRS) | **Done**, then **superseded** by the Nov 18 redesign; **removed** (PR #37) |
 | 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | **In progress** (#15-#18) |
 | 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Done** (#24-#26); not yet tried on a real phone |
-| 5 | Planner and the daily checklist with Play | Not started |
+| 5 | Planner and the daily checklist with Play | **In progress** (#47) |
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
 | 7 | Viewer tools: highlights, notes, explain, ask | Not started |
 | 8 | First run (tutorial) and after-class prompts | Not started |
