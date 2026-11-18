@@ -8,7 +8,7 @@ blocks from the browser's WebCrypto, with standard parameters. No home-made cryp
 
 | Threat | Protected? | How |
 | --- | --- | --- |
-| Our server, or anyone who takes it over, reading your classes and slides | **Yes** | The server never receives them. In v2 it only stores ciphertext it has no key for. |
+| Our server, or anyone who takes it over, reading your classes and slides | **Yes**, at rest | The server stores none of them. The one exception is AI requests (below): a section's slide text passes through the AI helper on its way to Anthropic, and nothing is kept. In v2 the server only stores ciphertext it has no key for. |
 | A backup file (`.honed`) found in someone's cloud drive | **Yes** | Backups hold only ciphertext and wrapped keys (#18). |
 | Another person using the same computer account, or copying the browser's files | **Yes**, while Honed is locked | Records are encrypted at rest; the key is only ever in memory while unlocked. |
 | A lost phone or laptop | By the device | The device's own lock and disk encryption. Honed adds the points above. |
@@ -66,7 +66,7 @@ user secret ──┼── passkey ─────PRF+HKDF─▶ KEK ─┼─�
 ### What stays readable on disk
 
 Only what IndexedDB's indexes need, so lists and the planner work without decrypting everything.
-Milestone 4 (#24) adds the lecture stores:
+Milestone 4 (#24) added the lecture stores; #40 the question banks and quiz attempts:
 
 | Store | Readable | Encrypted |
 | --- | --- | --- |
@@ -77,6 +77,8 @@ Milestone 4 (#24) adds the lecture stores:
 | deckPages | id (the deck's) | the text of every page |
 | lectures | id, courseId, date | minutes, dates |
 | sections | id, courseId, lectureId, deckId, nextDue | page range, the rest of the schedule (budget, minutes studied, extra minutes), dates |
+| questions (#40) | id, courseId, sectionId | the slide number, question, options, answer, explanation, dates |
+| quizAttempts (#40) | id, courseId, sectionId | when, every answer, the score |
 | changes (log) | seq, entity, entityId, op, at | the record data (PDF bytes are not in the log) |
 | meta | device id, schema step, the keyring (already wrapped) | nothing else is secret |
 
@@ -84,9 +86,30 @@ Milestone 2's flashcard stores (decks, notes, cards, reviews) were removed in #2
 which also deletes their change-log rows).
 
 So someone with the browser's files could see *how many* classes, decks, lectures and sections
-exist, on which dates lectures and exams fall, and when sections are due, but not a word of the
-slides, the class names, notes or scores. (A field may move from "readable" to "encrypted" if no
+exist, how many questions and quiz attempts each section has, on which dates lectures and exams
+fall, and when sections are due, but not a word of the slides, the class names, the questions or
+the scores. (A field may move from "readable" to "encrypted" if no
 index needs it; it must not move the other way without changing this table first.)
+
+## AI requests (#27, #34, #40)
+
+AI is the one time data leaves the device. Everything else in this document is about data at rest.
+
+- **What is sent:** only an AI job's inputs (`src/ai/backend.ts`): to make a section's questions,
+  the text of its slides (never the PDF) and the questions already in its bank; later, a selection or
+  a question from the viewer, or a short answer to grade. Nothing is sent unless the user asks for that
+  job ("Make questions").
+- **Where to:** `/ai/` on our own site only (`connect-src 'self'`), over HTTPS. Cloudflare (its edge
+  and Access) and the tunnel carry it to the helper on Nathan's server (`helper/`), which sends it
+  to Anthropic through Claude Code, on the asking person's own subscription.
+- **Who can use it:** only people the Cloudflare Access application allows (Matt and Nathan), and the
+  helper checks the Access token itself as well.
+- **What is kept:** nothing on the way. The helper logs counts and times, never content. Each run has
+  a fresh home folder, deleted after, with Claude Code's session history off. Anthropic handles it under
+  that person's Claude terms. What comes back (the questions) is stored on the device, sealed like
+  every other record.
+- **No AI when quizzing:** a multiple-choice quiz is graded on the device from the stored answer, so
+  quizzes work offline and send nothing.
 
 ## How the store applies it (#16, `src/db/store.ts`)
 

@@ -32,8 +32,9 @@ slides" and "M6: AI helper and quizzes":
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | **Done** (contract PR #29, storage PR #30) |
 | PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
 | Class and lecture screens; remove the flashcard layer | #26 | Nathan's Claude | `src/ui/` (not #17's screens), routes, old flashcard files | **Done** (screens PR #36, removal PR #37) |
-| AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #33); Nathan sets up the server side (steps in the PR) |
+| AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Done and live** (PR #33; server set up Nov 18, Matt's token still to add) |
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
+| Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | Contract in PR #41; storage and screens next |
 
 ## Milestones
 
