@@ -65,7 +65,9 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - `src/types/study.ts`: the shared contract (decks, notes, cards, FSRS state, review log). Plain
   JSON types only; changes go in their own PR, announced in the task issues.
 - `src/lib/scheduler.ts` (the only file importing ts-fsrs), `src/lib/cloze.ts`: FSRS and cloze.
-- `src/db/`: storage (SQLite in a Web Worker on OPFS) and the `StudyStore` the screens call.
+- `src/db/`: storage. `schema.ts` (IndexedDB stores and numbered migrations) and `store.ts` (the
+  `StudyStore` the screens call; the only code that touches the database). Read the top of
+  `store.ts` before changing it: inside an IndexedDB transaction, await only IndexedDB requests.
 - `src/ui/`: the screens.
 - `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design.
 - `server/`: the production server (Node's own modules only): serves `dist/`, `/healthz`, and every
