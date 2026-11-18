@@ -4,7 +4,7 @@
 import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-import { APP_DESCRIPTION, APP_NAME } from './src/brand';
+import { APP_DESCRIPTION, APP_NAME } from './src/brand.ts';
 
 // Fills %APP_NAME% and %APP_DESCRIPTION% in index.html from src/brand.ts
 const brandHtml = (): Plugin => ({
@@ -45,10 +45,6 @@ export default defineConfig({
       },
     }),
   ],
-  // SQLite's WebAssembly build loads its .wasm file itself; Vite must not pre-bundle it
-  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
-  // The database worker is a module (it imports SQLite)
-  worker: { format: 'es' },
   test: {
     include: ['src/**/*.test.ts', 'tests/**/*.test.mjs'],
     environment: 'node',
