@@ -104,6 +104,47 @@ index needs it; it must not move the other way without changing this table first
 - **Schema step 2** bumps the database version, so a milestone 2 tab still open elsewhere can't
   read sealed records as plain or write plain ones among them.
 
+## Backups (#18, `src/backup/`)
+
+A backup is the database as stored: **no record is decrypted to make one**, so a `.honed` file
+holds nothing more readable than the browser's own files (the "What stays readable" table above).
+It can sit in OneDrive, iCloud Drive or Google Drive.
+
+```jsonc
+{
+  "format": "honed-backup", "v": 1,          // this file format; a newer v is refused ("update first")
+  "createdAt": "2026-11-18T17:30:00.000Z",
+  "schema": 2,                                 // the database's schema step when it was made
+  "keyring":  { "v": 1, "entries": [...] },    // wrapped data keys only, as in meta
+  "keycheck": { "v": 1, "iv": ..., "ct": ... },// as in meta: tells a wrong key at once
+  "stores":   { "<store>": [ <row as stored, with its sealed `enc`> ], ... }
+}
+```
+
+- **Every record store** (`RECORD_STORES` in `src/db/schema.ts`) is copied without naming them,
+  so new stores join backups automatically. Not included: `deviceId` (each device keeps its own)
+  and the `migration` flag (a backup is only made once setup's sealing has finished).
+- **Bytes** (IVs, ciphertexts, wrapped keys, salts, credential ids) are written as
+  `{"$bytes": "<base64url, no padding>"}` and read back as `Uint8Array`.
+- **Making one** needs the store unlocked, and refuses if any record isn't sealed.
+- **Restoring** never touches this device's data until the very end:
+  1. The file's shape is checked (format, version, keyring, every row has an id and a sealed `enc`).
+  2. The user unlocks the **backup's** keyring with the passphrase, passkey or recovery key they
+     had when it was made.
+  3. Every record is decrypted once with its own additional data (`honed:v1:<store>:<id>`), so a
+     changed, swapped or truncated record fails here. The user sees what's inside and confirms.
+  4. The store checks the key against the backup's key check, refuses plain records and newer
+     schema steps, then replaces every record store, the keyring and the key check **in one
+     IndexedDB transaction**: all or nothing. Afterwards the device unlocks with the backup's ways
+     of unlocking.
+- A backup from an **older schema step** restores the stores that still exist. A future schema
+  step that changes record shapes must also handle older backups (or refuse them clearly).
+- **Automatic folder backups** (Chrome and Edge on a computer) keep their folder handle and the
+  last backup's time in a separate small database, `honed-backup-state`: nothing private, and a
+  restore doesn't overwrite it.
+- **Persistent storage:** `navigator.storage.persist()` is asked right after setup and after a
+  restore; Settings shows the answer.
+
 ## Recovery key format
 
 - 16 random bytes (128 bits), plus a 4-byte check (the first 4 bytes of the secret's SHA-256):
@@ -130,4 +171,4 @@ as PRF).
 | `src/lib/passkey.ts` | WebAuthn: create a passkey with PRF, get its PRF output, feature detection |
 | `src/db/` (#16) | Uses them to encrypt records and keep the keyring |
 | `src/ui/` (#17) | Setup, unlock, recovery, Settings |
-| `src/backup/` (#18) | The `.honed` file format (documented here when written) |
+| `src/backup/` (#18) | The `.honed` file format, making and restoring backups (see "Backups") |

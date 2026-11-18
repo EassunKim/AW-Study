@@ -7,6 +7,7 @@ export type Route =
   | { name: 'decks' }
   | { name: 'deck'; deckId: string }
   | { name: 'review'; deckId: string }
+  | { name: 'settings' }
   | { name: 'not-found' };
 
 const ID = '([A-Za-z0-9-]{1,64})';
@@ -14,6 +15,7 @@ const PATTERNS: [RegExp, (m: RegExpMatchArray) => Route][] = [
   [/^#?\/?$/, () => ({ name: 'decks' })],
   [new RegExp(`^#/deck/${ID}$`), (m) => ({ name: 'deck', deckId: m[1]! })],
   [new RegExp(`^#/review/${ID}$`), (m) => ({ name: 'review', deckId: m[1]! })],
+  [/^#\/settings$/, () => ({ name: 'settings' })],
 ];
 
 export function parseRoute(hash: string): Route {
@@ -32,6 +34,8 @@ export function href(route: Exclude<Route, { name: 'not-found' }>): string {
       return `#/deck/${route.deckId}`;
     case 'review':
       return `#/review/${route.deckId}`;
+    case 'settings':
+      return '#/settings';
   }
 }
 

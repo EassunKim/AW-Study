@@ -16,8 +16,8 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 | --- | --- | --- | --- | --- |
 | Encryption design and crypto core | #15 | Nathan's Claude | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | **Done** (PR #20 contract, PR #22 implementation) |
 | Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | Nathan's Claude | `src/db/` | **Done** (PR #23) |
-| Setup and unlock screens, recovery key, settings | #17 | unclaimed | `src/ui/`, `src/App.tsx`, `src/main.tsx` | Waits for #15's contract |
-| Persistent storage, backup and restore | #18 | unclaimed | `src/backup/`, the backup part of Settings | Waits for #15 and #16 |
+| Setup and unlock screens, recovery key, settings | #17 | Matt's Claude | `src/ui/`, `src/App.tsx`, `src/main.tsx` | **Done** (PR #21). Passkeys still to try by hand on an iPhone after deploy |
+| Persistent storage, backup and restore | #18 | Matt's Claude | `src/backup/`, the backup part of Settings, backup methods in `src/db/store.ts` | **Done** (PR #31) |
 
 Milestone 2 (#5, #6, #7) is done: see the log.
 
@@ -116,6 +116,19 @@ the "Test and publish" run on `main` to finish, then press Update.
   violations, every request same-site, a 150-slide deck in under 5 s with under 40 thumbnails
   drawn). 12 deliberate bugs each caught. (Matt's Claude)
 
+- **Nov 18:** #18 backups (PR #31): `.honed` backup files (the database as stored, no record
+  decrypted; format in SECURITY.md "Backups"), download or share from Settings, automatic backups
+  to a folder on Chrome/Edge desktops (hourly at most, newest 5 kept), a reminder after a week,
+  restore on the setup screen ("Moving from another device?") or in Settings, persistent storage
+  asked after setup and shown in Settings. The store gains `exportSealed`, `replaceFromBackup`
+  (one transaction, all or nothing) and `latestChange`. Backups copy every store in
+  `RECORD_STORES`, so #24's stores join automatically. 23 unit tests and browser tests on all
+  three engines (download, restore on a new device, replace in Settings, wrong passphrase, a
+  non-backup file); 18 deliberate bugs each caught. Folder backups can't be driven by Playwright
+  (no way to answer the folder picker): unit-tested with a fake folder. (Matt's Claude)
+
+- **Nov 18:** #17 screens (PR #21): first-run setup (passkey or passphrase, the recovery key shown once and typed back), the unlock screen (passkey, passphrase, recovery key, then a new passphrase), Settings (change passphrase, add/remove passkeys, new recovery key, Lock now), on the encrypted store from #16. Browser tests on all three engines, including an end-to-end scan of the real IndexedDB for plaintext; passkeys tested in Chromium with a virtual authenticator with PRF. 15 rules proved to fail without them. (Matt's Claude)
+
 - **Nov 18:** Redesign written into `docs/DESIGN.md`, `CLAUDE.md` (product, schedule and AI rules)
   and this file; milestones 4-9 replace the old 4-7; issues #24-#27. (Nathan's Claude)
 
@@ -180,6 +193,7 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **A mutation check that breaks the type check proves nothing in browser tests:** `npm run build`
   fails, and the tests run against the old `dist/`. Check the build succeeded before trusting a
   "missed" or "caught".
+- WebAuthn (passkeys) refuses an IP-address origin: Playwright's passkey test opens `localhost`, not `127.0.0.1`. Chromium's virtual authenticator supports PRF (`hasPrf: true`); WebKit has none, so iPhone passkeys are tried by hand.
 
 - **Writing to the encrypted store: read, decrypt, compute, encrypt, then write** in a second
   transaction (never encrypt inside one). Wrap every write in `exclusive()` in
