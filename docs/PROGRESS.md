@@ -108,6 +108,14 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** Compare models (PR #51, Nathan's request): the helper takes an optional `model` on any
+  job, only one of `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5` (`MODELS` in `helper/app.mjs`;
+  anything else 400 before Claude Code runs), says which answered, and logs it (counts only). In the
+  app, a section's quiz page has **Compare models**: the same first slides to each model in turn, their
+  questions side by side with the time taken, nothing saved unless one model's are added to the bank.
+  `AiModel`/`AI_MODELS` and `MakeQuestionsRequest.model` in `src/ai/backend.ts`. 6 deliberate bugs caught.
+  (Nathan's Claude)
+
 - **Nov 18:** #47 screens (PR #50): **Today** on the home screen (what fits today's minutes, minutes
   done and planned, what's waiting beyond today, the daily minutes to change) and **Play** (`#/play`):
   each study item is the section's slides with a timer; at 80% of its time the quiz is offered, *I'm

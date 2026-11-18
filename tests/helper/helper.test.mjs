@@ -425,3 +425,29 @@ describe('configuration', () => {
     expect(loads).toBe(1);
   });
 });
+
+describe('choosing a model (to compare them)', () => {
+  it('runs the model a request names, from the allowed three, and says which answered', async () => {
+    await start([reply({ questions: [goodQuestion()] }), reply({ questions: [goodQuestion()] })]);
+    const haiku = await post('questions', { pages: SLIDES, count: 1, model: 'claude-haiku-5-5' });
+    expect(haiku.status).toBe(200);
+    expect((await haiku.json()).model).toBe('claude-haiku-5-5');
+    const usual = await post('questions', { pages: SLIDES, count: 1 });
+    expect((await usual.json()).model).toBeUndefined(); // none named: the helper's own (and the reply as before)
+    const argv = calls().map((c) => c.argv[c.argv.indexOf('--model') + 1]);
+    expect(argv).toEqual(['claude-haiku-5-5', 'claude-opus-5-5']);
+    expect(logs.map((l) => l.model)).toEqual(['claude-haiku-5-5', 'claude-opus-5-5']); // logged, with counts only
+  });
+
+  it('refuses any other model before running anything, and it uses none of the day', async () => {
+    await start([reply({ questions: [goodQuestion()] })]);
+    for (const model of ['claude-opus-4', 'opus', '--dangerously-skip-permissions', '', 42, null]) {
+      const response = await post('questions', { pages: SLIDES, count: 1, model });
+      expect(response.status, String(model)).toBe(400);
+      expect((await response.json()).error).toContain('model: one of claude-haiku-5-5, claude-sonnet-5-5, claude-opus-5-5');
+    }
+    expect(calls()).toEqual([]);
+    const ok = await post('questions', { pages: SLIDES, count: 1, model: 'claude-sonnet-5-5' });
+    expect(ok.status).toBe(200);
+  });
+});
