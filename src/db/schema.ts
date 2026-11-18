@@ -12,13 +12,14 @@
 //   else is in `enc`, AES-GCM encrypted with the data key. A record is sealed exactly when it has
 //   an `enc` field.
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction } from 'idb';
+import type { Annotation } from '../types/annotation';
 import type { EncryptedRecord } from '../types/crypto';
 import type { Course, Exam, Lecture, Section, SlideDeck } from '../types/lecture';
 import type { StudySession, StudySettings } from '../types/plan';
 import type { Question, QuizAttempt } from '../types/quiz';
 
 export const DB_NAME = 'honed';
-export const DB_VERSION = 6;
+export const DB_VERSION = 7;
 
 /**
  * One row of the change log: every write, in order, with the device that made it. v2's sync ships
@@ -29,10 +30,10 @@ export interface ChangeRecord {
   id: string;
   deviceId: string;
   at: string;
-  entity: 'course' | 'exam' | 'slideDeck' | 'lecture' | 'section' | 'question' | 'quizAttempt' | 'studySession' | 'settings';
+  entity: 'course' | 'exam' | 'slideDeck' | 'lecture' | 'section' | 'question' | 'quizAttempt' | 'studySession' | 'settings' | 'annotation';
   entityId: string;
   op: 'put' | 'delete';
-  data: Course | Exam | SlideDeck | Lecture | Section | Question | QuizAttempt | StudySession | (StudySettings & { id: string }) | null; // never PDF bytes
+  data: Course | Exam | SlideDeck | Lecture | Section | Question | QuizAttempt | StudySession | (StudySettings & { id: string }) | Annotation | null; // never PDF bytes
 }
 
 export interface SealedChange {
@@ -124,6 +125,15 @@ export interface SealedSettings {
   enc: EncryptedRecord;
 }
 
+// --- Annotations (#56) ---
+
+export interface SealedAnnotation {
+  id: string;
+  courseId: string;
+  deckId: string;
+  enc: EncryptedRecord; // the page is inside
+}
+
 export interface HonedSchema extends DBSchema {
   // deviceId (string), keyring (Keyring), keycheck (EncryptedRecord), migration ('running')
   meta: { key: string; value: { key: string; value: unknown } };
@@ -143,6 +153,7 @@ export interface HonedSchema extends DBSchema {
   quizAttempts: { key: string; value: QuizAttempt | SealedQuizAttempt; indexes: { byCourse: string; bySection: string } };
   studySessions: { key: string; value: StudySession | SealedStudySession; indexes: { byCourse: string; bySection: string } };
   settings: { key: string; value: (StudySettings & { id: string }) | SealedSettings };
+  annotations: { key: string; value: Annotation | SealedAnnotation; indexes: { byCourse: string; byDeck: string } };
 }
 
 export type HonedDb = IDBPDatabase<HonedSchema>;
@@ -158,7 +169,8 @@ export type RecordStore =
   | 'questions'
   | 'quizAttempts'
   | 'studySessions'
-  | 'settings';
+  | 'settings'
+  | 'annotations';
 /** Every store of records (everything but meta): what setUp seals and backups (#18) copy. */
 export const RECORD_STORES: RecordStore[] = [
   'changes',
@@ -173,6 +185,7 @@ export const RECORD_STORES: RecordStore[] = [
   'quizAttempts',
   'studySessions',
   'settings',
+  'annotations',
 ];
 
 /** Milestone 2's flashcard stores and change-log entities, dropped by step 4. */
@@ -242,6 +255,12 @@ export async function openHonedDb(name: string = DB_NAME): Promise<HonedDb> {
         sessions.createIndex('byCourse', 'courseId');
         sessions.createIndex('bySection', 'sectionId');
         db.createObjectStore('settings', { keyPath: 'id' });
+      }
+      // Step 7 (Nov 18, 2026, #56): notes and highlights on a deck's slides
+      if (oldVersion < 7) {
+        const annotations = db.createObjectStore('annotations', { keyPath: 'id' });
+        annotations.createIndex('byCourse', 'courseId');
+        annotations.createIndex('byDeck', 'deckId');
       }
     },
   });

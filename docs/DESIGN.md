@@ -164,6 +164,7 @@ Slides are shown exactly as the PDF draws them, with your notes and highlights o
 - **Area highlight:** drag a box over any part of a slide, for diagrams and images.
 - **Notes:** attach a note to a highlight, or pin one anywhere on a slide.
 - Positions are saved relative to the page, so they line up at any zoom level and screen size.
+- Stored per deck and page (`src/types/annotation.ts`, #56), not per section, so they show wherever that slide is open. They can be edited and deleted; deleting a deck or a class deletes them.
 
 **AI in the viewer**
 

@@ -216,7 +216,7 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
       exclusive(async () => {
         requireOpen();
         await getCourseOrThrow(id);
-        const [examIds, deckIds, lectureIds, sectionIds, questionIds, attemptIds, sessionIds] = await Promise.all([
+        const [examIds, deckIds, lectureIds, sectionIds, questionIds, attemptIds, sessionIds, annotationIds] = await Promise.all([
           db.getAllKeysFromIndex('exams', 'byCourse', id),
           db.getAllKeysFromIndex('slideDecks', 'byCourse', id),
           db.getAllKeysFromIndex('lectures', 'byCourse', id),
@@ -224,11 +224,13 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
           db.getAllKeysFromIndex('questions', 'byCourse', id),
           db.getAllKeysFromIndex('quizAttempts', 'byCourse', id),
           db.getAllKeysFromIndex('studySessions', 'byCourse', id),
+          db.getAllKeysFromIndex('annotations', 'byCourse', id),
         ]);
         const deletes = [
           ...questionIds.map((i) => ({ store: 'questions' as const, id: i })),
           ...attemptIds.map((i) => ({ store: 'quizAttempts' as const, id: i })),
           ...sessionIds.map((i) => ({ store: 'studySessions' as const, id: i })),
+          ...annotationIds.map((i) => ({ store: 'annotations' as const, id: i })),
           ...sectionIds.map((i) => ({ store: 'sections' as const, id: i })),
           ...lectureIds.map((i) => ({ store: 'lectures' as const, id: i })),
           ...examIds.map((i) => ({ store: 'exams' as const, id: i })),
@@ -243,6 +245,7 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
           ...questionIds.map((i) => change('question', 'delete', i, null)),
           ...attemptIds.map((i) => change('quizAttempt', 'delete', i, null)),
           ...sessionIds.map((i) => change('studySession', 'delete', i, null)),
+          ...annotationIds.map((i) => change('annotation', 'delete', i, null)),
           ...sectionIds.map((i) => change('section', 'delete', i, null)),
           ...lectureIds.map((i) => change('lecture', 'delete', i, null)),
           ...examIds.map((i) => change('exam', 'delete', i, null)),
@@ -357,14 +360,19 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
         if (used > 0) {
           throw invalid(`This deck is used by ${used} lecture section${used === 1 ? '' : 's'}: delete those lectures first.`);
         }
+        const annotationIds = await db.getAllKeysFromIndex('annotations', 'byDeck', id);
         await write(
           [],
           [
             { store: 'slideDecks', id },
             { store: 'deckFiles', id },
             { store: 'deckPages', id },
+            ...annotationIds.map((a) => ({ store: 'annotations' as const, id: a })),
           ],
-          [await change('slideDeck', 'delete', id, null)],
+          await Promise.all([
+            ...annotationIds.map((a) => change('annotation', 'delete', a, null)),
+            change('slideDeck', 'delete', id, null),
+          ]),
         );
       }),
 
