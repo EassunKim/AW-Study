@@ -11,7 +11,7 @@ Milestone 2, **Study by hand**, is split into three tasks. Each has a GitHub iss
 
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
-| Scheduler and cloze: FSRS, the daily queue, cloze parsing | #5 | Matt's Claude | `src/lib/scheduler.ts`, `src/lib/cloze.ts` + tests | Ready to start once the kickoff PR is merged |
+| Scheduler and cloze: FSRS, the daily queue, cloze parsing | #5 | Matt's Claude | `src/lib/scheduler.ts`, `src/lib/cloze.ts` + tests | **Done** (PR #12) |
 | Data layer: IndexedDB, schema, change log, `StudyStore` | #6 | Nathan's Claude | `src/db/` | PR #9: store done and tested; waits for #5 to test notes in browsers |
 | Screens: decks, card editor, review | #7 | Whoever is free after #5 and #6 | `src/ui/`, `src/App.tsx` | Waiting for #5 and #6 |
 
@@ -70,6 +70,11 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** #5 scheduler and cloze (PR #12): `src/lib/scheduler.ts` (ts-fsrs 6, retention 0.9,
+  max 36500 days, deterministic fuzz; the daily queue with the study day, new-card limit,
+  suspended cards and one card per note per day; button labels) and `src/lib/cloze.ts`
+  (`checkCloze`, `renderCloze`), with 71 Vitest tests. Each key rule was proved to fail without it
+  (30 of 32; the other two are already enforced by ts-fsrs). Signatures unchanged. (Matt's Claude)
 - **Nov 18:** CI's test job runs in Playwright's own image (`mcr.microsoft.com/playwright`) after
   `playwright install --with-deps` hung twice on Ubuntu's mirrors; jobs get time limits (20 and
   15 min); Docker actions moved to their Node 24 majors (#10). (Nathan's Claude)
@@ -90,6 +95,15 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- ts-fsrs's review log `due` field is the card's previous review time, not its old due date.
+  `review()` fills `ReviewEntry.dueBefore` from the state passed in instead. ts-fsrs 6 also marks
+  the classic `fsrs()` API we use as deprecated (it still works); only `scheduler.ts` would change.
+- `npm install` on a different Node version (Matt's PC has Node 22) can rewrite
+  `package-lock.json`. Don't commit that unless the PR is about dependencies.
+- **Don't use `America/Vancouver` in tests.** BC moved to permanent UTC-7 in 2026, and only newer
+  time zone data knows it: Node 26 says UTC-7 in November, Node 22 says UTC-8, so a test that
+  passes on one PC fails on another. Use a zone whose rules haven't changed (`America/Los_Angeles`,
+  `America/New_York`, `Asia/Tokyo`, `UTC`).
 - **Upgrading Playwright?** Also change the image tag in `.github/workflows/publish.yml`
   (`mcr.microsoft.com/playwright:v<version>-noble`) and the version in its check step, or CI fails.
 - **Playwright's WebKit has no OPFS** (the browser's private file system): anything built on it
