@@ -1,16 +1,24 @@
-// Making a section's question bank with AI (DESIGN, "Questions"): about 3 questions per slide, at
-// least 10, asked for a few slides at a time so each request stays well inside the helper's time
-// and size limits. What comes back is checked twice (src/ai/check.ts, then the store), repeats are
-// dropped, and each request's questions are saved as they arrive, so stopping half-way keeps them.
+// Making a section's question bank with AI (DESIGN, "Questions"). How many: by the amount of text, about
+// one question per 100 words, at least 3 and at most 10 a page, and at least 10 for the section, so a
+// slide of a few lines gets 3 and a dense page of a document saved as PDF gets more (Nathan, Nov 18).
+// A page of under 20 words (title, divider, thank-you) counts as 1, and the AI skips such slides.
+// They're asked for a few pages at a time, within the helper's 30 questions a request. What comes back
+// is checked twice (src/ai/check.ts, then the store), repeats are dropped, and each request's
+// questions are saved as they arrive, so stopping half-way keeps them.
 import type { AiBackend, SlideText } from '../ai/backend';
 import { questionKey } from '../db/quiz';
 import type { Section } from '../types/lecture';
 import type { QuizStore } from '../types/quiz';
 
-export const QUESTIONS_PER_SLIDE = 3;
+export const WORDS_PER_QUESTION = 100;
+/** Below this, a page is probably a title, divider or thank-you slide. */
+export const SHORT_PAGE_WORDS = 20;
+export const MIN_PER_PAGE = 3;
+export const MAX_PER_PAGE = 10;
 export const MIN_BANK = 10;
 export const SLIDES_PER_REQUEST = 5;
-/** The helper's limits (helper/jobs.mjs LIMITS): characters per slide, questions to avoid. */
+/** The helper's limits (helper/jobs.mjs LIMITS): questions a request, characters a slide, questions to avoid. */
+export const QUESTIONS_PER_REQUEST = 30;
 const PAGE_TEXT_MAX = 8_000;
 const AVOID_MAX = 200;
 
@@ -24,9 +32,21 @@ export function sectionSlides(section: Pick<Section, 'firstPage' | 'lastPage'>, 
   return slides;
 }
 
-/** How many questions a section's bank should hold. */
-export function bankTarget(slideCount: number): number {
-  return slideCount === 0 ? 0 : Math.max(MIN_BANK, QUESTIONS_PER_SLIDE * slideCount);
+/**
+ * Questions a page is worth: one per WORDS_PER_QUESTION words, between MIN_PER_PAGE and MAX_PER_PAGE.
+ * A page of under SHORT_PAGE_WORDS words (a title, section divider, "Thank you" or "Questions?" slide)
+ * is worth just 1: it's still sent, and the AI is told to skip such slides and ask about the rest.
+ */
+export function questionsForPage(text: string): number {
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (words < SHORT_PAGE_WORDS) return 1;
+  return Math.min(MAX_PER_PAGE, Math.max(MIN_PER_PAGE, Math.round(words / WORDS_PER_QUESTION)));
+}
+
+/** How many questions a section's bank should hold: its pages' worth, at least MIN_BANK (0 with no text). */
+export function bankTarget(slides: SlideText[]): number {
+  if (slides.length === 0) return 0;
+  return Math.max(MIN_BANK, slides.reduce((n, s) => n + questionsForPage(s.text), 0));
 }
 
 export interface BankRequest {
@@ -34,26 +54,43 @@ export interface BankRequest {
   count: number;
 }
 
-/**
- * The requests that fill a bank from `have` questions up to its target: the slides in groups of
- * SLIDES_PER_REQUEST, the questions still needed shared between them by slide count (whole numbers that
- * add up exactly). Empty when the bank is full or there's no slide text.
- */
-export function planBank(slides: SlideText[], have: number): BankRequest[] {
-  const need = bankTarget(slides.length) - have;
-  if (need <= 0) return [];
-  const groups: SlideText[][] = [];
-  for (let i = 0; i < slides.length; i += SLIDES_PER_REQUEST) groups.push(slides.slice(i, i + SLIDES_PER_REQUEST));
-  const exact = groups.map((g) => (need * g.length) / slides.length);
-  const counts = exact.map(Math.floor);
-  let left = need - counts.reduce((a, b) => a + b, 0);
-  const byRemainder = exact.map((x, i) => [x - Math.floor(x), i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
-  for (const [, i] of byRemainder) {
+/** Whole numbers in proportion to `weights` that add up to `total` (largest remainder; ties to the earlier). */
+function share(total: number, weights: number[]): number[] {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const exact = weights.map((w) => (total * w) / sum);
+  const out = exact.map(Math.floor);
+  let left = total - out.reduce((a, b) => a + b, 0);
+  const order = exact.map((x, i) => [x - Math.floor(x), i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (const [, i] of order) {
     if (left <= 0) break;
-    counts[i]!++;
+    out[i]!++;
     left--;
   }
-  return groups.map((pages, i) => ({ pages, count: counts[i]! })).filter((r) => r.count > 0);
+  return out;
+}
+
+/**
+ * The requests that fill a bank from `have` questions up to its target. Pages go in groups of at most
+ * SLIDES_PER_REQUEST pages and QUESTIONS_PER_REQUEST questions' worth; the questions still needed are
+ * shared between the groups by what their pages are worth (whole numbers that add up exactly). Empty
+ * when the bank is full or there's no text.
+ */
+export function planBank(slides: SlideText[], have: number): BankRequest[] {
+  const target = bankTarget(slides);
+  const need = target - have;
+  if (need <= 0) return [];
+  const groups: { pages: SlideText[]; worth: number }[] = [];
+  for (const slide of slides) {
+    const worth = questionsForPage(slide.text);
+    const last = groups.at(-1);
+    if (last && last.pages.length < SLIDES_PER_REQUEST && last.worth + worth <= QUESTIONS_PER_REQUEST) {
+      last.pages.push(slide);
+      last.worth += worth;
+    } else groups.push({ pages: [slide], worth });
+  }
+  // A section under MIN_BANK is topped up in proportion too (its target is more than its pages' worth)
+  const counts = share(need, groups.map((g) => g.worth)).map((c) => Math.min(c, QUESTIONS_PER_REQUEST));
+  return groups.map((g, i) => ({ pages: g.pages, count: counts[i]! })).filter((r) => r.count > 0);
 }
 
 export interface BankProgress {

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { AiError, type McQuestion } from '../ai/backend';
 import { FakeAiBackend } from '../ai/fake';
 import type { Question, QuestionInput, QuizAttempt } from '../types/quiz';
-import { bankTarget, fillBank, planBank, sectionSlides, SLIDES_PER_REQUEST } from './bank';
+import { bankTarget, fillBank, planBank, questionsForPage, sectionSlides, SLIDES_PER_REQUEST } from './bank';
 import { describeScore, pickQuiz } from './pick';
 
-const slides = (n: number, from = 1) => Array.from({ length: n }, (_, i) => ({ page: from + i, text: `Slide ${from + i} text` }));
+/** An ordinary slide: a heading and a few bullets, about 40 words. */
+const slideText = (page: number) => `Slide ${page} ${Array.from({ length: 38 }, (_, i) => `point${i}`).join(' ')}`;
+const slides = (n: number, from = 1) => Array.from({ length: n }, (_, i) => ({ page: from + i, text: slideText(from + i) }));
 
 describe('sectionSlides', () => {
   it('takes the section’s pages with text, numbered from 1, trimmed and capped', () => {
@@ -18,15 +20,43 @@ describe('sectionSlides', () => {
 });
 
 describe('planBank', () => {
-  it('asks for about 3 a slide, at least 10, a few slides a request, adding up exactly', () => {
-    expect(bankTarget(0)).toBe(0);
-    expect(bankTarget(2)).toBe(10);
-    expect(bankTarget(10)).toBe(30);
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  const dense = (n: number, perPage: number, from = 1) => Array.from({ length: n }, (_, i) => ({ page: from + i, text: words(perPage) }));
+
+  it('a page is worth one question per 100 words, at least 3 and at most 10; a short page just 1', () => {
+    expect([20, 40, 260, 349, 350, 500, 1_000, 5_000].map((n) => questionsForPage(words(n)))).toEqual([3, 3, 3, 3, 4, 5, 10, 10]);
+    // Title, divider, "Thank you", "Questions?": under 20 words
+    for (const text of ['Unit 4: Fallacies PHIL 201 Dr. Smith Fall 2026', 'Thank you!', 'Questions?', words(19)]) {
+      expect(questionsForPage(text), text).toBe(1);
+    }
+  });
+
+  it('title and thank-you slides barely count, so a lecture’s questions go to its content', () => {
+    const lecture = [{ page: 1, text: 'Unit 4: Fallacies' }, ...slides(8, 2), { page: 10, text: 'Thank you! Questions?' }];
+    expect(bankTarget(lecture)).toBe(26); // 1 + 8 x 3 + 1
+  });
+
+  it('a bank is its pages’ worth, at least 10: slides as before, dense pages more', () => {
+    expect(bankTarget([])).toBe(0);
+    expect(bankTarget(slides(2))).toBe(10); // 2 short slides: 6, so the minimum
+    expect(bankTarget(slides(10))).toBe(30); // short slides: 3 each, as before
+    expect(bankTarget(dense(19, 500))).toBe(95); // a 19-page document of ~500 words a page: 5 each
+    expect(bankTarget([...slides(2), ...dense(1, 1_200, 3)])).toBe(16); // 3 + 3 + 10
+  });
+
+  it('asks a few pages at a time, never over 30 questions a request, adding up exactly', () => {
     expect(planBank(slides(3), 0)).toEqual([{ pages: slides(3), count: 10 }]);
     const plan = planBank(slides(12), 0);
     expect(plan.map((r) => r.pages.length)).toEqual([SLIDES_PER_REQUEST, SLIDES_PER_REQUEST, 2]);
     expect(plan.map((r) => r.count)).toEqual([15, 15, 6]);
-    expect(planBank(slides(40), 0).every((r) => r.count <= 30)).toBe(true); // the helper's limit per request
+    // Dense pages: 10 each, so only 3 pages fit in a request's 30
+    const heavy = planBank(dense(7, 1_500), 0);
+    expect(heavy.map((r) => r.pages.length)).toEqual([3, 3, 1]);
+    expect(heavy.map((r) => r.count)).toEqual([30, 30, 10]);
+    for (const p of [planBank(dense(40, 700), 0), planBank(dense(19, 500), 0), planBank(slides(40), 0)]) {
+      expect(p.every((r) => r.count <= 30 && r.pages.length <= SLIDES_PER_REQUEST)).toBe(true);
+    }
+    expect(planBank(dense(19, 500), 0).reduce((n, r) => n + r.count, 0)).toBe(95);
   });
 
   it('only tops up what’s missing, and asks nothing for a full bank or no text', () => {
