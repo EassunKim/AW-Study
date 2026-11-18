@@ -2,6 +2,7 @@
 // headers visitors get.
 import { expect, test, type Page } from '@playwright/test';
 import { APP_NAME } from '../../src/brand';
+import { openUnlocked, unlockWithPassphrase } from './lock-helpers';
 
 // Collects page errors and console errors. A blocked script or style (the security policy saying
 // no) shows up here, so "no errors" also means "nothing the policy had to block".
@@ -79,4 +80,33 @@ test('the service worker leaves /ai/ and Cloudflare’s /cdn-cgi/ to the network
   const other = await page.goto('/some/page');
   expect(other?.fromServiceWorker()).toBe(true);
   await expect(page.getByRole('heading', { name: 'Honed' })).toBeVisible();
+});
+
+test('a new version never reloads an unlocked app: it waits, says so, and applies on Lock', async ({ page }) => {
+  await openUnlocked(page);
+  const marked = async () => page.evaluate(() => (window as unknown as { mark?: number }).mark === 1);
+  const mark = () => page.evaluate(() => void ((window as unknown as { mark?: number }).mark = 1));
+  const newVersion = () => page.evaluate(() => window.dispatchEvent(new Event('honed:update-ready')));
+
+  // Unlocked: no reload (that would ask for the passkey again, or lose a quiz), a banner instead
+  await mark();
+  await newVersion();
+  await expect(page.getByTestId('update-banner')).toContainText('A new version of Honed is ready');
+  expect(await marked()).toBe(true);
+
+  // Lock: now it reloads, onto the unlock screen
+  const reloaded = page.waitForEvent('load');
+  await page.getByRole('button', { name: 'Lock', exact: true }).click();
+  await reloaded;
+  expect(await marked()).toBe(false);
+  await expect(page.getByRole('heading', { name: /^Unlock/ })).toBeVisible();
+
+  // Locked, nothing started: a new version reloads at once
+  await mark();
+  const again = page.waitForEvent('load');
+  await newVersion();
+  await again;
+  expect(await marked()).toBe(false);
+  await unlockWithPassphrase(page);
+  await expect(page.getByTestId('update-banner')).toBeHidden();
 });

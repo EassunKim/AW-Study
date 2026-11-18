@@ -108,6 +108,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** Updates never reload an unlocked app (PR #55): the service worker's autoUpdate reloaded the
+  page as soon as a new version arrived, which locked it, so a passkey was asked for twice (and a quiz in
+  progress could be lost). Now (`src/ui/update.ts`) it reloads at once only when locked with no unlock
+  started; otherwise a banner says a new version is ready (Reload), and it applies on the next Lock.
+  WebKit found a race in the banner (an update arriving between its first render and its listener). 5
+  deliberate bugs caught. (Nathan's Claude)
+
 - **Nov 18:** Maths in quizzes (PR #53, Nathan's request after a calculus test): the helper's system prompt
   asks for LaTeX between `\(` `\)` or `\[` `\]`, never dollars; `src/quiz/math.ts` splits text, and `MathText` draws
   the maths with KaTeX 0.19.1 (MIT; `trust: false`; `katex.render` sets sizes through element.style, which

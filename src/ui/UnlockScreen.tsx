@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 import { APP_NAME } from '../brand';
 import { wrapWithPassphrase } from '../lib/crypto';
 import { getPasskeySecret } from '../lib/passkey';
+import { setActivity } from './update';
 import type { Keyring, UnlockSecret } from '../types/crypto';
 import { hasPassphrase, passkeyEntries, passphraseProblem, unlockForChange, unlockMessage, unlockWith } from './keys';
 import { NewPassphraseFields, RecoveryKeyField, usePrfSupported, useVault } from './lock-parts';
@@ -36,6 +37,7 @@ function Unlock({ keyring, onUnlocked }: { keyring: Keyring; onUnlocked: () => v
   const open = async (secretFor: () => Promise<UnlockSecret>, method: UnlockSecret['method']) => {
     setBusy(true);
     setProblem(null);
+    setActivity('unlocking'); // a new version waits until this is done
     try {
       const given = await secretFor();
       if (given.method === 'recovery') {
@@ -51,6 +53,7 @@ function Unlock({ keyring, onUnlocked }: { keyring: Keyring; onUnlocked: () => v
     } catch (err) {
       setProblem(unlockMessage(err, method));
       setBusy(false);
+      setActivity('locked');
     }
   };
 

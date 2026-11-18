@@ -13,6 +13,7 @@ import { SettingsScreen } from './ui/SettingsScreen';
 import { SetupScreen } from './ui/SetupScreen';
 import { StoreContext } from './ui/store-context';
 import { UnlockScreen } from './ui/UnlockScreen';
+import { isUpdateReady, onUpdateChange, setActivity } from './ui/update';
 import type { Vault, VaultStatus } from './ui/vault';
 
 // With PDF.js, so loaded only when slides are opened
@@ -27,6 +28,8 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   const route = useRoute();
   const [status, setStatus] = useState<VaultStatus>(() => vault.status());
   const refresh = () => setStatus(vault.status());
+  // A new version waits while you're setting up or unlocked (src/ui/update.ts), and applies on locking
+  useEffect(() => setActivity(status === 'unlocked' ? 'unlocked' : status === 'new' ? 'unlocking' : 'locked'), [status]);
   // The slides use the whole window (app.css .wide); header and footer line up with them
   const wide = status === 'unlocked' && (route.name === 'slides' || route.name === 'play');
   const lock = () => {
@@ -59,6 +62,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
           {status === 'new' && <SetupScreen onDone={refresh} />}
           {status === 'locked' && <UnlockScreen onUnlocked={refresh} />}
           {status === 'unlocked' && <BackupWatcher store={store} />}
+          {status === 'unlocked' && <UpdateBanner />}
           {status === 'unlocked' && <BankJobsStatus />}
           {status === 'unlocked' && <Screen route={route} onLock={lock} />}
         </main>
@@ -97,6 +101,25 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
         </section>
       )}
     </>
+  );
+}
+
+/** "A new version is ready": reloading would lock the app, so it's your choice when (or it happens on Lock). */
+function UpdateBanner() {
+  const [ready, setReady] = useState(isUpdateReady);
+  useEffect(() => {
+    const stop = onUpdateChange(setReady);
+    setReady(isUpdateReady()); // it may have arrived between the first render and listening
+    return stop;
+  }, []);
+  if (!ready) return null;
+  return (
+    <p className="update-banner" role="status" data-testid="update-banner">
+      A new version of {APP_NAME} is ready. Reloading locks it, so finish what you’re doing first.{' '}
+      <button type="button" onClick={() => window.location.reload()}>
+        Reload
+      </button>
+    </p>
   );
 }
 
