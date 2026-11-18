@@ -70,9 +70,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
-- **Nov 18:** CI gets time limits (job 20/15 min, browser install 8 min) after a run on `main`
-  hung in `playwright install --with-deps`; Docker actions moved to their Node 24 majors (#10).
-  If the install step times out, rerun the job. (Nathan's Claude)
+- **Nov 18:** CI's test job runs in Playwright's own image (`mcr.microsoft.com/playwright`) after
+  `playwright install --with-deps` hung twice on Ubuntu's mirrors; jobs get time limits (20 and
+  15 min); Docker actions moved to their Node 24 majors (#10). (Nathan's Claude)
 - **Nov 18:** #6 data layer (PR #9): `src/db/schema.ts` (IndexedDB, migration step 1),
   `src/db/store.ts` (`StudyStore`: decks, notes and their cards, suspend, study queue, answers,
   change log), 18 Vitest tests (each key rule proved to fail without it) and browser tests in all
@@ -90,6 +90,8 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **Upgrading Playwright?** Also change the image tag in `.github/workflows/publish.yml`
+  (`mcr.microsoft.com/playwright:v<version>-noble`) and the version in its check step, or CI fails.
 - **Playwright's WebKit has no OPFS** (the browser's private file system): anything built on it
   can't be tested for iPhones here. Real Safari has it; our tests can't show it.
 - **IndexedDB transactions commit as soon as nothing is pending.** Inside one, await only
