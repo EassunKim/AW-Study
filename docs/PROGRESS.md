@@ -15,7 +15,7 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
 | Encryption design and crypto core | #15 | Nathan's Claude | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | **Done** (PR #20 contract, PR #22 implementation) |
-| Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | unclaimed | `src/db/` | **Ready**: #15 is done |
+| Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | Nathan's Claude | `src/db/` | **Done** (PR #23) |
 | Setup and unlock screens, recovery key, settings | #17 | unclaimed | `src/ui/`, `src/App.tsx`, `src/main.tsx` | Waits for #15's contract |
 | Persistent storage, backup and restore | #18 | unclaimed | `src/backup/`, the backup part of Settings | Waits for #15 and #16 |
 
@@ -83,6 +83,15 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** #16 encrypted storage (PR #23): `StudyStore` gains the `Vault` methods agreed with
+  #17 (`status`, `getKeyring`, `setUp` with progress, `unlock`, `lock`, three keyring
+  operations); records are sealed per SECURITY.md (only index fields readable); `setUp`
+  encrypts milestone 2 data in place, resumable; schema step 2. The whole store test suite runs
+  twice (plain and encrypted), plus 15 encryption tests (no plaintext on disk, exact readable
+  fields, locking, wrong keys, keyring rules, a v1 database migrated with progress, an
+  interrupted setup finished by unlock, moved records). Eight deliberate bugs each caught.
+  2,000 encrypted cards: listDecks 6 ms, studyQueue 30 ms in Node. (Nathan's Claude)
+
 - **Nov 18:** #15 crypto core (PRs #20, #22): `docs/SECURITY.md`; `src/lib/crypto.ts` (data key,
   wrapping under passphrase / recovery key / passkey PRF, `unlock`, recovery key format,
   record encryption with additional data) and `src/lib/passkey.ts` (create a passkey with PRF, get
@@ -126,6 +135,11 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- **Writing to the encrypted store: read, decrypt, compute, encrypt, then write** in a second
+  transaction (never encrypt inside one). Wrap every write in `exclusive()` in
+  `src/db/store.ts` so nothing slips in between. Counting cards uses their readable fields
+  (`cardFacts`), so it needs no decryption.
 
 - **WebCrypto and `Uint8Array` types:** TypeScript wants `Uint8Array<ArrayBuffer>` for WebCrypto
   inputs. Copy with `new Uint8Array(data)` (the `bytes()` helper in `src/lib/crypto.ts`) rather

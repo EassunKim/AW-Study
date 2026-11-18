@@ -4,6 +4,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClozeCheck, QueueCard, QueueOptions, Rating, ReviewOutcome, SchedulingState } from '../types/study';
+import { newDataKey, testKeyring } from './test-helpers';
 import { openHonedDb } from './schema';
 import { openStudyStore, StoreError, type StoreDeps, type StudyStore } from './store';
 
@@ -65,16 +66,23 @@ let store: StudyStore;
 let queueCalls: ReturnType<typeof fakeDeps>['queueCalls'];
 let counter = 0;
 
+const basic = (deckId: string, front = 'Q', back = 'A') => store.addNote({ deckId, kind: 'basic', front, back });
+
+// Every test runs twice: before encryption is set up (plain records, as in milestone 2) and
+// encrypted (sealed records). The store must behave the same either way.
+describe.each(['before setup (plain)', 'encrypted'] as const)('store, %s', (mode) => {
 beforeEach(async () => {
   name = `test-${++counter}`; // a fresh database per test
   const fake = fakeDeps();
   queueCalls = fake.queueCalls;
   store = await openStudyStore({ name, deps: fake.deps });
+  if (mode === 'encrypted') {
+    const key = await newDataKey();
+    await store.setUp(await testKeyring(key), key);
+  }
 });
 
 afterEach(() => store.close());
-
-const basic = (deckId: string, front = 'Q', back = 'A') => store.addNote({ deckId, kind: 'basic', front, back });
 
 describe('device id', () => {
   it('is made once and kept when the database is opened again', async () => {
@@ -201,9 +209,7 @@ describe('answering', () => {
     const { cards } = await basic(deck.id);
     const card = await store.answer(cards[0]!.id, 3, 1234.6, T0);
     expect(card.state).toMatchObject({ phase: 'review', reps: 1, lastReview: T0.toISOString() });
-    const db = await openHonedDb(name);
-    const [review] = await db.getAll('reviews');
-    db.close();
+    const review = (await store.changesSince(0)).find((c) => c.entity === 'review')!.data;
     expect(review).toMatchObject({
       cardId: cards[0]!.id,
       rating: 3,
@@ -289,4 +295,5 @@ describe('change log', () => {
     const after = await store.changesSince(log[4]!.seq!);
     expect(after).toHaveLength(2);
   });
+});
 });
