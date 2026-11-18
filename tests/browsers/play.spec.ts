@@ -32,6 +32,7 @@ async function lectureYesterday(page: Page, className: string, minutes = 30) {
   await form.getByLabel('Minutes').fill(String(minutes));
   await form.getByLabel('First slide').fill('2');
   await form.getByLabel('Last slide').fill('4');
+  await form.getByLabel(/Make quiz questions now/).uncheck(); // Play makes them, in its own test
   await form.getByRole('button', { name: 'Save lecture' }).click();
   await expect(page.getByTestId('lecture-row')).toHaveCount(1);
   await page.getByRole('link', { name: '← Classes' }).click();

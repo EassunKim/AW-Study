@@ -5,7 +5,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { numberedSlides } from '../../src/viewer/test-pdf';
 import { addClass, pdfFile, watchProblems } from './class-helpers';
-import { openUnlocked, reloadUnlocked } from './lock-helpers';
+import { openUnlocked, reloadUnlocked, unlockWithPassphrase } from './lock-helpers';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -37,7 +37,7 @@ async function fakeHelper(page: Page) {
 }
 
 /** A class with a lecture that covered slides 2-4 of a 4-slide PDF, ending on the class page. */
-async function classWithLecture(page: Page) {
+async function classWithLecture(page: Page, { makeQuestions = false } = {}) {
   await openUnlocked(page);
   await addClass(page, 'BIO 110');
   await page.getByRole('button', { name: 'What was covered?' }).click();
@@ -47,6 +47,8 @@ async function classWithLecture(page: Page) {
   await form.getByLabel('Minutes').fill('50');
   await form.getByLabel('First slide').fill('2');
   await form.getByLabel('Last slide').fill('4');
+  await expect(form.getByLabel(/Make quiz questions now/)).toBeChecked(); // on unless turned off
+  if (!makeQuestions) await form.getByLabel(/Make quiz questions now/).uncheck();
   await form.getByRole('button', { name: 'Save lecture' }).click();
   await expect(page.getByTestId('lecture-row')).toContainText('Cells, slides 2–4');
 }
@@ -198,4 +200,100 @@ test('compare models lays the three side by side on a desktop, one under another
   else expect(opus.y).toBeGreaterThan(haiku.y + haiku.height - 1); // stacked
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('saving what was covered makes the quiz questions in the background, so the quiz is ready', async ({ page }) => {
+  const problems = await watchProblems(page);
+  // A slow helper: each answer waits until the test lets it go, to see the work carry on across screens
+  let release: () => void = () => {};
+  const asked: AskedFor[] = [];
+  await page.route('**/ai/questions', async (route) => {
+    const body = route.request().postDataJSON() as AskedFor;
+    asked.push(body);
+    await new Promise<void>((resolve) => (release = resolve));
+    const questions = Array.from({ length: body.count }, (_, i) => ({
+      question: `Background question ${i + 1}?`,
+      options: [`Right ${i + 1}`, `Wrong ${i + 1}`, `Other ${i + 1}`, `Else ${i + 1}`],
+      answer: 0,
+      page: body.pages[i % body.pages.length]!.page,
+      explanation: '',
+    }));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ questions }) });
+  });
+  await classWithLecture(page, { makeQuestions: true });
+  await expect(page.getByTestId('bank-jobs')).toContainText('Making quiz questions for Cells, slides 2–4');
+
+  // Leave the class page: the work goes on
+  await page.getByRole('link', { name: '← Classes' }).click();
+  await expect(page.getByTestId('bank-jobs')).toContainText('Making quiz questions');
+  await expect.poll(() => asked.length).toBe(1);
+  release();
+  await expect(page.getByTestId('bank-jobs')).toContainText('Quiz questions ready: 10 for Cells, slides 2–4.');
+  await page.getByTestId('bank-jobs').getByRole('button', { name: 'OK' }).click();
+  await expect(page.getByTestId('bank-jobs')).toBeHidden();
+
+  // The quiz is ready, without pressing Make questions
+  await page.getByTestId('class-row').getByRole('link').click();
+  await quizLink(page).click();
+  await expect(page.getByTestId('bank-size')).toHaveText('10 questions in this section’s bank.');
+  await expect(page.getByRole('button', { name: 'Start the quiz (5 questions)' })).toBeVisible();
+  expect(await problems()).toEqual([]);
+});
+
+test('turned off, nothing is sent; a lapsed sign-in pauses the background work until you try again', async ({ page }) => {
+  const problems = await watchProblems(page);
+  const asked: string[] = [];
+  let signedIn = false;
+  await page.route('**/ai/questions', async (route) => {
+    asked.push(route.request().url());
+    if (!signedIn) return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'Not signed in.' }) });
+    const body = route.request().postDataJSON() as AskedFor;
+    const questions = Array.from({ length: body.count }, (_, i) => ({ question: `Q ${i + 1}?`, options: ['a', 'b', 'c', 'd'], answer: 0, page: body.pages[0]!.page, explanation: '' }));
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ questions }) });
+  });
+
+  // Off: no AI request at all
+  await classWithLecture(page, { makeQuestions: false });
+  await expect(page.getByTestId('lecture-row')).toHaveCount(1);
+  expect(asked).toEqual([]);
+  await expect(page.getByTestId('bank-jobs')).toBeHidden();
+
+  // On, signed out: it says so, offers to sign in, and goes on when asked
+  await page.getByRole('button', { name: 'What was covered?' }).click();
+  const form = page.getByRole('form', { name: 'What was covered?' });
+  await form.getByRole('button', { name: /Cells/ }).click();
+  await form.getByLabel('Lecture date').fill('2026-11-18');
+  await form.getByLabel('Minutes').fill('50');
+  await form.getByLabel('First slide').fill('1');
+  await form.getByLabel('Last slide').fill('2');
+  await form.getByRole('button', { name: 'Save lecture' }).click();
+  const status = page.getByTestId('bank-jobs');
+  await expect(status).toContainText('Sign in again to use AI.');
+  await expect(status.getByRole('link', { name: 'Sign in for AI' })).toHaveAttribute('href', '/ai/whoami');
+  signedIn = true;
+  await status.getByRole('button', { name: 'Try again' }).click();
+  await expect(status).toContainText('Quiz questions ready: 10 for Cells, slides 1–2.');
+  expect((await problems()).filter((p) => !/status of 401/.test(p))).toEqual([]);
+});
+
+test('locking stops the background work: a late answer writes nothing', async ({ page }) => {
+  let release: () => void = () => {};
+  let answered = false;
+  await page.route('**/ai/questions', async (route) => {
+    const body = route.request().postDataJSON() as AskedFor;
+    await new Promise<void>((resolve) => (release = resolve));
+    const questions = Array.from({ length: body.count }, (_, i) => ({ question: `Late ${i + 1}?`, options: ['a', 'b', 'c', 'd'], answer: 0, page: body.pages[0]!.page, explanation: '' }));
+    answered = true;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ questions }) }).catch(() => {});
+  });
+  await classWithLecture(page, { makeQuestions: true });
+  await expect(page.getByTestId('bank-jobs')).toContainText('Making quiz questions');
+  await page.getByRole('button', { name: 'Lock', exact: true }).click();
+  release();
+  await expect.poll(() => answered).toBe(true);
+  await unlockWithPassphrase(page);
+  await expect(page.getByTestId('bank-jobs')).toBeHidden();
+  await page.getByTestId('class-row').getByRole('link').click();
+  await quizLink(page).click();
+  await expect(page.getByTestId('bank-size')).toContainText('No questions yet');
 });

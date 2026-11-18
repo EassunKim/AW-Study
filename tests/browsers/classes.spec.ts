@@ -17,6 +17,7 @@ async function record(page: Page, { date, minutes, first, last }: { date?: strin
   if (minutes) await form.getByLabel('Minutes').fill(String(minutes));
   await slides(page, 1).getByLabel('First slide').fill(String(first));
   await slides(page, 1).getByLabel('Last slide').fill(String(last));
+  await form.getByLabel(/Make quiz questions now/).uncheck(); // these tests don't answer /ai/
   await form.getByRole('button', { name: 'Save lecture' }).click();
 }
 
@@ -88,6 +89,7 @@ test('the next lecture carries on where the last stopped, and can use two decks'
   await lectureForm(page).getByRole('button', { name: 'Add slides from another deck' }).click();
   await slides(page, 2).getByLabel('Or upload a new PDF').setInputFiles(pdfFile('Tissues.pdf', numberedSlides(3)));
   await slides(page, 2).getByLabel('Last slide').fill('3');
+  await lectureForm(page).getByLabel(/Make quiz questions now/).uncheck(); // these tests don't answer /ai/
   await lectureForm(page).getByRole('button', { name: 'Save lecture' }).click();
   await expect(lectureRow(page)).toHaveCount(2);
   const newest = lectureRow(page).first();

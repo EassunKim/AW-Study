@@ -601,3 +601,18 @@ button.link {
     align-items: start;
   }
 }
+
+/* --- Background question-making (bank-jobs.tsx) --- */
+
+.bank-jobs {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 0.9rem;
+}
+
+.bank-jobs p {
+  margin: 0;
+}
