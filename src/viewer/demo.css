@@ -1,0 +1,11 @@
+/* The viewer's test page (demo.tsx) */
+.viewer-demo {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.viewer-demo-frame {
+  height: min(80vh, 48rem);
+  margin: 1rem 0;
+}
