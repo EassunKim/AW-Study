@@ -20,11 +20,21 @@ export interface McQuestion {
   explanation: string;
 }
 
+/** The models the helper lets a request choose (helper/app.mjs MODELS), to compare them. */
+export const AI_MODELS = [
+  { id: 'claude-haiku-5-5', name: 'Haiku' },
+  { id: 'claude-sonnet-5-5', name: 'Sonnet' },
+  { id: 'claude-opus-5-5', name: 'Opus' },
+] as const;
+export type AiModel = (typeof AI_MODELS)[number]['id'];
+
 export interface MakeQuestionsRequest {
   pages: SlideText[];
   count: number;
   /** Questions already in the bank, so new ones don't repeat them. */
   avoid?: string[];
+  /** A model to use instead of the helper's own (comparing models). */
+  model?: AiModel;
 }
 
 export interface GradeRequest {

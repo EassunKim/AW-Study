@@ -12,6 +12,7 @@ import type { Course, Section, SlideDeck } from '../types/lecture';
 import type { OptionIndex, Question, QuizAttempt } from '../types/quiz';
 import { SlideViewer } from '../viewer/SlideViewer';
 import { useAi } from './ai-context';
+import { CompareModels } from './CompareModels';
 import { slidesLabel } from './classes';
 import { href } from './route';
 import { useStore } from './store-context';
@@ -96,6 +97,7 @@ export function Start({
   questions,
   attempts,
   size: wanted = QUIZ_SIZE,
+  compare = true,
   onStart,
   onBankChanged,
 }: {
@@ -104,6 +106,8 @@ export function Start({
   attempts: QuizAttempt[];
   /** Questions the quiz asks (the planner's size in a study session). */
   size?: number;
+  /** Offer "Compare models" (not in a study session). */
+  compare?: boolean;
   onStart: () => void;
   onBankChanged: () => Promise<void>;
 }) {
@@ -133,6 +137,7 @@ export function Start({
     }
   };
 
+  const [comparing, setComparing] = useState(false);
   const last = attempts[0];
   const size = Math.min(wanted, questions.length);
 
@@ -196,6 +201,15 @@ export function Start({
         </div>
       )}
       {questions.length > 0 && <p className="muted small">Quizzes don’t use AI: they work offline and send nothing.</p>}
+      {compare && slides.length > 0 && !progress && !comparing && (
+        <p className="small">
+          <button type="button" className="link" onClick={() => setComparing(true)}>
+            Compare models
+          </button>{' '}
+          <span className="muted">(see what Haiku, Sonnet and Opus write from these slides)</span>
+        </p>
+      )}
+      {comparing && <CompareModels setting={setting} bank={questions} onAdded={() => void onBankChanged()} onClose={() => setComparing(false)} />}
     </div>
   );
 }

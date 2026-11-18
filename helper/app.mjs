@@ -12,11 +12,18 @@ import { InputError, JOBS, ReplyError, systemPrompt } from './jobs.mjs';
 export const MAX_BODY = 512 * 1024;
 
 /**
+ * The models a request may ask for by name (`"model"` in its JSON), to compare them on the same slides.
+ * Anything else is refused before Claude Code runs. Without a `model`, the helper's own (HELPER_MODEL).
+ */
+export const MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'];
+
+/**
  * @param {object} options
  * @param {(headers: object) => Promise<string>} options.checkAccess  the signed-in email, or throws AccessError
  * @param {{ email: string, token: string, label: string }[]} options.people
  * @param {string} options.appOrigin  e.g. https://honed.pacificfish.ca
- * @param {string} options.model
+ * @param {string} options.model  the default
+ * @param {string[]} [options.models]  the models a request may choose (MODELS)
  * @param {number} options.dailyLimit  requests per person per day (UTC)
  * @param {number} options.timeoutMs
  * @param {typeof runClaude} [options.run]  (tests)
@@ -27,6 +34,7 @@ export const MAX_BODY = 512 * 1024;
  */
 export function createHelper(options) {
   const { checkAccess, appOrigin, model, dailyLimit, timeoutMs } = options;
+  const models = new Set(options.models ?? MODELS);
   const run = options.run ?? runClaude;
   const log = options.log ?? ((line) => console.log(JSON.stringify(line)));
   const now = options.now ?? (() => new Date());
@@ -40,6 +48,7 @@ export function createHelper(options) {
     const job = url.pathname.startsWith('/ai/') ? url.pathname.slice(4) : null; // also 'whoami'
     let person = null;
     let attempts = 0;
+    let chosen = model;
 
     const send = (status, body) => {
       const text = JSON.stringify(body);
@@ -50,7 +59,7 @@ export function createHelper(options) {
       });
       res.end(text);
       // Counts and errors only: never the request or the reply
-      if (job !== null) log({ at: now().toISOString(), job, person: person?.label ?? null, status, attempts, ms: Date.now() - started });
+      if (job !== null) log({ at: now().toISOString(), job, person: person?.label ?? null, model: chosen, status, attempts, ms: Date.now() - started });
     };
 
     if (url.pathname === '/healthz' && req.method === 'GET') return send(200, { ok: true });
@@ -96,6 +105,14 @@ export function createHelper(options) {
       return send(400, { error: 'The request isn’t valid JSON.' });
     }
 
+    // A chosen model, from the allowed few only
+    if (typeof body === 'object' && body !== null && body.model !== undefined) {
+      if (typeof body.model !== 'string' || !models.has(body.model)) {
+        return send(400, { error: 'model: one of ' + [...models].join(', ') + '.' });
+      }
+      chosen = body.model;
+    }
+
     let input;
     try {
       input = JOBS[job].validate(body);
@@ -123,12 +140,14 @@ export function createHelper(options) {
             prompt,
             system: systemPrompt(),
             token: person.token,
-            model,
+            model: chosen,
             timeoutMs,
             command: options.command,
             extraEnv: options.extraEnv,
           });
-          return send(200, JOBS[job].check(text, input));
+          const answer = JOBS[job].check(text, input);
+          // Say which model answered when one was asked for (comparing); other replies stay as they were
+          return send(200, body.model === undefined ? answer : { ...answer, model: chosen });
         } catch (err) {
           if (err instanceof ClaudeError && err.code === 'timeout') return send(504, { error: err.message });
           if (!(err instanceof ReplyError || err instanceof ClaudeError)) throw err;

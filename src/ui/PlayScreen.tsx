@@ -172,7 +172,7 @@ function PlayQuiz({ place, size, onDone, last }: { place: ItemPlace; size: numbe
   return (
     <div className="stack">
       <p>These slides have no quiz questions yet: make them now (it uses AI), or skip the quiz this time.</p>
-      <Start setting={data.setting} questions={data.questions} attempts={data.attempts} size={size} onStart={() => begin(data.questions, data.attempts)} onBankChanged={reload} />
+      <Start setting={data.setting} questions={data.questions} attempts={data.attempts} size={size} compare={false} onStart={() => begin(data.questions, data.attempts)} onBankChanged={reload} />
       <button type="button" onClick={onDone}>
         Skip the quiz
       </button>

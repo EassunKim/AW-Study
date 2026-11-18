@@ -137,3 +137,65 @@ test('when the AI can’t be used, it says why, and a lapsed sign-in offers to s
   // The CSP blocks nothing here, and the failed requests are the test's own 401 and 429 answers
   expect((await problems()).filter((p) => !/status of (401|429)/.test(p))).toEqual([]);
 });
+
+test('compare models: the same slides to Haiku, Sonnet and Opus, side by side; one model’s questions can be kept', async ({ page }) => {
+  const problems = await watchProblems(page);
+  const asked: { model?: string; pages: { page: number }[]; count: number }[] = [];
+  await page.route('**/ai/questions', async (route) => {
+    const body = route.request().postDataJSON() as (typeof asked)[number];
+    asked.push(body);
+    const name = (body.model ?? 'default').replace('claude-', '').replace('-5-5', '');
+    const questions = Array.from({ length: body.count }, (_, i) => ({
+      question: `${name} question ${i + 1}?`,
+      options: [`${name} right ${i + 1}`, `wrong ${i + 1}`, `other ${i + 1}`, `else ${i + 1}`],
+      answer: 0,
+      page: body.pages[i % body.pages.length]!.page,
+      explanation: `${name} explains.`,
+    }));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ questions, model: body.model }) });
+  });
+  await classWithLecture(page);
+  await quizLink(page).click();
+  await page.getByRole('button', { name: 'Compare models' }).click();
+  await page.getByRole('button', { name: 'Compare Haiku, Sonnet and Opus' }).click();
+
+  for (const name of ['haiku', 'sonnet', 'opus']) {
+    await expect(page.getByTestId(`compare-${name}`).getByTestId('compare-status')).toHaveText(/^5 questions in \d+\.\d s$/);
+    await expect(page.getByTestId(`compare-${name}`)).toContainText(`${name} question 1?`);
+  }
+  // One request per model, the same slides and count, one after another
+  expect(asked.map((a) => a.model)).toEqual(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
+  expect(new Set(asked.map((a) => JSON.stringify([a.pages, a.count]))).size).toBe(1);
+  await expect(page.getByTestId('bank-size')).toContainText('No questions yet'); // nothing saved by comparing
+
+  // Keep Sonnet's: they go into the bank, and the quiz can start
+  await page.getByRole('button', { name: 'Add Sonnet’s questions to the bank' }).click();
+  await expect(page.getByTestId('compare-sonnet')).toContainText('Added 5 to the bank.');
+  await expect(page.getByTestId('bank-size')).toHaveText('5 questions in this section’s bank.');
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Start the quiz (5 questions)' }).click();
+  await expect(page.getByTestId('quiz-question')).toContainText('sonnet question');
+
+  expect(await problems()).toEqual([]);
+});
+
+test('compare models lays the three side by side on a desktop, one under another on a phone', async ({ page }, info) => {
+  await page.route('**/ai/questions', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ questions: [{ question: 'Q?', options: ['a', 'b', 'c', 'd'], answer: 0, page: 2, explanation: '' }] }),
+    }),
+  );
+  await classWithLecture(page);
+  await quizLink(page).click();
+  await page.getByRole('button', { name: 'Compare models' }).click();
+  await page.getByRole('button', { name: 'Compare Haiku, Sonnet and Opus' }).click();
+  await expect(page.getByTestId('compare-opus').getByTestId('compare-status')).toHaveText(/^1 question in /);
+  const haiku = (await page.getByTestId('compare-haiku').boundingBox())!;
+  const opus = (await page.getByTestId('compare-opus').boundingBox())!;
+  if (info.project.name === 'desktop') expect(Math.abs(haiku.y - opus.y)).toBeLessThan(2); // one row
+  else expect(opus.y).toBeGreaterThan(haiku.y + haiku.height - 1); // stacked
+  if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
