@@ -92,7 +92,11 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   (the store reaches screens through React context). Classes (#26): `ClassesScreen` (home for now),
   `ClassScreen`, `ClassEditor`, `ExamEditor`, `LectureForm` ("What was covered?"), `SlidesScreen`
   (the viewer, loaded lazily with PDF.js), `pdf-file.ts` (reading a picked PDF) and `classes.ts`
-  (pure helpers with tests: lecture times, the latest lecture, labels). Forms use `noValidate` and
+  (pure helpers with tests: lecture times, the latest lecture, labels). Quizzes (#40): `QuizScreen` (making
+  the bank, the quiz, loaded lazily), `ai-context.ts` (the `AiBackend` the screens use: `HttpAiBackend`).
+- `src/quiz/`: quiz logic with tests: `bank.ts` (the bank's size, the AI requests, saving as they arrive) and
+  `pick.ts` (which questions a quiz asks, option order, the score text). Browser tests answer `/ai/` themselves
+  (`tests/browsers/quiz.spec.ts`, service workers off there), so they never spend usage. Forms use `noValidate` and
   show our own messages; no `<select>` (WebKit's pulls in a stylesheet the CSP blocks). `ConfirmDialog` (never `confirm()`), `settings.ts` (day
   start 4 a.m.).
 - `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design.

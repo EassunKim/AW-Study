@@ -4,6 +4,8 @@ import { useState, type FormEvent } from 'react';
 import { DECK_TITLE_MAX } from '../db/lectures';
 import { deviceTimeZone, studyDay } from '../lib/studyDay';
 import type { Exam, LectureWithSections, SlideDeck } from '../types/lecture';
+import { describeScore } from '../quiz/pick';
+import type { QuizAttempt } from '../types/quiz';
 import { describeMeetings, formatDate, latestLecture, orderSections, relativeDay, slidesLabel, titleFromFileName } from './classes';
 import { ClassEditor } from './ClassEditor';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -24,13 +26,17 @@ type Deleting =
 export function ClassScreen({ courseId }: { courseId: string }) {
   const store = useStore();
   const { data, error, reload } = useLoad(async () => {
-    const [course, lectures, decks, exams] = await Promise.all([
+    const [course, lectures, decks, exams, attempts] = await Promise.all([
       store.getCourse(courseId),
       store.listLectures(courseId),
       store.listSlideDecks(courseId),
       store.listExams(courseId),
+      store.listQuizAttempts(),
     ]);
-    return { course, lectures, decks, exams };
+    // Each section's latest quiz (attempts come newest first)
+    const lastQuiz = new Map<string, QuizAttempt>();
+    for (const a of attempts) if (a.courseId === courseId && !lastQuiz.has(a.sectionId)) lastQuiz.set(a.sectionId, a);
+    return { course, lectures, decks, exams, lastQuiz };
   }, [store, courseId]);
   const [editingClass, setEditingClass] = useState(false);
   const [recording, setRecording] = useState<{ date: string; minutes: number | null } | null>(null);
@@ -44,7 +50,7 @@ export function ClassScreen({ courseId }: { courseId: string }) {
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;
   if (!data.course) return <MissingClass />;
-  const { course, lectures, decks, exams } = data;
+  const { course, lectures, decks, exams, lastQuiz } = data;
   const now = new Date();
   const today = studyDay(now, deviceTimeZone(), DAY_START_HOUR);
   const latest = latestLecture(course.meetings, now, deviceTimeZone());
@@ -185,7 +191,16 @@ export function ClassScreen({ courseId }: { courseId: string }) {
                           <a href={href({ name: 'slides', courseId, deckId: s.deckId, first: s.firstPage, last: s.lastPage })}>
                             {deck?.title ?? 'Slides'}, {slidesLabel(s.firstPage, s.lastPage)}
                           </a>{' '}
-                          <span className="muted small">{s.schedule.budgetMinutes} min to study</span>
+                          <span className="muted small">{s.schedule.budgetMinutes} min to study</span>{' '}
+                          <a className="small" href={href({ name: 'quiz', courseId, sectionId: s.id })} aria-label={`Quiz on ${deck?.title ?? 'slides'}, ${slidesLabel(s.firstPage, s.lastPage)}`}>
+                            Quiz
+                          </a>
+                          {lastQuiz.get(s.id) && (
+                            <span className="muted small" data-testid="section-last-quiz">
+                              {' '}
+                              (last: {describeScore(lastQuiz.get(s.id)!.right, lastQuiz.get(s.id)!.asked)})
+                            </span>
+                          )}
                         </li>
                       );
                     })}

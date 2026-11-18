@@ -49,7 +49,7 @@ test('add a class, record a lecture with new slides, view them, and find it all 
   await expect(page.getByTestId('deck-row')).toContainText('5 slides');
 
   // The section opens in the viewer at its first slide, with its range marked
-  await lectureRow(page).getByRole('link', { name: 'Week 4, slides 2–4' }).click();
+  await lectureRow(page).getByRole('link', { name: 'Week 4, slides 2–4', exact: true }).click();
   await expect(page.getByRole('heading', { level: 2, name: /Week 4/ })).toContainText('slides 2–4');
   await expect(page.getByTestId('slide-position')).toHaveText('Slide 2 of 5');
   await expect(page.getByTestId('slide-page')).toHaveAttribute('data-rendered', '2');
