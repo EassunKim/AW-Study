@@ -1,0 +1,24 @@
+/* Backups (#18): the reminder banner and the Settings section. */
+
+.banner {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+}
+
+.banner > span {
+  flex: 1 1 14rem;
+}
+
+.warning {
+  color: var(--danger);
+}
+
+.backups input[type='file'],
+.restore input[type='file'] {
+  max-width: 100%;
+}

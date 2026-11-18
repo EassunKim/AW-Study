@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BackupWatcher } from './backup/BackupWatcher';
 import { APP_NAME } from './brand';
 import type { StudyStore } from './db/store';
 import { deviceTimeZone, studyDay } from './lib/studyDay';
@@ -48,6 +49,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
         <main className="app">
           {status === 'new' && <SetupScreen onDone={refresh} />}
           {status === 'locked' && <UnlockScreen onUnlocked={refresh} />}
+          {status === 'unlocked' && <BackupWatcher store={store} />}
           {status === 'unlocked' && <Screen route={route} onLock={lock} />}
         </main>
         <Footer />
