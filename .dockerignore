@@ -1,0 +1,14 @@
+# Not sent to the image build: the build stage installs its own packages and makes its own dist/
+.git
+.github
+node_modules
+dist
+tests
+tools
+docs
+test-results
+playwright-report
+coverage
+*.log
+.env
+.env.*

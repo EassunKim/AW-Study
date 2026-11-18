@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- AW-Study icon: two stacked cards with a tick. The PNG sizes are drawn from this file by
+       `npm run icons` (tools/make-icons.mjs). -->
+  <rect width="512" height="512" rx="112" fill="#4f46e5"/>
+  <rect x="150" y="104" width="232" height="300" rx="28" fill="#c7d2fe" transform="rotate(-10 266 254)"/>
+  <rect x="140" y="124" width="232" height="300" rx="28" fill="#ffffff"/>
+  <path d="M196 276 l44 44 l88 -96" fill="none" stroke="#4f46e5" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
