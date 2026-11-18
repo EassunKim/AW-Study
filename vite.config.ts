@@ -45,6 +45,10 @@ export default defineConfig({
       },
     }),
   ],
+  // SQLite's WebAssembly build loads its .wasm file itself; Vite must not pre-bundle it
+  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
+  // The database worker is a module (it imports SQLite)
+  worker: { format: 'es' },
   test: {
     include: ['src/**/*.test.ts', 'tests/**/*.test.mjs'],
     environment: 'node',
