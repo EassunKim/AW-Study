@@ -92,9 +92,10 @@ export default defineConfig({
           },
         ],
         navigateFallback: '/index.html', // any page opened offline gets the app
-        // Never for the AI helper (helper/, behind Cloudflare Access): its pages must reach the network,
-        // or Access never gets to show its sign-in and the browser never gets the Access cookie
-        navigateFallbackDenylist: [/^\/healthz/, /^\/ai(\/|$)/],
+        // Never for the AI helper (helper/, behind Cloudflare Access), nor for Cloudflare's own pages on
+        // this site (/cdn-cgi/: after the Google sign-in, Access sets its cookie at
+        // /cdn-cgi/access/authorized). They must reach the network, or there's no sign-in cookie.
+        navigateFallbackDenylist: [/^\/healthz/, /^\/ai(\/|$)/, /^\/cdn-cgi\//],
       },
     }),
   ],
