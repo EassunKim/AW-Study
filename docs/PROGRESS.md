@@ -32,7 +32,7 @@ slides" and "M6: AI helper and quizzes":
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Contract on `main` (PR #29); storage next |
 | PDF slide viewer component | #25 | Matt's Claude (after #18) | `src/viewer/`, `tests/fixtures/` | Ready (independent) |
 | Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Waits for #24's contract and #25 |
-| AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #HELPER); Nathan sets up the server side (steps in the PR) |
+| AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #open C:\Users\mekim\AppData\Local\Temp\claude\4770acc3d7bcc157\8db5b715-72e1-4f77-b80c-1a2a285b63fe\scratchpad\pr27-body.md: The system cannot find the file specified.); Nathan sets up the server side (steps in the PR) |
 
 ## Milestones
 
@@ -105,7 +105,7 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
-- **Nov 18:** #27 AI helper (PR #HELPER): `helper/`, a Node server (its own modules only) for
+- **Nov 18:** #27 AI helper (PR #open C:\Users\mekim\AppData\Local\Temp\claude\4770acc3d7bcc157\8db5b715-72e1-4f77-b80c-1a2a285b63fe\scratchpad\pr27-body.md: The system cannot find the file specified.): `helper/`, a Node server (its own modules only) for
   `POST /ai/questions`, `/ai/grade`, `/ai/explain`, `/ai/ask`. It checks the Cloudflare Access
   token itself (signature, team, audience, expiry), maps the email to that person's own Claude
   Code token, and runs `claude -p` with **no tools** (`--tools ""`, `--disallowedTools "*"`), no
