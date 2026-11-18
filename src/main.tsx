@@ -15,7 +15,7 @@ openStudyStore().then(
   (store) =>
     root.render(
       <StrictMode>
-        <App store={store} />
+        <App store={store} vault={store} />
       </StrictMode>,
     ),
   (err: unknown) => root.render(<StorageProblem message={messageOf(err)} />),

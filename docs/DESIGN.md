@@ -154,6 +154,7 @@ Slides are shown exactly as the PDF draws them, with your notes and highlights o
 - **PDF.js** (Mozilla's PDF renderer, open source, Apache-2.0) draws each page in the browser, entirely on the device. It also gives each page's text, which highlighting, search and the AI need.
 - One slide at a time, fitted to the screen, with swipe or arrow keys, pinch-zoom on phones, and a strip of thumbnails. Pages render only when near the screen, so a 200-page deck stays quick.
 - The section's range is marked (e.g. slides 21–30); the rest of the deck stays reachable for context.
+- Built in #25 as `src/viewer/` (`SlideViewer`, `extractPageText`), on PDF.js's legacy build (wider browser support). PDF.js's worker and data files are served from our own site, so the Content-Security-Policy is unchanged. Until the lecture screens use it, `/viewer-demo.html` shows it on its own.
 
 **Notes and highlights** (stored as annotations, encrypted; the PDF itself is never changed)
 

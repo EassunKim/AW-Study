@@ -22,7 +22,7 @@ import { buildQueue, newSchedulingState, review } from '../lib/scheduler';
 import { studyDay } from '../lib/studyDay';
 import type { EncryptedRecord, Keyring, KeyringEntry, UnlockMethod } from '../types/crypto';
 import type { Card, Deck, Note, NoteKind, QueueOptions, Rating, ReviewRecord } from '../types/study';
-import { openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb, type RecordStore } from './schema';
+import { DB_VERSION, openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb, type RecordStore } from './schema';
 
 export type StoreStatus = 'new' | 'locked' | 'unlocked';
 
@@ -69,6 +69,18 @@ export interface StudyStore {
   /** Removes every entry of `method` and adds `entry`, in one go (change passphrase, new recovery key). */
   replaceKeyringEntries(method: UnlockMethod, entry: KeyringEntry): Promise<void>;
 
+  // --- Backups (#18, src/backup/): records travel exactly as stored, sealed ---
+  /** Every record of every store as stored (sealed), the keyring and the key check. Unlocked only. */
+  exportSealed(): Promise<SealedSnapshot>;
+  /**
+   * Replaces all records and the keyring with a backup's, in one transaction (all or nothing), and
+   * leaves the store unlocked with `dataKey`. Refuses with 'wrong-key' if `dataKey` doesn't open the
+   * backup, 'invalid' for a newer schema or a record that isn't sealed, and 'locked' while locked.
+   */
+  replaceFromBackup(snapshot: SealedSnapshot, dataKey: CryptoKey): Promise<void>;
+  /** The newest change-log row's number (0 if none), so backups can tell whether anything changed. */
+  latestChange(): Promise<number>;
+
   // --- Study data ---
   listDecks(now: Date): Promise<DeckSummary[]>;
   getDeck(id: string): Promise<Deck | null>;
@@ -93,6 +105,15 @@ export interface StudyStore {
   /** Change-log rows after `seq` (0 = all), oldest first. For v2's sync, and for tests. */
   changesSince(seq: number): Promise<ChangeRecord[]>;
   close(): void;
+}
+
+/** A whole database as stored, for a backup (#18). Every record is sealed. */
+export interface SealedSnapshot {
+  schema: number; // DB_VERSION when it was taken
+  keyring: Keyring;
+  keycheck: EncryptedRecord;
+  /** Every record store (RECORD_STORES), rows exactly as stored. */
+  stores: Record<string, unknown[]>;
 }
 
 export type StoreErrorCode = 'not-found' | 'invalid' | 'locked' | 'wrong-key';
@@ -362,6 +383,65 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
         if (entry.method !== method) throw new StoreError('invalid', 'The new entry is a different kind.');
         return [...entries.filter((e) => e.method !== method), entry];
       }),
+
+    exportSealed: () =>
+      exclusive(async () => {
+        if (status() !== 'unlocked') throw new StoreError('locked', 'Unlock first.');
+        const tx = db.transaction(['meta', ...RECORD_STORES], 'readonly');
+        const keyring = (await tx.objectStore('meta').get('keyring'))?.value as Keyring;
+        const keycheck = (await tx.objectStore('meta').get('keycheck'))?.value as EncryptedRecord;
+        const migrating = (await tx.objectStore('meta').get('migration')) !== undefined;
+        const stores: Record<string, unknown[]> = {};
+        for (const name of RECORD_STORES) stores[name] = await tx.objectStore(name).getAll();
+        await tx.done;
+        // Unlocked means setUp's sealing has finished, but never let a plain record into a backup
+        if (migrating || Object.values(stores).some((rows) => rows.some((r) => !isSealed(r)))) {
+          throw new StoreError('invalid', 'Some records aren’t encrypted yet. Lock, unlock and try again.');
+        }
+        return { schema: DB_VERSION, keyring, keycheck, stores };
+      }),
+
+    replaceFromBackup: (snapshot, dataKey) =>
+      exclusive(async () => {
+        if (status() === 'locked') throw new StoreError('locked', 'Unlock first.');
+        if (!Number.isInteger(snapshot.schema) || snapshot.schema > DB_VERSION) {
+          throw new StoreError('invalid', 'This backup was made by a newer version. Update the app first.');
+        }
+        if (snapshot.keyring?.v !== 1) throw new StoreError('invalid', 'Bad keyring.');
+        checkKeyring(snapshot.keyring.entries);
+        try {
+          await decryptRecord(dataKey, KEYCHECK_AAD, snapshot.keycheck);
+        } catch {
+          throw new StoreError('wrong-key', 'That key doesn’t open this backup.');
+        }
+        const rows: Partial<Record<RecordStore, Row[]>> = {};
+        for (const name of RECORD_STORES) {
+          const list = snapshot.stores[name] ?? [];
+          if (!Array.isArray(list) || !list.every((r) => isSealed(r) && typeof r.id === 'string')) {
+            throw new StoreError('invalid', `The backup’s ${name} aren’t all encrypted records.`);
+          }
+          rows[name] = list as Row[];
+        }
+        // One transaction: if anything fails, this device's data is left exactly as it was
+        const tx = db.transaction(['meta', ...RECORD_STORES], 'readwrite');
+        for (const name of RECORD_STORES) {
+          const target = tx.objectStore(name);
+          await target.clear();
+          for (const row of rows[name]!) await target.put(row as never);
+        }
+        const meta = tx.objectStore('meta');
+        await meta.put({ key: 'keyring', value: snapshot.keyring });
+        await meta.put({ key: 'keycheck', value: snapshot.keycheck });
+        await meta.delete('migration');
+        await tx.done;
+        hasKeyring = true;
+        key = dataKey;
+      }),
+
+    async latestChange() {
+      const cursor = await db.transaction('changes').store.openCursor(null, 'prev');
+      return cursor ? Number(cursor.key) : 0;
+    },
 
     async listDecks(now) {
       requireOpen();

@@ -1,6 +1,8 @@
 // Vite builds the app into dist/ (`npm run build`) and runs it while you work (`npm run dev`).
 // The PWA plugin writes the web app manifest and a service worker that caches the whole app, so it
 // installs to a phone's Home Screen and opens with no network. Vitest reads the `test` part.
+import { createReadStream, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -12,10 +14,49 @@ const brandHtml = (): Plugin => ({
   transformIndexHtml: (html) => html.replaceAll('%APP_NAME%', APP_NAME).replaceAll('%APP_DESCRIPTION%', APP_DESCRIPTION),
 });
 
+// PDF.js's data files (src/viewer/pdf.ts), served from our own site at /pdfjs/: standard fonts,
+// character maps, WebAssembly image decoders and colour profiles, with their licences. Copied into
+// the build, and served from node_modules while you work.
+const PDFJS = 'node_modules/pdfjs-dist';
+const PDFJS_DIRS = ['standard_fonts', 'cmaps', 'wasm', 'iccs'];
+const pdfjsAssets = (): Plugin => ({
+  name: 'pdfjs-assets',
+  generateBundle() {
+    for (const dir of PDFJS_DIRS) {
+      for (const name of readdirSync(join(PDFJS, dir))) {
+        if (/quickjs/i.test(name)) continue; // only for PDF scripting, which we never turn on
+        this.emitFile({ type: 'asset', fileName: `pdfjs/${dir}/${name}`, source: readFileSync(join(PDFJS, dir, name)) });
+      }
+    }
+  },
+  configureServer(server) {
+    server.middlewares.use('/pdfjs/', (req, res, next) => {
+      const [dir, name, ...rest] = (req.url ?? '').split('?')[0]!.split('/').filter(Boolean);
+      if (!dir || !name || rest.length || !PDFJS_DIRS.includes(dir) || name.includes('..')) return next();
+      const file = join(PDFJS, dir, name);
+      try {
+        if (!statSync(file).isFile()) return next();
+      } catch {
+        return next();
+      }
+      if (name.endsWith('.wasm')) res.setHeader('Content-Type', 'application/wasm');
+      createReadStream(file).pipe(res);
+    });
+  },
+});
+
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      // The app, and a page that shows the slide viewer on its own (src/viewer/demo.tsx) until the
+      // lecture screens use it (#26); the browser tests drive it.
+      input: { main: 'index.html', viewer: 'viewer-demo.html' },
+    },
+  },
   plugins: [
     brandHtml(),
     react(),
+    pdfjsAssets(),
     VitePWA({
       registerType: 'autoUpdate', // a new version takes over on the next open, no prompt
       injectRegister: false, // registered from src/main.tsx (no inline script: the CSP forbids those)
@@ -39,7 +80,17 @@ export default defineConfig({
         // Take charge of the open page at once, so the very first visit already works offline
         clientsClaim: true,
         skipWaiting: true,
-        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,wasm}'],
+        // .mjs: PDF.js's worker. Its fonts and decoders are precached too, so slides open offline;
+        // its character maps (for Chinese, Japanese and Korean text, 1.4 MB) are cached when used.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,webmanifest,wasm}', 'pdfjs/standard_fonts/*', 'pdfjs/iccs/*.icc'],
+        globIgnores: ['pdfjs/**/LICENSE*', 'pdfjs/wasm/*_nowasm_fallback.js'], // the fallbacks: cached if ever used
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/pdfjs/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'pdfjs-data' },
+          },
+        ],
         navigateFallback: '/index.html', // any page opened offline gets the app
         navigateFallbackDenylist: [/^\/healthz/],
       },
