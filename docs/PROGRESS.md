@@ -17,7 +17,7 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 | Encryption design and crypto core | #15 | Nathan's Claude | `docs/SECURITY.md`, `src/types/crypto.ts`, `src/lib/crypto.ts`, `src/lib/passkey.ts` | **Done** (PR #20 contract, PR #22 implementation) |
 | Encrypted storage: records encrypted, migration of M2 data, lock/unlock | #16 | Nathan's Claude | `src/db/` | **Done** (PR #23) |
 | Setup and unlock screens, recovery key, settings | #17 | Matt's Claude | `src/ui/`, `src/App.tsx`, `src/main.tsx` | **Done** (PR #21). Passkeys still to try by hand on an iPhone after deploy |
-| Persistent storage, backup and restore | #18 | Matt's Claude (after #17) | `src/backup/`, the backup part of Settings | Ready: #16 is done; starts after #17 |
+| Persistent storage, backup and restore | #18 | Matt's Claude | `src/backup/`, the backup part of Settings, backup methods in `src/db/store.ts` | **Done** (PR #29) |
 
 Milestone 2 (#5, #6, #7) is done: see the log.
 
@@ -30,7 +30,7 @@ slides" and "M6: AI helper and quizzes":
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Starting: contract first |
-| PDF slide viewer component | #25 | unclaimed | `src/viewer/`, `tests/fixtures/` | Ready (independent) |
+| PDF slide viewer component | #25 | Matt's Claude (after #18) | `src/viewer/`, `tests/fixtures/` | Ready (independent) |
 | Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Waits for #24's contract and #25 |
 | AI helper on the server | #27 | unclaimed | `helper/`, its CI job | Ready (independent) |
 
@@ -104,6 +104,17 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** #18 backups (PR #29): `.honed` backup files (the database as stored, no record
+  decrypted; format in SECURITY.md "Backups"), download or share from Settings, automatic backups
+  to a folder on Chrome/Edge desktops (hourly at most, newest 5 kept), a reminder after a week,
+  restore on the setup screen ("Moving from another device?") or in Settings, persistent storage
+  asked after setup and shown in Settings. The store gains `exportSealed`, `replaceFromBackup`
+  (one transaction, all or nothing) and `latestChange`. Backups copy every store in
+  `RECORD_STORES`, so #24's stores join automatically. 23 unit tests and browser tests on all
+  three engines (download, restore on a new device, replace in Settings, wrong passphrase, a
+  non-backup file); 17 deliberate bugs each caught. Folder backups can't be driven by Playwright
+  (no way to answer the folder picker): unit-tested with a fake folder. (Matt's Claude)
 
 - **Nov 18:** #17 screens (PR #21): first-run setup (passkey or passphrase, the recovery key shown once and typed back), the unlock screen (passkey, passphrase, recovery key, then a new passphrase), Settings (change passphrase, add/remove passkeys, new recovery key, Lock now), on the encrypted store from #16. Browser tests on all three engines, including an end-to-end scan of the real IndexedDB for plaintext; passkeys tested in Chromium with a virtual authenticator with PRF. 15 rules proved to fail without them. (Matt's Claude)
 

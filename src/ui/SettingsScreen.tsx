@@ -1,8 +1,9 @@
 // Settings: how you unlock (change or add the passphrase, add or remove passkeys, a new recovery
 // key) and Lock now. Every change that adds a way in asks you to prove it's you first. Removing a
 // passkey only asks "are you sure", and the store refuses to remove your last way in.
-// Backups and storage (#18) get their own section here.
+// Backups and storage (#18) are their own section, src/backup/BackupSettings.tsx.
 import { useState, type FormEvent } from 'react';
+import { BackupSettings } from '../backup/BackupSettings';
 import { APP_NAME } from '../brand';
 import { newRecoveryKey, wrapWithPasskey, wrapWithPassphrase, wrapWithRecoveryKey } from '../lib/crypto';
 import { createPasskey } from '../lib/passkey';
@@ -18,6 +19,7 @@ import {
   useVault,
 } from './lock-parts';
 import { href } from './route';
+import { useStore } from './store-context';
 import { messageOf, useLoad } from './useLoad';
 
 type Task = 'passphrase' | 'passkey' | 'recovery';
@@ -30,6 +32,7 @@ const WHY: Record<Task, string> = {
 
 export function SettingsScreen({ onLock }: { onLock: () => void }) {
   const vault = useVault();
+  const store = useStore();
   const prf = usePrfSupported();
   const { data: keyring, error, reload } = useLoad(() => vault.getKeyring(), [vault]);
   const [task, setTask] = useState<Task | null>(null);
@@ -120,6 +123,8 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
           {problem}
         </p>
       )}
+
+      <BackupSettings store={store} onRestored={() => void reload()} />
 
       <h3>This device</h3>
       <p className="muted small">Locking forgets the key until you unlock again. Reloading the page locks too.</p>

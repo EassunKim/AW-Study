@@ -2,15 +2,19 @@
 // cards already on this device (milestone 2's) with progress. Nothing is saved until the recovery
 // key has been confirmed, so closing the page half-way just starts setup again.
 import { useState, type FormEvent } from 'react';
+import { askToPersist } from '../backup/persist';
+import { RestoreBackup } from '../backup/RestoreBackup';
 import { APP_NAME } from '../brand';
 import { createPasskey } from '../lib/passkey';
 import { makeKeys, passphraseProblem, unlockMessage, type NewKeys } from './keys';
 import { guessDeviceLabel, NewPassphraseFields, RecoveryKeySheet, usePrfSupported, useVault } from './lock-parts';
+import { useStore } from './store-context';
 
-type Step = 'intro' | 'passphrase' | 'passkey' | 'recovery' | 'saving';
+type Step = 'intro' | 'passphrase' | 'passkey' | 'recovery' | 'saving' | 'restore';
 
 export function SetupScreen({ onDone }: { onDone: () => void }) {
   const vault = useVault();
+  const store = useStore();
   const prf = usePrfSupported();
   const [step, setStep] = useState<Step>('intro');
   const [keys, setKeys] = useState<NewKeys | null>(null);
@@ -61,6 +65,7 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
     try {
       await vault.setUp(keys.keyring, keys.dataKey, (done, total) => setProgress({ done, total }));
       setKeys(null);
+      void askToPersist(); // right after setup, when browsers are likeliest to say yes
       onDone();
     } catch (err) {
       setProblem(`Setting up didn’t finish: ${err instanceof Error ? err.message : String(err)}. Reload to try again.`);
@@ -87,7 +92,14 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
           <button type="button" className={prf ? '' : 'primary'} onClick={() => setStep('passphrase')}>
             Use a passphrase
           </button>
+          <button type="button" className="link" onClick={() => setStep('restore')}>
+            Moving from another device? Restore a backup
+          </button>
         </div>
+      )}
+
+      {step === 'restore' && (
+        <RestoreBackup store={store} replacing={false} onRestored={onDone} onCancel={() => setStep('intro')} />
       )}
 
       {step === 'passphrase' && (
