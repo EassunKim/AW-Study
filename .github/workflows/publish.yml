@@ -1,5 +1,5 @@
 # Tests every pull request and every push to main. On main it also builds and publishes the image
-# ghcr.io/eassunkim/aw-study:main. When the green tick appears on the commit, press "Update from
+# ghcr.io/nandminc/aw-study:main. When the green tick appears on the commit, press "Update from
 # GitHub" at https://apps.pacificfish.ca and the server deploys exactly that image.
 name: Test and publish
 
@@ -43,7 +43,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # Image names must be lowercase: EassunKim/AW-Study -> ghcr.io/eassunkim/aw-study
+      # Image names must be lowercase: NandMinc/AW-Study -> ghcr.io/nandminc/aw-study
       - id: name
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
       # On a pull request the image is only built, to prove the Dockerfile works; on main it's published

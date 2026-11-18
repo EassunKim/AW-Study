@@ -16,7 +16,7 @@ Goals for the first version:
 
 End-to-end encrypted sync between devices follows in the second version.
 
-Code: [github.com/EassunKim/AW-Study](https://github.com/EassunKim/AW-Study) (Matt's repo; Nathan is a collaborator).
+Code: [github.com/NandMinc/AW-Study](https://github.com/NandMinc/AW-Study) (the NandMinc organisation; Matt and Nathan are admins).
 
 ## Who it's for and scope
 

@@ -72,7 +72,7 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   security header (`server/headers.mjs`).
 - `tests/server.test.mjs`: the server. `tests/browsers/`: Playwright against the built app.
 - `.github/workflows/publish.yml`: tests every PR and push; on `main` publishes
-  `ghcr.io/eassunkim/aw-study:main`, which the home server deploys when someone presses Update.
+  `ghcr.io/nandminc/aw-study:main`, which the home server deploys when someone presses Update.
 
 ## Rules
 

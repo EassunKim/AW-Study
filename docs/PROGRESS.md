@@ -38,6 +38,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Decisions (newest first)
 
+- **Nov 18:** The repo moved from EassunKim/AW-Study to the **NandMinc** organisation
+  (github.com/NandMinc/AW-Study; Matt and Nathan are admins). The image follows the repo's name:
+  `ghcr.io/nandminc/aw-study`. Update your clone: `git remote set-url origin
+  https://github.com/NandMinc/AW-Study.git`.
 - **Nov 18:** Matt's and Nathan's Claudes coordinate through GitHub: one issue per task (label
   `agent-task`), a draft PR as soon as work starts, this file updated in every PR. They can't
   message each other directly (different accounts and machines).
@@ -56,6 +60,8 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** Repo moved to NandMinc (Matt). References updated; the server switches to
+  `ghcr.io/nandminc/aw-study` after the first publish from the new home. (Nathan's Claude)
 - **Nov 18:** Kickoff for milestone 2: shared types, scheduler and cloze stubs, ts-fsrs and
   sqlite-wasm added, this file, the "Working together" rules, issues #5-#7. (Nathan's Claude)
 - **Nov 18:** First deploy of the skeleton to honed.pacificfish.ca, checked live in Chromium and
@@ -65,6 +71,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- The image name comes from the repo's owner (`ghcr.io/${GITHUB_REPOSITORY,,}` in the workflow).
+  Moving or renaming the repo moves the image, and the home server keeps deploying the old name
+  until Nathan switches its compose file and `apps.json`. Tell Nathan before any such move.
 - A merged PR ignores later pushes to its branch. Before pushing more, check
   `gh pr view <n> --json state`; if it's merged, start a new branch from that commit.
 - The service worker needs `clientsClaim` (in `vite.config.ts`), or the first visit isn't
