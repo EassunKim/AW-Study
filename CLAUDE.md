@@ -77,7 +77,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   `docs/SECURITY.md` describes. Change SECURITY.md first, in its own PR, then the code.
 - `src/db/`: storage. `schema.ts` (IndexedDB stores, numbered migrations, sealed record shapes),
   `lectures.ts` (the `LectureStore` methods: classes, exams, slide decks, lectures, sections),
-  `quiz.ts` (the `QuizStore` methods: question banks and quiz attempts, #40) and
+  `quiz.ts` (the `QuizStore` methods: question banks quiz attempts, #40) and
+  `plan.ts` (the `PlanStore` methods: study sessions and settings, #47) and
   `store.ts` (the `StudyStore` the screens call, including lock/unlock and the keyring; the
   only code that touches the database). Read the top of `store.ts` before changing it: records are
   sealed (encrypted) per `docs/SECURITY.md`, and every write is read, compute, encrypt, then
@@ -94,6 +95,9 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   (the viewer, loaded lazily with PDF.js), `pdf-file.ts` (reading a picked PDF) and `classes.ts`
   (pure helpers with tests: lecture times, the latest lecture, labels). Quizzes (#40): `QuizScreen` (making
   the bank, the quiz, loaded lazily), `ai-context.ts` (the `AiBackend` the screens use: `HttpAiBackend`).
+- `src/plan/`: the planner (#47), pure, with tests: `planner.ts` works out today's checklist from the
+  lectures, study sessions and quiz attempts every time (nothing it works out is stored); `rules.ts` holds
+  the numbers (days 1/3/7, the score table) in one place, to tune.
 - `src/quiz/`: quiz logic with tests: `bank.ts` (the bank's size, the AI requests, saving as they arrive) and
   `pick.ts` (which questions a quiz asks, option order, the score text). Browser tests answer `/ai/` themselves
   (`tests/browsers/quiz.spec.ts`, service workers off there), so they never spend usage. Forms use `noValidate` and

@@ -14,10 +14,11 @@
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction } from 'idb';
 import type { EncryptedRecord } from '../types/crypto';
 import type { Course, Exam, Lecture, Section, SlideDeck } from '../types/lecture';
+import type { StudySession, StudySettings } from '../types/plan';
 import type { Question, QuizAttempt } from '../types/quiz';
 
 export const DB_NAME = 'honed';
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 
 /**
  * One row of the change log: every write, in order, with the device that made it. v2's sync ships
@@ -28,10 +29,10 @@ export interface ChangeRecord {
   id: string;
   deviceId: string;
   at: string;
-  entity: 'course' | 'exam' | 'slideDeck' | 'lecture' | 'section' | 'question' | 'quizAttempt';
+  entity: 'course' | 'exam' | 'slideDeck' | 'lecture' | 'section' | 'question' | 'quizAttempt' | 'studySession' | 'settings';
   entityId: string;
   op: 'put' | 'delete';
-  data: Course | Exam | SlideDeck | Lecture | Section | Question | QuizAttempt | null; // never PDF bytes
+  data: Course | Exam | SlideDeck | Lecture | Section | Question | QuizAttempt | StudySession | (StudySettings & { id: string }) | null; // never PDF bytes
 }
 
 export interface SealedChange {
@@ -109,6 +110,20 @@ export interface SealedQuizAttempt {
   enc: EncryptedRecord;
 }
 
+// --- Planning (#47) ---
+
+export interface SealedStudySession {
+  id: string;
+  courseId: string;
+  sectionId: string;
+  enc: EncryptedRecord;
+}
+/** Settings records by name: "study" holds StudySettings. */
+export interface SealedSettings {
+  id: string;
+  enc: EncryptedRecord;
+}
+
 export interface HonedSchema extends DBSchema {
   // deviceId (string), keyring (Keyring), keycheck (EncryptedRecord), migration ('running')
   meta: { key: string; value: { key: string; value: unknown } };
@@ -126,6 +141,8 @@ export interface HonedSchema extends DBSchema {
   };
   questions: { key: string; value: Question | SealedQuestion; indexes: { byCourse: string; bySection: string } };
   quizAttempts: { key: string; value: QuizAttempt | SealedQuizAttempt; indexes: { byCourse: string; bySection: string } };
+  studySessions: { key: string; value: StudySession | SealedStudySession; indexes: { byCourse: string; bySection: string } };
+  settings: { key: string; value: (StudySettings & { id: string }) | SealedSettings };
 }
 
 export type HonedDb = IDBPDatabase<HonedSchema>;
@@ -139,7 +156,9 @@ export type RecordStore =
   | 'lectures'
   | 'sections'
   | 'questions'
-  | 'quizAttempts';
+  | 'quizAttempts'
+  | 'studySessions'
+  | 'settings';
 /** Every store of records (everything but meta): what setUp seals and backups (#18) copy. */
 export const RECORD_STORES: RecordStore[] = [
   'changes',
@@ -152,6 +171,8 @@ export const RECORD_STORES: RecordStore[] = [
   'sections',
   'questions',
   'quizAttempts',
+  'studySessions',
+  'settings',
 ];
 
 /** Milestone 2's flashcard stores and change-log entities, dropped by step 4. */
@@ -214,6 +235,13 @@ export async function openHonedDb(name: string = DB_NAME): Promise<HonedDb> {
           store.createIndex('byCourse', 'courseId');
           store.createIndex('bySection', 'sectionId');
         }
+      }
+      // Step 6 (Nov 18, 2026, #47): study sessions done (the planner's history), and settings
+      if (oldVersion < 6) {
+        const sessions = db.createObjectStore('studySessions', { keyPath: 'id' });
+        sessions.createIndex('byCourse', 'courseId');
+        sessions.createIndex('bySection', 'sectionId');
+        db.createObjectStore('settings', { keyPath: 'id' });
       }
     },
   });

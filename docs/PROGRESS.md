@@ -35,7 +35,7 @@ slides" and "M6: AI helper and quizzes":
 | AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Done and live** (PR #33; server set up Nov 18, Matt's token still to add) |
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 | Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
-| Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | Contract in PR #48; storage, planner and screens next |
+| Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | Contract PR #48; storage and planner PR #49; screens next |
 
 ## Milestones
 
@@ -107,6 +107,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** #47 storage and planner (PR #49): schema step 6 (`studySessions`, `settings`) and
+  `src/db/plan.ts`; `src/plan/planner.ts` works today's checklist out from the history each time. First
+  week on days 1, 3 and 7 (a third of the budget each, one at a time, a late one pushing the next by its
+  spacing), then quizzes by the score table (first gap 7 days), extra study the day after a score under
+  70%, priority weakest, then new, then most overdue, filled to the daily minutes less what's done today.
+  Numbers in `src/plan/rules.ts`. 12 of 13 deliberate bugs caught (the 13th, the 90% band's 3-day minimum,
+  can't bite with whole-day gaps). (Nathan's Claude)
 
 - **Nov 18:** #40 screens (PR #43): each section of a lecture has a **Quiz** link (with its last score) on the
   class page. "Make questions" fills the section's bank through the AI helper: 3 a slide, at least 10, five
