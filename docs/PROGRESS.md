@@ -108,6 +108,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** Maths in quizzes (PR #53, Nathan's request after a calculus test): the helper's system prompt
+  asks for LaTeX between `\(` `\)` or `\[` `\]`, never dollars; `src/quiz/math.ts` splits text, and `MathText` draws
+  the maths with KaTeX 0.19.1 (MIT; `trust: false`; `katex.render` sets sizes through element.style, which
+  the CSP allows). `vite.config.ts` never inlines fonts as data: URLs (the CSP's font-src 'self' blocked
+  them). Questions already in a bank stay as written. 6 deliberate bugs caught. (Nathan's Claude)
+
 - **Nov 18:** Questions made in the background (PR #52, Nathan's request): "What was covered?" has
   **Make quiz questions now**, on by default; on saving, its sections join a queue (`src/ui/bank-jobs.tsx`,
   held by App, so it carries on across screens) that fills each bank in turn, with a status line on

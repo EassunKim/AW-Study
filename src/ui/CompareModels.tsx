@@ -8,6 +8,7 @@ import { planBank, sectionSlides } from '../quiz/bank';
 import type { Question } from '../types/quiz';
 import { useAi } from './ai-context';
 import { slidesLabel } from './classes';
+import { MathText } from './MathText';
 import type { Setting } from './QuizScreen';
 import { useStore } from './store-context';
 import { messageOf } from './useLoad';
@@ -111,17 +112,23 @@ export function CompareModels({ setting, bank, onAdded, onClose }: { setting: Se
                     {result.questions.map((q, i) => (
                       <li key={i}>
                         <p className="small">
-                          <strong>{q.question}</strong> <span className="muted">(slide {q.page})</span>
+                          <strong>
+                            <MathText text={q.question} />
+                          </strong> <span className="muted">(slide {q.page})</span>
                         </p>
                         <ul className="compare-options small">
                           {q.options.map((o, j) => (
                             <li key={j} className={j === q.answer ? 'right' : ''}>
-                              {LETTERS[j]}. {o}
+                              {LETTERS[j]}. <MathText text={o} />
                               {j === q.answer && ' ✓'}
                             </li>
                           ))}
                         </ul>
-                        {q.explanation && <p className="muted small">{q.explanation}</p>}
+                        {q.explanation && (
+                          <p className="muted small">
+                            <MathText text={q.explanation} />
+                          </p>
+                        )}
                       </li>
                     ))}
                   </ol>

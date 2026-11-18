@@ -451,3 +451,23 @@ describe('choosing a model (to compare them)', () => {
     expect(ok.status).toBe(200);
   });
 });
+
+describe('maths', () => {
+  it('the system prompt asks for LaTeX between \( \) or \[ \], never dollars', async () => {
+    await start([reply({ questions: [goodQuestion()] })]);
+    await post('questions', { pages: SLIDES, count: 1 });
+    const call = calls()[0];
+    const system = call.argv[call.argv.indexOf('--system-prompt') + 1];
+    expect(system).toContain(String.raw`between \( and \)`);
+    expect(system).toContain(String.raw`between \[ and \]`);
+    expect(system).toContain('Never use dollar signs for maths');
+  });
+
+  it('LaTeX in a reply comes through untouched', async () => {
+    const q = { ...goodQuestion(), question: String.raw`Which is \(\int u\,dv\)?`, options: [String.raw`\(uv - \int v\,du\)`, 'b', 'c', 'd'] };
+    await start([reply({ questions: [q] })]);
+    const body = await (await post('questions', { pages: SLIDES, count: 1 })).json();
+    expect(body.questions[0].question).toBe(String.raw`Which is \(\int u\,dv\)?`);
+    expect(body.questions[0].options[0]).toBe(String.raw`\(uv - \int v\,du\)`);
+  });
+});
