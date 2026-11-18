@@ -40,10 +40,16 @@ merged PR ignores later pushes.
 
 ## The product in one paragraph
 
-A local-first PWA. Slides, cards and review history live on the user's device, encrypted; the
-server only serves the app's files (v2 adds end-to-end encrypted sync of an append-only change log).
-FSRS schedules reviews inside a daily time budget. AI drafts cards from slides that the user
-approves; AI is a per-lecture choice (own API key, local model through Ollama, or none).
+**Redesigned Nov 18 (read `docs/DESIGN.md`; the flashcard design is history).** A local-first PWA
+built around **lectures**: you add classes (days, times, length, exam dates), and after each lecture
+the slides (PDF) and the range covered, which becomes a **section**. A planner fits sections into
+your daily study minutes (a lecture's length is its first-week budget) and shows today's checklist
+with a **Play** button. A study session shows the original slides in a built-in viewer (PDF.js,
+with notes and highlights), then a **multiple-choice quiz** from a per-section question bank made
+by AI. The score sets when the section comes back, the next quiz's size, and any extra study time
+in later days (never an immediate re-study). Everything is stored encrypted on the device. AI runs
+as Claude Code in a locked-down helper on Nathan's home server, on Matt's and Nathan's own
+subscriptions. Flashcards and FSRS card scheduling are out for now.
 
 ## Stack and commands
 
@@ -63,9 +69,11 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - `src/brand.ts`: the app's name (**Honed**, a working name). Every user-visible name comes from
   here: never type the name anywhere else. The repo, npm package and image stay `aw-study`.
 - `src/`: the app. Pure logic in `src/lib/` with a `*.test.ts` beside each file.
-- `src/types/study.ts`: the shared contract (decks, notes, cards, FSRS state, review log). Plain
-  JSON types only; changes go in their own PR, announced in the task issues.
-- `src/lib/scheduler.ts` (the only file importing ts-fsrs), `src/lib/cloze.ts`: FSRS and cloze.
+- `src/types/study.ts`, `src/lib/scheduler.ts` (ts-fsrs), `src/lib/cloze.ts`, and the deck/note/card
+  parts of `src/db/store.ts` and `src/ui/`: **the flashcard design, to be removed** once milestone 4's
+  replacements exist (DESIGN, "What happens to what's already built"). Don't build on them.
+- The new shared contract (classes, lectures, decks, sections, questions...) arrives with
+  milestone 4; plain JSON types, changed only in their own PR, announced in the task issues.
 - `src/lib/crypto.ts`, `src/lib/passkey.ts`, `src/types/crypto.ts`: encryption, exactly as
   `docs/SECURITY.md` describes. Change SECURITY.md first, in its own PR, then the code.
 - `src/db/`: storage. `schema.ts` (IndexedDB stores, numbered migrations, sealed record shapes)
@@ -93,7 +101,7 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   Matt's claude"). Merging someone else's PR? Say so in a comment first, and if it needs `main`
   merged in or a small fix, push it to their branch and tell them to pull before continuing.
   Review is optional: ask for one when you want a second look, and always before changing the
-  shared contract (`src/types/study.ts`) or files another open task owns. Small PRs, merged often.
+  shared contract (`src/types/`) or files another open task owns. Small PRs, merged often.
 - Line endings are LF everywhere (`.gitattributes`); don't fight it.
 
 **Tests**
@@ -104,33 +112,36 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - Keep the WebKit (iPhone) project: it catches what Chromium doesn't.
 
 **Privacy and security**
-- No user data leaves the device, except slides sent to AI for a lecture where the user turned AI
-  on. Tests must check both.
+- No user data leaves the device except the inputs of AI jobs (slide text, selections, answers to
+  grade), sent only to our own AI helper at `/ai/`, never stored on the way. Tests must check it.
 - Nothing loaded from other sites at runtime: no CDNs, fonts, analytics or scripts. Libraries are
   npm packages bundled by Vite. Each new dependency is agreed in its PR.
 - The Content-Security-Policy in `server/headers.mjs` stays strict: no `unsafe-inline`, no
-  `unsafe-eval`. When AI arrives, `connect-src` gains only the AI provider's API and
-  `http://localhost:11434` (Ollama). No inline `<script>` or `<style>`, and no `style=` in HTML.
+  `unsafe-eval`. The AI helper is on the same site (`/ai/`), so `connect-src 'self'` stays as it
+  is. No inline `<script>` or `<style>`, and no `style=` in HTML.
 - Never commit API keys, `.env` files, real lecture slides or databases. Test data comes from
   public material (e.g. MIT OpenCourseWare).
 - Encryption uses WebCrypto building blocks only (AES-GCM, PRF/PBKDF2 for keys). No home-made crypto.
 
-**FSRS** (it learns only from grades and dates)
-1. Only the user's confirmed grade reaches FSRS, never an AI-suggested one.
-2. The review log is never edited, only added to.
-3. Reading a card or its explanation is not a review.
-4. A small fix keeps a card's FSRS state; a real change retires it and starts fresh cards.
-5. Practice questions stay outside FSRS.
-6. One fact per card, no duplicates.
+**The schedule** (DESIGN, "Planning the day")
+1. Only quiz answers move a section's schedule, never time spent looking at slides.
+2. Quiz attempts and study sessions are only ever added to, never edited: they are the history the
+   schedule learns from.
+3. A low score adds study time in later days; it never sends the user back into the slides on the
+   spot.
+4. The planner never plans more than the daily minutes, except before an exam, and then says so.
+5. The tuning numbers (score table, day 1/3/7, 80% point, questions per slide) live in one settings
+   file, so they can change without touching the logic.
 
 **AI**
-- AI suggests, the user decides. Nothing joins a deck without approval.
-- Every AI call goes through the `AiBackend` interface; tests use a fake backend, so CI never spends
-  money or sends data.
-- Default model `claude-opus-5-5`. A step moves to a cheaper model only on test-set results, decided
-  by Matt and Nathan.
-- Follow the cost measures in `docs/DESIGN.md` (skip duplicate/empty slides, text before images,
-  short replies, caching, never pay twice).
+- Every AI job (make questions, grade a short answer, explain, ask) goes through the `AiBackend`
+  interface; tests use a fake backend, so CI never spends usage or sends data.
+- Multiple-choice quizzes are graded on the device and need no AI at quiz time (the question bank
+  is made earlier).
+- The AI helper on the server (milestone 6) runs Claude Code headless with **all tools off**, fixed
+  prompts per job, no logging of content, limits per person, in an isolated container. Its tokens
+  are created and installed by Matt and Nathan themselves, never by a Claude.
+- Questions must be checked before use: four options, one right answer among them, a slide number.
 
 ## Hosting
 
