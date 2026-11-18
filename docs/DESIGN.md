@@ -286,8 +286,10 @@ Tick a question once Matt and Nathan agree, and write the answer under it.
 - [ ] **Motivation:** the first design had a daily ring, streaks and combos. Keep those ideas for the checklist and Play (e.g. the ring fills as today's list gets done), or leave them for later with leaderboards?
 - [ ] **Default daily minutes:** 60? And should some classes get more of the time than others (e.g. a weight per class)?
 - [ ] **Tuning numbers:** the 80% point for the quiz, about 3 questions per slide, the score table and the day 1/3/7 first week are guesses. Fine to start with and adjust after a few weeks of use?
-- [ ] **Anthropic's terms:** confirm that running Claude Code headless on the server for your own studying, each on your own subscription, is within them, before the helper goes live.
-- [ ] **Who sets up the helper's tokens:** each of you runs `claude setup-token` and puts the token on the server (Nathan can add Matt's to the app's settings with him).
+- [x] **Anthropic's terms:** confirm that running Claude Code headless on the server for your own studying, each on your own subscription, is within them, before the helper goes live.
+    - Nathan checked (Nov 18): allowed for each person's own use, on their own subscription, with the official Claude Code CLI, as long as nobody else can run Claude on that login (Access and the helper make sure of that). Headless `claude -p` runs draw on the plan's separate monthly credit for programmatic use, not the normal chat limits.
+- [x] **Who sets up the helper's tokens:** each of you runs `claude setup-token` and puts the token on the server (Nathan can add Matt's to the app's settings with him).
+    - Done that way (Nov 18): the tokens live in a file on the server that Nathan made (`tokens.env`, outside every Claude's folders). Nathan's is in; Matt's goes in when he has it.
 
 **Future ideas**
 
