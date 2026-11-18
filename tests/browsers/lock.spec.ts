@@ -29,7 +29,7 @@ const alert = (page: Page) => page.getByRole('alert');
 test('set up with a passphrase, then unlock after a reload', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Lock your cards' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Lock your classes and slides' })).toBeVisible();
   await expect(page.getByText(/Only you can unlock them/)).toBeVisible();
 
   // Too short, then not matching, are refused with a message
@@ -50,7 +50,7 @@ test('set up with a passphrase, then unlock after a reload', async ({ page }) =>
   // The recovery key: shown once, says what losing it means, downloads, and must be typed back
   const recoveryKey = await readRecoveryKey(page);
   expect(recoveryKey).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){7}[0-9A-HJKMNP-TV-Z]{4}$/);
-  await expect(page.getByText(/your cards are gone/)).toBeVisible();
+  await expect(page.getByText(/your classes and slides are gone/)).toBeVisible();
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download' }).click()]);
   expect(download.suggestedFilename()).toMatch(/-recovery-key\.txt$/); // no spaces: WebKit on Linux turns them into underscores
   expect(await readFile((await download.path())!, 'utf8')).toContain(recoveryKey);
@@ -64,7 +64,7 @@ test('set up with a passphrase, then unlock after a reload', async ({ page }) =>
   await expect(page.getByRole('heading', { level: 2, name: 'Classes' })).toBeVisible();
   await addClassAndReturn(page, 'Biology');
 
-  // A reload locks; a wrong passphrase is refused; the right one opens the same cards
+  // A reload locks; a wrong passphrase is refused; the right one opens the same classes
   await page.reload();
   await expect(unlockHeading(page)).toBeVisible();
   await expect(page.getByText('Biology')).toBeHidden();

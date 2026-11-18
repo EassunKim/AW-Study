@@ -1,5 +1,5 @@
 // First run: explain, choose a passkey or a passphrase, save the recovery key, then encrypt any
-// cards already on this device (milestone 2's) with progress. Nothing is saved until the recovery
+// data already on this device with progress. Nothing is saved until the recovery
 // key has been confirmed, so closing the page half-way just starts setup again.
 import { useState, type FormEvent } from 'react';
 import { askToPersist } from '../backup/persist';
@@ -74,12 +74,12 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
 
   return (
     <section className="setup" aria-labelledby="setup-title">
-      <h2 id="setup-title">Lock your cards</h2>
+      <h2 id="setup-title">Lock your classes and slides</h2>
 
       {step === 'intro' && (
         <div className="stack">
           <p>
-            {APP_NAME} encrypts your cards on this device. Only you can unlock them: not us, and not anyone else who
+            {APP_NAME} encrypts your classes, slides and study history on this device. Only you can unlock them: not us, and not anyone else who
             uses this computer or finds a backup.
           </p>
           <p>Choose how you’ll unlock {APP_NAME} each time you open it.</p>
@@ -134,12 +134,12 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
       )}
 
       {step === 'recovery' && keys && (
-        <RecoveryKeySheet recoveryKey={keys.recoveryKey} onSaved={save} saveLabel="I’ve saved it: lock my cards" />
+        <RecoveryKeySheet recoveryKey={keys.recoveryKey} onSaved={save} saveLabel="I’ve saved it: lock my data" />
       )}
 
       {step === 'saving' && (
         <div className="stack" aria-live="polite">
-          <p>Encrypting your cards…</p>
+          <p>Encrypting what’s already on this device…</p>
           {/* total is 0 on a fresh device: nothing to encrypt */}
           <progress max={Math.max(1, progress?.total ?? 1)} value={progress?.done ?? 0} aria-label="Encrypting" />
           {progress && progress.total > 0 && (

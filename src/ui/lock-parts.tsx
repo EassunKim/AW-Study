@@ -144,13 +144,13 @@ export function RecoveryKeySheet({
           ))}
         </p>
         <p className="print-only small">
-          It unlocks your {APP_NAME} cards if you forget your passphrase or lose your passkey. If you lose it and
-          your passphrase, nobody can get your cards back.
+          It unlocks your {APP_NAME} data if you forget your passphrase or lose your passkey. If you lose it and
+          your passphrase, nobody can get your data back.
         </p>
       </div>
       <p>
         <strong>Save this recovery key now.</strong> It’s the only way back in if you forget your passphrase or lose
-        your passkey. It’s shown only this once. <strong>Without it and your passphrase, your cards are gone</strong>:
+        your passkey. It’s shown only this once. <strong>Without it and your passphrase, your classes and slides are gone</strong>:
         nobody, including us, can unlock them.
       </p>
       <div className="row">

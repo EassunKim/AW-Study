@@ -32,13 +32,24 @@ async function setUp(store: StudyStore) {
   return { key, keyring };
 }
 
+/** A class with a deck (its PDF and page text holding the tag), a lecture of two sections and an exam. */
 async function writeSome(store: StudyStore, tag = MARKER) {
-  const deck = await store.createDeck(`Deck ${tag}`);
-  const note = await store.addNote({ deckId: deck.id, kind: 'basic', front: `Q ${tag}`, back: `A ${tag}` });
-  await store.addNote({ deckId: deck.id, kind: 'cloze', front: `{{c1::${tag}}} and {{c2::two}}`, back: tag });
-  await store.answer(note.cards[0]!.id, 3, 1500, T0);
-  return deck;
+  const course = await store.createCourse({ name: `Class ${tag}`, meetings: [], termStart: null, termEnd: null });
+  const deck = await store.addSlideDeck({ courseId: course.id, title: `Deck ${tag}`, fileName: 'w1.pdf', data: fakePdf(tag), pageTexts: [tag, 'two', 'three'] });
+  await store.recordLecture({
+    courseId: course.id,
+    date: '2026-11-16',
+    minutes: 50,
+    sections: [
+      { deckId: deck.id, firstPage: 1, lastPage: 2 },
+      { deckId: deck.id, firstPage: 3, lastPage: 3 },
+    ],
+  });
+  await store.addExam({ courseId: course.id, title: `Exam ${tag}`, kind: 'final', date: '2026-12-10', lectureIds: null });
+  return course;
 }
+
+const classNames = async (store: StudyStore) => (await store.listCourses('2026-11-18')).map((c) => c.name);
 
 /** Every row of every store (and the keyring and key check), as stored. */
 async function raw(name: string) {
@@ -89,14 +100,13 @@ describe('making a backup', () => {
     const backup = decodeBackup(text);
     const key = await unlock(backup.snapshot.keyring, passphrase);
     const summary = await openBackup(backup, key);
-    expect(summary.counts).toEqual({ decks: 1, notes: 2, cards: 3, reviews: 1 });
+    expect(summary.counts).toEqual({ classes: 1, exams: 1, 'slide decks': 1, lectures: 1, sections: 2 });
     await restoreBackup(to, backup.snapshot, key);
 
     expect(to.status()).toBe('unlocked');
     expect(await raw(toName)).toEqual(await raw(fromName));
     // And it reads back through the store
-    const decks = await to.listDecks(T0);
-    expect(decks.map((d) => d.name)).toEqual([`Deck ${MARKER}`]);
+    expect(await classNames(to)).toEqual([`Class ${MARKER}`]);
     expect(await to.changesSince(0)).toEqual(await from.changesSince(0));
   });
 
@@ -113,7 +123,7 @@ describe('making a backup', () => {
     const again = await open(toName);
     expect(again.status()).toBe('locked');
     await again.unlock(await unlock((await again.getKeyring())!, passphrase));
-    expect((await again.listDecks(T0)).length).toBe(1);
+    expect(await classNames(again)).toEqual([`Class ${MARKER}`]);
   });
 
   it('holds no plaintext: the marker appears nowhere in the file', async () => {
@@ -135,7 +145,7 @@ describe('making a backup', () => {
 
   it('refuses before setup (records would be plain)', async () => {
     const store = await open();
-    await store.createDeck(`Plain ${MARKER}`);
+    await store.createCourse({ name: `Plain ${MARKER}`, meetings: [], termStart: null, termEnd: null });
     await expect(makeBackup(store, T0)).rejects.toBeInstanceOf(StoreError);
   });
 
@@ -168,7 +178,7 @@ describe('restoring safely', () => {
     const { text, device } = await twoDevices();
     const backup = decodeBackup(text);
     await restoreBackup(device, backup.snapshot, await unlock(backup.snapshot.keyring, passphrase));
-    expect((await device.listDecks(T0)).map((d) => d.name)).toEqual([`Deck ${MARKER}`]);
+    expect(await classNames(device)).toEqual([`Class ${MARKER}`]);
   });
 
   it('a wrong key fails and leaves this device untouched', async () => {
@@ -183,8 +193,8 @@ describe('restoring safely', () => {
   it('a record changed in the file fails to open, and nothing is restored', async () => {
     const { text, deviceName, before } = await twoDevices();
     const backup = decodeBackup(text);
-    const card = backup.snapshot.stores.cards![0] as { enc: { ct: Uint8Array } };
-    card.enc.ct[5] = card.enc.ct[5]! ^ 1;
+    const section = backup.snapshot.stores.sections![0] as { enc: { ct: Uint8Array } };
+    section.enc.ct[5] = section.enc.ct[5]! ^ 1;
     const key = await unlock(backup.snapshot.keyring, passphrase);
     await expect(openBackup(backup, key)).rejects.toMatchObject({ code: 'damaged' });
     expect(await raw(deviceName)).toEqual(before);
@@ -193,7 +203,7 @@ describe('restoring safely', () => {
   it('a record moved to another record’s place fails to open', async () => {
     const { text } = await twoDevices();
     const backup = decodeBackup(text);
-    const [a, b] = backup.snapshot.stores.cards as { id: string }[];
+    const [a, b] = backup.snapshot.stores.sections as { id: string }[];
     [a!.id, b!.id] = [b!.id, a!.id];
     const key = await unlock(backup.snapshot.keyring, passphrase);
     await expect(openBackup(backup, key)).rejects.toMatchObject({ code: 'damaged' });
@@ -202,7 +212,7 @@ describe('restoring safely', () => {
   it('the store refuses plain records in a backup, leaving the device untouched', async () => {
     const { text, device, deviceName, before } = await twoDevices();
     const backup = decodeBackup(text);
-    backup.snapshot.stores.decks!.push({ id: 'x', name: `Plain ${MARKER}` });
+    backup.snapshot.stores.courses!.push({ id: 'x', name: `Plain ${MARKER}` });
     await expect(restoreBackup(device, backup.snapshot, await unlock(backup.snapshot.keyring, passphrase))).rejects.toMatchObject({
       code: 'invalid',
     });
@@ -278,7 +288,7 @@ describe('the file format', () => {
   });
 
   it('describes what it holds', () => {
-    expect(describeCounts({ decks: 1, notes: 2, classes: 1, entries: 3 })).toBe('1 deck, 2 notes, 1 class, 3 entries');
+    expect(describeCounts({ classes: 1, 'slide decks': 2, lectures: 3, entries: 3 })).toBe('1 class, 2 slide decks, 3 lectures, 3 entries');
     expect(describeCounts({})).toBe('nothing yet');
   });
 });

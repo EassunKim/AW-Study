@@ -5,10 +5,7 @@ import type { StudyStore } from './db/store';
 import { deviceTimeZone, studyDay } from './lib/studyDay';
 import { ClassesScreen } from './ui/ClassesScreen';
 import { ClassScreen } from './ui/ClassScreen';
-import { DeckScreen } from './ui/DeckScreen';
-import { DecksScreen } from './ui/DecksScreen';
 import { VaultContext } from './ui/lock-parts';
-import { ReviewScreen } from './ui/ReviewScreen';
 import { go, href, useRoute } from './ui/route';
 import { DAY_START_HOUR } from './ui/settings';
 import { SettingsScreen } from './ui/SettingsScreen';
@@ -73,9 +70,6 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
           <SlidesScreen key={href(route)} courseId={route.courseId} deckId={route.deckId} first={route.first} last={route.last} />
         </Suspense>
       )}
-      {route.name === 'decks' && <DecksScreen />}
-      {route.name === 'deck' && <DeckScreen key={route.deckId} deckId={route.deckId} />}
-      {route.name === 'review' && <ReviewScreen key={route.deckId} deckId={route.deckId} />}
       {route.name === 'settings' && <SettingsScreen onLock={onLock} />}
       {route.name === 'not-found' && (
         <section>

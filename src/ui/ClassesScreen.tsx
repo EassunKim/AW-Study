@@ -113,9 +113,6 @@ export function ClassesScreen() {
         </>
       )}
 
-      <p className="muted small old-cards">
-        <a href={href({ name: 'decks' })}>Old flashcards</a> (from the first prototype; going away soon)
-      </p>
     </section>
   );
 }

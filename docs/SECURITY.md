@@ -1,6 +1,6 @@
 # Security design
 
-How Honed keeps a user's cards private on their own device. This is the design milestone 3 (#15-#18)
+How Honed keeps a user's classes and slides private on their own device. This is the design milestone 3 (#15-#18)
 builds; change it here first, in its own PR, before changing the code. **Only standard building
 blocks from the browser's WebCrypto, with standard parameters. No home-made cryptography.**
 
@@ -8,12 +8,12 @@ blocks from the browser's WebCrypto, with standard parameters. No home-made cryp
 
 | Threat | Protected? | How |
 | --- | --- | --- |
-| Our server, or anyone who takes it over, reading cards | **Yes** | The server never receives cards. In v2 it only stores ciphertext it has no key for. |
+| Our server, or anyone who takes it over, reading your classes and slides | **Yes** | The server never receives them. In v2 it only stores ciphertext it has no key for. |
 | A backup file (`.honed`) found in someone's cloud drive | **Yes** | Backups hold only ciphertext and wrapped keys (#18). |
 | Another person using the same computer account, or copying the browser's files | **Yes**, while Honed is locked | Records are encrypted at rest; the key is only ever in memory while unlocked. |
 | A lost phone or laptop | By the device | The device's own lock and disk encryption. Honed adds the points above. |
 | Malicious code running inside the page while it's unlocked | **No** (encryption can't) | Prevented instead by the strict Content-Security-Policy, no outside scripts, few dependencies. |
-| Forgetting the passphrase **and** losing the recovery key | **No: the cards are gone** | Nobody else can unlock them; that is the point. The setup screen says so plainly. |
+| Forgetting the passphrase **and** losing the recovery key | **No: the data is gone** | Nobody else can unlock them; that is the point. The setup screen says so plainly. |
 | Guessing a weak passphrase from stolen browser files | Slowed | PBKDF2 makes every guess cost about half a second. A strong passphrase or a passkey is the real protection. |
 
 ## Keys
@@ -80,8 +80,8 @@ Milestone 4 (#24) adds the lecture stores:
 | changes (log) | seq, entity, entityId, op, at | the record data (PDF bytes are not in the log) |
 | meta | device id, schema step, the keyring (already wrapped) | nothing else is secret |
 
-The milestone 2 flashcard stores (decks, notes, cards, reviews) are removed in #26; until then
-they follow the same rule (ids and links readable; text, FSRS numbers and dates encrypted).
+Milestone 2's flashcard stores (decks, notes, cards, reviews) were removed in #26 (schema step 4,
+which also deletes their change-log rows).
 
 So someone with the browser's files could see *how many* classes, decks, lectures and sections
 exist, on which dates lectures and exams fall, and when sections are due, but not a word of the
@@ -95,8 +95,8 @@ index needs it; it must not move the other way without changing this table first
   and `'unlocked'` (every record written is sealed). The setup screen (#17) gates the app, so in
   practice nothing is written in `'new'` once it exists.
 - **Setting up** saves the keyring, an encrypted check value (so `unlock` can tell a wrong key at
-  once) and a "migration running" flag, then seals every plain record (decks, notes, cards,
-  reviews and the change log), in batches, and clears the flag. If the page closes half-way, the
+  once) and a "migration running" flag, then seals every plain record (every store, the
+  change log included), in batches, and clears the flag. If the page closes half-way, the
   store opens `'locked'` and the next `unlock` finishes the job.
 - **The keyring always keeps** at least one passphrase or passkey (to unlock) and at least one
   recovery key; the store refuses changes that would break that. Keyring changes never rewrite a

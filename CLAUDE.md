@@ -23,7 +23,7 @@ other**. GitHub is the shared channel. Each human relays only when something nee
 - Branch, and open a **draft PR** at once with `Closes #<issue>`, so `gh pr list` shows the
   work is in progress.
 - Only edit the files your task owns (its row in `docs/PROGRESS.md`). Need a change elsewhere,
-  especially to the shared contract `src/types/study.ts`? Ask in the issue first.
+  especially to the shared contract `src/types/lecture.ts`? Ask in the issue first.
 
 **Talking to the other Claude:** comment on the task's issue (or the PR), signed `[Matt's Claude]`
 or `[Nathan's Claude]`. Write so it makes sense to a reader with no other context: what you
@@ -69,11 +69,9 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - `src/brand.ts`: the app's name (**Honed**, a working name). Every user-visible name comes from
   here: never type the name anywhere else. The repo, npm package and image stay `aw-study`.
 - `src/`: the app. Pure logic in `src/lib/` with a `*.test.ts` beside each file.
-- `src/types/study.ts`, `src/lib/scheduler.ts` (ts-fsrs), `src/lib/cloze.ts`, and the deck/note/card
-  parts of `src/db/store.ts` and `src/ui/`: **the flashcard design, to be removed** once milestone 4's
-  replacements exist (DESIGN, "What happens to what's already built"). Don't build on them.
-- The new shared contract (classes, lectures, decks, sections, questions...) arrives with
-  milestone 4; plain JSON types, changed only in their own PR, announced in the task issues.
+- `src/types/lecture.ts`: the shared contract (classes, exams, slide decks, lectures, sections and
+  `LectureStore`); plain JSON types, changed only in their own PR, announced in the task issues.
+  The flashcard design (decks, notes, cards, FSRS, cloze) was removed in #26; it's in git history.
 - `src/lib/crypto.ts`, `src/lib/passkey.ts`, `src/types/crypto.ts`: encryption, exactly as
   `docs/SECURITY.md` describes. Change SECURITY.md first, in its own PR, then the code.
 - `src/db/`: storage. `schema.ts` (IndexedDB stores, numbered migrations, sealed record shapes),
@@ -93,9 +91,7 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   `ClassScreen`, `ClassEditor`, `ExamEditor`, `LectureForm` ("What was covered?"), `SlidesScreen`
   (the viewer, loaded lazily with PDF.js), `pdf-file.ts` (reading a picked PDF) and `classes.ts`
   (pure helpers with tests: lecture times, the latest lecture, labels). Forms use `noValidate` and
-  show our own messages; no `<select>` (WebKit's pulls in a stylesheet the CSP blocks). The old
-  flashcard screens (`DecksScreen`, `DeckScreen`, `NoteEditor`, `ReviewScreen`, `CardText`) are
-  under `#/cards` until #26 removes them. `ConfirmDialog` (never `confirm()`), `settings.ts` (day
+  show our own messages; no `<select>` (WebKit's pulls in a stylesheet the CSP blocks). `ConfirmDialog` (never `confirm()`), `settings.ts` (day
   start 4 a.m.).
 - `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design.
 - `helper/`: the AI helper (milestone 6), its own image `ghcr.io/nandminc/aw-study-ai`: a Node

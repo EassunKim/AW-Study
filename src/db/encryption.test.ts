@@ -1,13 +1,14 @@
-// Encryption at rest (#16, docs/SECURITY.md): what's on disk, locking, the keyring rules, and
-// migrating milestone 2 data. Uses the real FSRS, cloze and crypto (with few PBKDF2 iterations).
+// Encryption at rest (#16, docs/SECURITY.md): what's on disk, locking, the keyring rules, sealing
+// what was written before setup, and the schema steps that dropped milestone 2's flashcards (#26).
+// Uses the real crypto (with few PBKDF2 iterations).
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
 import { afterEach, describe, expect, it } from 'vitest';
 import { newRecoveryKey, wrapWithPasskey, wrapWithPassphrase, wrapWithRecoveryKey } from '../lib/crypto';
 import { CryptoError, type Keyring } from '../types/crypto';
-import { openHonedDb, RECORD_STORES } from './schema';
-import { openStudyStore, StoreError, type StudyStore } from './store';
-import { containsText, newDataKey, testKeyring } from './test-helpers';
+import { DB_VERSION, openHonedDb, RECORD_STORES } from './schema';
+import { openStudyStore, type StudyStore } from './store';
+import { containsText, fakePdf, newDataKey, testKeyring } from './test-helpers';
 
 const MARKER = 'SECRET-MARKER-42';
 const T0 = new Date('2026-11-18T18:00:00Z');
@@ -25,13 +26,19 @@ afterEach(() => {
   for (const store of opened.splice(0)) store.close();
 });
 
-/** Some of everything, containing MARKER wherever a person can type. */
+/** Some of everything, containing MARKER wherever a person can type (and inside the PDF). */
 async function writeEverything(store: StudyStore) {
-  const deck = await store.createDeck(`Deck ${MARKER}`);
-  const basic = await store.addNote({ deckId: deck.id, kind: 'basic', front: `Q ${MARKER}`, back: `A ${MARKER}` });
-  await store.addNote({ deckId: deck.id, kind: 'cloze', front: `{{c1::${MARKER}}} and {{c2::two}}`, back: MARKER });
-  await store.answer(basic.cards[0]!.id, 3, 1500, T0);
-  return { deck, basic };
+  const course = await store.createCourse({ name: `Class ${MARKER}`, meetings: [{ day: 1, start: '10:30', minutes: 50 }], termStart: null, termEnd: null });
+  const deck = await store.addSlideDeck({
+    courseId: course.id,
+    title: `Deck ${MARKER}`,
+    fileName: `${MARKER}.pdf`,
+    data: fakePdf(MARKER),
+    pageTexts: [`one ${MARKER}`, 'two'],
+  });
+  const lecture = await store.recordLecture({ courseId: course.id, date: '2026-11-16', minutes: 50, sections: [{ deckId: deck.id, firstPage: 1, lastPage: 2 }] });
+  await store.addExam({ courseId: course.id, title: `Exam ${MARKER}`, kind: 'midterm', date: '2026-12-01', lectureIds: null });
+  return { course, deck, lecture };
 }
 
 /** Every row of every store, as stored. */
@@ -56,30 +63,26 @@ describe('on disk', () => {
     const { store } = await setUpNew(name);
     await writeEverything(store);
     const rows = await rawRows(name);
-    expect(rows.cards!.length).toBeGreaterThan(0);
+    expect(rows.sections!.length).toBeGreaterThan(0);
     for (const [storeName, list] of Object.entries(rows)) {
       expect(containsText(list, MARKER), `plaintext found in ${storeName}`).toBe(false);
     }
   });
 
-  it('keeps readable exactly the fields SECURITY.md lists, and seals the rest', async () => {
+  it('keeps the change log’s readable fields exactly as SECURITY.md lists them', async () => {
     const name = freshName();
     const { store } = await setUpNew(name);
     await writeEverything(store);
     const rows = await rawRows(name);
-    const keys = (store: string) => Object.keys(rows[store]![0] as object).sort();
-    expect(keys('decks')).toEqual(['enc', 'id']);
-    expect(keys('notes')).toEqual(['deckId', 'enc', 'id']);
-    expect(keys('cards')).toEqual(['deckId', 'due', 'enc', 'id', 'noteId', 'phase', 'position', 'suspended']);
-    expect(keys('reviews')).toEqual(['cardId', 'enc', 'id', 'reviewedAt']);
-    expect(keys('changes')).toEqual(['at', 'enc', 'entity', 'entityId', 'id', 'op', 'seq']);
+    expect(Object.keys(rows.changes![0] as object).sort()).toEqual(['at', 'enc', 'entity', 'entityId', 'id', 'op', 'seq']);
+    // The lecture stores' readable fields are checked in lectures.test.ts
   });
 
-  it('before setup, records are plain (milestone 2), and setUp seals all of them', async () => {
+  it('before setup, records are plain, and setUp seals all of them', async () => {
     const name = freshName();
     const store = await open(name);
     await writeEverything(store);
-    expect(containsText((await rawRows(name)).notes, MARKER)).toBe(true); // plain before setup
+    expect(containsText((await rawRows(name)).courses, MARKER)).toBe(true); // plain before setup
     const key = await newDataKey();
     await store.setUp(await testKeyring(key), key);
     const rows = await rawRows(name);
@@ -92,16 +95,16 @@ describe('on disk', () => {
   it('a record moved into another record’s place won’t decrypt', async () => {
     const name = freshName();
     const { store } = await setUpNew(name);
-    const deck = await store.createDeck('D');
-    const a = await store.addNote({ deckId: deck.id, kind: 'basic', front: 'a', back: 'a' });
-    const b = await store.addNote({ deckId: deck.id, kind: 'basic', front: 'b', back: 'b' });
+    const input = { meetings: [], termStart: null, termEnd: null };
+    const a = await store.createCourse({ ...input, name: 'a' });
+    const b = await store.createCourse({ ...input, name: 'b' });
     const db = await openHonedDb(name);
-    const rowA = (await db.get('cards', a.cards[0]!.id)) as { enc: unknown };
-    const rowB = (await db.get('cards', b.cards[0]!.id)) as object;
-    await db.put('cards', { ...rowB, enc: rowA.enc } as never); // b's place, a's ciphertext
+    const rowA = (await db.get('courses', a.id)) as { enc: unknown };
+    const rowB = (await db.get('courses', b.id)) as object;
+    await db.put('courses', { ...rowB, enc: rowA.enc } as never); // b's place, a's ciphertext
     db.close();
-    await expect(store.getCard(b.cards[0]!.id)).rejects.toBeInstanceOf(CryptoError);
-    expect((await store.getCard(a.cards[0]!.id))!.note.front).toBe('a');
+    await expect(store.getCourse(b.id)).rejects.toBeInstanceOf(CryptoError);
+    expect((await store.getCourse(a.id))!.name).toBe('a');
   });
 });
 
@@ -114,7 +117,7 @@ describe('locking', () => {
     const key = await newDataKey();
     await first.setUp(await testKeyring(key), key);
     expect(first.status()).toBe('unlocked');
-    const { deck } = await writeEverything(first);
+    const { course } = await writeEverything(first);
     first.close();
 
     const again = await open(name);
@@ -122,30 +125,42 @@ describe('locking', () => {
     expect((await again.getKeyring())!.entries.map((e) => e.method).sort()).toEqual(['passphrase', 'recovery']);
     await again.unlock(key);
     expect(again.status()).toBe('unlocked');
-    expect((await again.getDeck(deck.id))!.name).toBe(`Deck ${MARKER}`);
+    expect((await again.getCourse(course.id))!.name).toBe(`Class ${MARKER}`);
   });
 
   it('refuses everything while locked, with code "locked"', async () => {
     const name = freshName();
     const { store } = await setUpNew(name);
-    const { deck, basic } = await writeEverything(store);
+    const { course, deck, lecture } = await writeEverything(store);
+    const [exam] = await store.listExams(course.id);
     store.lock();
     expect(store.status()).toBe('locked');
+    const courseInput = { name: 'x', meetings: [], termStart: null, termEnd: null };
+    const examInput = { courseId: course.id, title: 'x', kind: 'test' as const, date: '2026-12-01', lectureIds: null };
     const calls: [string, () => Promise<unknown>][] = [
-      ['listDecks', () => store.listDecks(T0)],
-      ['getDeck', () => store.getDeck(deck.id)],
-      ['createDeck', () => store.createDeck('x')],
-      ['renameDeck', () => store.renameDeck(deck.id, 'x')],
-      ['deleteDeck', () => store.deleteDeck(deck.id)],
-      ['listNotes', () => store.listNotes(deck.id)],
-      ['addNote', () => store.addNote({ deckId: deck.id, kind: 'basic', front: 'q', back: 'a' })],
-      ['updateNote', () => store.updateNote(basic.note.id, { front: 'q', back: 'a' })],
-      ['deleteNote', () => store.deleteNote(basic.note.id)],
-      ['getCard', () => store.getCard(basic.cards[0]!.id)],
-      ['setSuspended', () => store.setSuspended(basic.cards[0]!.id, true)],
-      ['studyQueue', () => store.studyQueue({ now: T0, timeZone: 'UTC', dayStartHour: 4, newPerDay: 20 })],
-      ['answer', () => store.answer(basic.cards[0]!.id, 3, 0, T0)],
+      ['listCourses', () => store.listCourses('2026-11-18')],
+      ['getCourse', () => store.getCourse(course.id)],
+      ['createCourse', () => store.createCourse(courseInput)],
+      ['updateCourse', () => store.updateCourse(course.id, courseInput)],
+      ['deleteCourse', () => store.deleteCourse(course.id)],
+      ['listExams', () => store.listExams(course.id)],
+      ['addExam', () => store.addExam(examInput)],
+      ['updateExam', () => store.updateExam(exam!.id, examInput)],
+      ['deleteExam', () => store.deleteExam(exam!.id)],
+      ['listSlideDecks', () => store.listSlideDecks(course.id)],
+      ['addSlideDeck', () => store.addSlideDeck({ courseId: course.id, title: 'x', fileName: 'x.pdf', data: fakePdf(), pageTexts: ['x'] })],
+      ['renameSlideDeck', () => store.renameSlideDeck(deck.id, 'x')],
+      ['deleteSlideDeck', () => store.deleteSlideDeck(deck.id)],
+      ['getSlideDeckFile', () => store.getSlideDeckFile(deck.id)],
+      ['getSlideDeckPages', () => store.getSlideDeckPages(deck.id)],
+      ['listLectures', () => store.listLectures(course.id)],
+      ['getLecture', () => store.getLecture(lecture.lecture.id)],
+      ['recordLecture', () => store.recordLecture({ courseId: course.id, date: '2026-11-18', minutes: 50, sections: [{ deckId: deck.id, firstPage: 1, lastPage: 1 }] })],
+      ['updateLecture', () => store.updateLecture(lecture.lecture.id, { date: '2026-11-18', minutes: 50 })],
+      ['deleteLecture', () => store.deleteLecture(lecture.lecture.id)],
+      ['listSections', () => store.listSections()],
       ['changesSince', () => store.changesSince(0)],
+      ['exportSealed', () => store.exportSealed()],
       ['addKeyringEntry', async () => store.addKeyringEntry((await store.getKeyring())!.entries[0]!)],
     ];
     for (const [label, call] of calls) {
@@ -223,33 +238,12 @@ describe('the keyring', () => {
   });
 });
 
-describe('milestone 2 data', () => {
-  it('a version 1 database (milestone 2) opens, keeps working unencrypted, and setUp encrypts it with progress', async () => {
+describe('setUp and interrupted setUps', () => {
+  it('seals what was written before setup, reporting progress, and everything reads back the same', async () => {
     const name = freshName();
-    // Exactly what milestone 2's schema step 1 made, with a plain deck in it
-    const v1 = await openDB(name, 1, {
-      upgrade(db) {
-        db.createObjectStore('meta', { keyPath: 'key' });
-        db.createObjectStore('decks', { keyPath: 'id' });
-        db.createObjectStore('notes', { keyPath: 'id' }).createIndex('byDeck', 'deckId');
-        const cards = db.createObjectStore('cards', { keyPath: 'id' });
-        cards.createIndex('byDeck', 'deckId');
-        cards.createIndex('byNote', 'noteId');
-        const reviews = db.createObjectStore('reviews', { keyPath: 'id' });
-        reviews.createIndex('byCard', 'cardId');
-        reviews.createIndex('byTime', 'reviewedAt');
-        db.createObjectStore('changes', { keyPath: 'seq', autoIncrement: true });
-      },
-    });
-    await v1.put('decks', { id: 'old-deck', name: `Old ${MARKER}`, createdAt: T0.toISOString(), updatedAt: T0.toISOString() });
-    v1.close();
-
     const store = await open(name);
-    expect(store.status()).toBe('new');
-    const deck = (await store.listDecks(T0))[0]!;
-    expect(deck.name).toBe(`Old ${MARKER}`);
-    await store.addNote({ deckId: deck.id, kind: 'cloze', front: `{{c1::${MARKER}}}`, back: '' });
-    const notesBefore = await store.listNotes(deck.id);
+    const { course } = await writeEverything(store);
+    const lecturesBefore = await store.listLectures(course.id);
     const changesBefore = await store.changesSince(0);
 
     const progress: [number, number][] = [];
@@ -260,7 +254,7 @@ describe('milestone 2 data', () => {
     expect(progress.at(-1)).toEqual([total, total]);
     expect(progress.map((p) => p[0])).toEqual([...progress.map((p) => p[0])].sort((a, b) => a - b)); // only goes up
 
-    expect(await store.listNotes(deck.id)).toEqual(notesBefore);
+    expect(await store.listLectures(course.id)).toEqual(lecturesBefore);
     expect(await store.changesSince(0)).toEqual(changesBefore);
     expect(containsText(await rawRows(name), MARKER)).toBe(false);
   });
@@ -268,8 +262,9 @@ describe('milestone 2 data', () => {
   it('a setUp interrupted half-way is finished by the next unlock, losing nothing', async () => {
     const name = freshName();
     const store = await open(name, { migrationBatch: 1 });
-    const { deck } = await writeEverything(store);
-    const notesBefore = await store.listNotes(deck.id);
+    const { course, deck } = await writeEverything(store);
+    const lecturesBefore = await store.listLectures(course.id);
+    const pdfBefore = await store.getSlideDeckFile(deck.id);
     const key = await newDataKey();
     let calls = 0;
     const closedHalfWay = store.setUp(await testKeyring(key), key, () => {
@@ -285,30 +280,97 @@ describe('milestone 2 data', () => {
     const again = await open(name);
     expect(again.status()).toBe('locked'); // set up, so it needs the key
     await again.unlock(key);
-    expect(await again.listNotes(deck.id)).toEqual(notesBefore);
+    expect(await again.listLectures(course.id)).toEqual(lecturesBefore);
+    expect(await again.getSlideDeckFile(deck.id)).toEqual(pdfBefore);
     const after = await rawRows(name);
     for (const s of RECORD_STORES) expect(after[s]!.every((r) => 'enc' in (r as object)), s).toBe(true);
     expect(after.meta!.some((r) => (r as { key: string }).key === 'migration')).toBe(false);
   });
 });
 
-describe('speed', () => {
-  it('lists and queues 2,000 encrypted cards (time printed for the PR)', async () => {
-    const { store } = await setUpNew(freshName());
-    const deck = await store.createDeck('Big');
-    for (let i = 0; i < 1_000; i++) {
-      await store.addNote({ deckId: deck.id, kind: 'cloze', front: `{{c1::fact ${i}}} and {{c2::detail ${i}}}`, back: '' });
-    }
-    let start = performance.now();
-    const [summary] = await store.listDecks(T0);
-    const listMs = performance.now() - start;
-    start = performance.now();
-    const queue = await store.studyQueue({ deckId: deck.id, now: T0, timeZone: 'UTC', dayStartHour: 4, newPerDay: 20 });
-    const queueMs = performance.now() - start;
-    expect(summary!.total).toBe(2_000);
-    expect(queue).toHaveLength(20);
-    console.log(`2,000 encrypted cards: listDecks ${listMs.toFixed(0)} ms, studyQueue ${queueMs.toFixed(0)} ms (Node + fake-indexeddb)`);
-  }, 120_000);
+describe('milestone 2’s flashcards are dropped (schema step 4)', () => {
+  /** Exactly what milestone 2's schema step 1 made. */
+  const stepOne = (db: import('idb').IDBPDatabase) => {
+    db.createObjectStore('meta', { keyPath: 'key' });
+    db.createObjectStore('decks', { keyPath: 'id' });
+    db.createObjectStore('notes', { keyPath: 'id' }).createIndex('byDeck', 'deckId');
+    const cards = db.createObjectStore('cards', { keyPath: 'id' });
+    cards.createIndex('byDeck', 'deckId');
+    cards.createIndex('byNote', 'noteId');
+    const reviews = db.createObjectStore('reviews', { keyPath: 'id' });
+    reviews.createIndex('byCard', 'cardId');
+    reviews.createIndex('byTime', 'reviewedAt');
+    db.createObjectStore('changes', { keyPath: 'seq', autoIncrement: true });
+  };
+  const change = (entity: string, entityId: string) => ({ id: `ch-${entityId}`, deviceId: 'd', at: T0.toISOString(), entity, entityId, op: 'put', data: null });
+
+  it('a version 1 database opens, without its card stores or their changes, and works', async () => {
+    const name = freshName();
+    const v1 = await openDB(name, 1, { upgrade: (db) => stepOne(db as never) });
+    await v1.put('decks', { id: 'old-deck', name: 'Old', createdAt: T0.toISOString(), updatedAt: T0.toISOString() });
+    await v1.put('changes', change('deck', 'old-deck'));
+    await v1.put('meta', { key: 'deviceId', value: 'kept-device' });
+    v1.close();
+
+    const store = await open(name);
+    expect(store.deviceId()).toBe('kept-device');
+    expect(store.status()).toBe('new');
+    expect(await store.changesSince(0)).toEqual([]);
+    await writeEverything(store);
+    const db = await openHonedDb(name);
+    expect(db.version).toBe(DB_VERSION);
+    expect([...db.objectStoreNames].sort()).toEqual([...RECORD_STORES, 'meta'].sort());
+    db.close();
+  });
+
+  it('a version 3 database keeps its classes, sealed or not, and loses only the flashcards', async () => {
+    // A version 3 database made by the app as it was before #26, with cards beside a class
+    const name = freshName();
+    const v3 = await openDB(name, 3, {
+      upgrade(db) {
+        stepOne(db as never);
+        db.createObjectStore('courses', { keyPath: 'id' });
+        for (const s of ['exams', 'slideDecks', 'lectures']) db.createObjectStore(s, { keyPath: 'id' }).createIndex('byCourse', 'courseId');
+        db.createObjectStore('deckFiles', { keyPath: 'id' });
+        db.createObjectStore('deckPages', { keyPath: 'id' });
+        const sections = db.createObjectStore('sections', { keyPath: 'id' });
+        sections.createIndex('byCourse', 'courseId');
+        sections.createIndex('byLecture', 'lectureId');
+        sections.createIndex('byDeck', 'deckId');
+      },
+    });
+    const course = { id: 'c1', name: 'Kept', meetings: [], termStart: null, termEnd: null, createdAt: T0.toISOString(), updatedAt: T0.toISOString() };
+    await v3.put('courses', course);
+    await v3.put('cards', { id: 'card-1', deckId: 'd', noteId: 'n' });
+    for (const row of [change('card', 'card-1'), change('course', 'c1'), change('review', 'r1'), change('note', 'n')]) await v3.put('changes', row);
+    v3.close();
+
+    const store = await open(name);
+    expect(await store.getCourse('c1')).toEqual(course);
+    expect((await store.changesSince(0)).map((c) => `${c.entity}:${c.entityId}`)).toEqual(['course:c1']);
+    const db = await openHonedDb(name);
+    for (const gone of ['decks', 'notes', 'cards', 'reviews']) expect(db.objectStoreNames.contains(gone as never), gone).toBe(false);
+    db.close();
+  });
 });
 
-void StoreError;
+describe('speed', () => {
+  it('lists 2,000 encrypted sections (time printed for the PR)', async () => {
+    const { store } = await setUpNew(freshName());
+    const course = await store.createCourse({ name: 'Big', meetings: [], termStart: null, termEnd: null });
+    const deck = await store.addSlideDeck({ courseId: course.id, title: 'Big', fileName: 'big.pdf', data: fakePdf(), pageTexts: Array(200).fill('p') });
+    for (let i = 0; i < 200; i++) {
+      const sections = Array.from({ length: 10 }, (_, j) => ({ deckId: deck.id, firstPage: (i % 20) * 10 + j + 1, lastPage: (i % 20) * 10 + j + 1 }));
+      await store.recordLecture({ courseId: course.id, date: '2026-11-18', minutes: 50, sections });
+    }
+    let start = performance.now();
+    const sections = await store.listSections();
+    const sectionsMs = performance.now() - start;
+    start = performance.now();
+    const lectures = await store.listLectures(course.id);
+    const lecturesMs = performance.now() - start;
+    expect(sections).toHaveLength(2_000);
+    expect(lectures).toHaveLength(200);
+    console.log(`2,000 encrypted sections: listSections ${sectionsMs.toFixed(0)} ms, listLectures ${lecturesMs.toFixed(0)} ms (Node + fake-indexeddb)`);
+  }, 120_000);
+});

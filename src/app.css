@@ -10,10 +10,6 @@
   --accent-text: #ffffff;
   --border: #e2e8f0;
   --danger: #b91c1c;
-  --again: #b91c1c;
-  --hard: #b45309;
-  --good: #15803d;
-  --easy: #1d4ed8;
   --radius: 0.75rem;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -30,10 +26,6 @@
     --accent-text: #111827;
     --border: #334155;
     --danger: #f87171;
-    --again: #f87171;
-    --hard: #fbbf24;
-    --good: #4ade80;
-    --easy: #60a5fa;
   }
 }
 
@@ -244,153 +236,13 @@ kbd {
   gap: 0.5rem;
 }
 
-.deck-row,
-.note-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.deck-link {
-  flex: 1 1 12rem;
-  display: flex;
-  flex-direction: column;
-  min-height: 44px;
-  justify-content: center;
-  color: var(--text);
-  text-decoration: none;
-}
-
-.deck-name {
-  font-weight: 600;
-  font-size: 1.1rem;
-}
-
-.counts {
-  display: inline-flex;
-  gap: 0.75rem;
-  font-size: 0.9rem;
-}
-
-.counts .due {
-  color: var(--good);
-}
-
-.counts .new {
-  color: var(--easy);
-}
-
-.note-text {
-  flex: 1 1 14rem;
-  min-width: 0;
-}
-
-/* --- Cards --- */
-
-.card-text {
-  white-space: pre-wrap; /* keep the line breaks people type */
-  overflow-wrap: anywhere;
-}
-
-.cloze-blank {
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.cloze-answer {
-  font-weight: 700;
-  color: var(--good);
-}
-
-.previews {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.preview {
-  padding: 0.5rem 0.75rem;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-}
+/* --- Forms --- */
 
 .editor {
   padding: 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-}
-
-.review .card {
-  min-height: 12rem;
-  padding: 1.25rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 1.25rem;
-}
-
-.review .card hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 1rem 0;
-}
-
-.answer-bar {
-  margin-top: 1rem;
-  min-height: 4.5rem; /* the same height before and after "Show answer" */
-  display: flex;
-  align-items: stretch;
-}
-
-.answer-bar > .wide {
-  min-height: 4.5rem;
-}
-
-.grades {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-}
-
-.grade {
-  flex-direction: column;
-  gap: 0;
-  padding: 0.25rem;
-  min-height: 4.5rem;
-}
-
-.grade-label {
-  font-weight: 700;
-}
-
-.grade-when {
-  font-size: 0.85rem;
-  color: var(--muted);
-  min-height: 1.3em;
-}
-
-.grade-1 .grade-label {
-  color: var(--again);
-}
-
-.grade-2 .grade-label {
-  color: var(--hard);
-}
-
-.grade-3 .grade-label {
-  color: var(--good);
-}
-
-.grade-4 .grade-label {
-  color: var(--easy);
 }
 
 /* --- Dialog --- */
@@ -562,9 +414,6 @@ label.file input {
   color: inherit;
 }
 
-.old-cards {
-  margin-top: 2rem;
-}
 
 .slides-frame {
   height: min(75vh, 44rem);

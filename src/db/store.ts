@@ -14,45 +14,15 @@
 // the change, encrypts, then writes (a second transaction). Writes run one at a time (Web Locks
 // across tabs where available, a queue within this one), so nothing slips in between.
 //
-// FSRS and cloze come in as `deps` (the real ones by default), so tests can use stand-ins. The
-// review log is only ever added to (FSRS rule 2). Deleting a card or deck keeps its reviews.
-import { checkCloze } from '../lib/cloze';
+// The clock and ids come in as `deps` (the real ones by default), so tests can fix them. The
+// classes, lectures and slides themselves are in lectures.ts.
 import { decryptBytes, decryptRecord, encryptBytes, encryptRecord, recordAad } from '../lib/crypto';
-import { buildQueue, newSchedulingState, review } from '../lib/scheduler';
-import { studyDay } from '../lib/studyDay';
 import type { EncryptedRecord, Keyring, KeyringEntry, UnlockMethod } from '../types/crypto';
 import type { LectureStore, Section } from '../types/lecture';
-import type { Card, Deck, Note, NoteKind, QueueOptions, Rating, ReviewRecord } from '../types/study';
 import { lectureMethods } from './lectures';
 import { DB_VERSION, openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb, type RecordStore } from './schema';
 
 export type StoreStatus = 'new' | 'locked' | 'unlocked';
-
-export interface DeckSummary extends Deck {
-  total: number; // cards in the deck
-  newCount: number; // never reviewed, not suspended
-  dueCount: number; // reviewed before and due by `now`, not suspended
-}
-
-export interface NoteWithCards {
-  note: Note;
-  cards: Card[]; // ordered by ordinal
-}
-
-export interface NoteInput {
-  deckId: string;
-  kind: NoteKind;
-  front: string;
-  back: string;
-}
-
-export interface StudyQueueOptions {
-  deckId?: string; // leave out to study every deck
-  now: Date;
-  timeZone: string;
-  dayStartHour: number;
-  newPerDay: number;
-}
 
 export interface StudyStore extends LectureStore {
   deviceId(): string;
@@ -83,27 +53,6 @@ export interface StudyStore extends LectureStore {
   /** The newest change-log row's number (0 if none), so backups can tell whether anything changed. */
   latestChange(): Promise<number>;
 
-  // --- Study data ---
-  listDecks(now: Date): Promise<DeckSummary[]>;
-  getDeck(id: string): Promise<Deck | null>;
-  createDeck(name: string): Promise<Deck>;
-  renameDeck(id: string, name: string): Promise<Deck>;
-  /** Deletes the deck, its notes and its cards. Their reviews stay in the log. */
-  deleteDeck(id: string): Promise<void>;
-  listNotes(deckId: string): Promise<NoteWithCards[]>;
-  addNote(input: NoteInput): Promise<NoteWithCards>;
-  /**
-   * Changes a note's text. Cards keep their FSRS state (FSRS rule 4: a small fix). For a cloze
-   * note, numbers that disappear lose their card and new numbers get a new card.
-   */
-  updateNote(id: string, edit: { front: string; back: string }): Promise<NoteWithCards>;
-  deleteNote(id: string): Promise<void>;
-  getCard(id: string): Promise<{ card: Card; note: Note } | null>;
-  setSuspended(cardId: string, suspended: boolean): Promise<Card>;
-  /** The card ids to study now, in order (see buildQueue in src/lib/scheduler.ts). */
-  studyQueue(options: StudyQueueOptions): Promise<string[]>;
-  /** Records an answer: the card's new FSRS state and a row in the review log. */
-  answer(cardId: string, rating: Rating, durationMs: number, now: Date): Promise<Card>;
   /** Change-log rows after `seq` (0 = all), oldest first. For v2's sync, and for tests. */
   changesSince(seq: number): Promise<ChangeRecord[]>;
   close(): void;
@@ -131,10 +80,6 @@ export class StoreError extends Error {
 }
 
 export interface StoreDeps {
-  newSchedulingState: typeof newSchedulingState;
-  review: typeof review;
-  buildQueue: typeof buildQueue;
-  checkCloze: typeof checkCloze;
   /** Now, for createdAt/updatedAt and change-log times. */
   clock: () => Date;
   newId: () => string;
@@ -143,23 +88,13 @@ export interface StoreDeps {
 }
 
 const realDeps: StoreDeps = {
-  newSchedulingState,
-  review,
-  buildQueue,
-  checkCloze,
   clock: () => new Date(),
   newId: () => crypto.randomUUID(),
   migrationBatch: 200,
 };
 
-export const DECK_NAME_MAX = 100;
-
 /** The fields each store keeps readable when sealed (docs/SECURITY.md, "What stays readable"). */
 const READABLE: Record<RecordStore, readonly string[]> = {
-  decks: ['id'],
-  notes: ['id', 'deckId'],
-  cards: ['id', 'noteId', 'deckId', 'suspended', 'position'],
-  reviews: ['id', 'cardId', 'reviewedAt'],
   changes: ['seq', 'id', 'at', 'entity', 'entityId', 'op'],
   courses: ['id'],
   exams: ['id', 'courseId', 'date'],
@@ -206,18 +141,6 @@ function checkKeyring(entries: KeyringEntry[]) {
   }
 }
 
-/** A card's readable facts, sealed or plain (counting needs no decryption). */
-function cardFacts(row: unknown) {
-  const c = row as Row & { state?: Card['state'] };
-  return {
-    deckId: String(c.deckId),
-    suspended: Boolean(c.suspended),
-    position: Number(c.position),
-    phase: (c.phase ?? c.state?.phase) as Card['state']['phase'],
-    due: String(c.due ?? c.state?.due),
-  };
-}
-
 function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: boolean): StudyStore {
   let key: CryptoKey | null = null;
   let hasKeyring = keyringSaved;
@@ -260,11 +183,6 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
       else secret[field] = value;
     }
     if (readable.seq === undefined) delete readable.seq; // a new change row: IndexedDB numbers it
-    if (name === 'cards') {
-      const state = plain.state as Card['state'];
-      readable.phase = state.phase;
-      readable.due = state.due;
-    }
     if (name === 'sections') {
       readable.nextDue = (plain.schedule as Section['schedule']).nextDue;
     }
@@ -289,30 +207,6 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
   /** A change-log row, sealed, ready to add in the caller's write transaction. */
   const change = (entity: ChangeRecord['entity'], op: ChangeRecord['op'], entityId: string, data: ChangeRecord['data']) =>
     seal('changes', { id: deps.newId(), deviceId: device, at: iso(), entity, entityId, op, data });
-
-  // --- Validation ---
-
-  const deckName = (name: string) => {
-    const clean = name.trim();
-    if (!clean) throw new StoreError('invalid', 'A deck needs a name.');
-    if (clean.length > DECK_NAME_MAX) throw new StoreError('invalid', `Deck names can be at most ${DECK_NAME_MAX} characters.`);
-    return clean;
-  };
-
-  /** The card numbers a note's text makes: [1] for basic, the cloze numbers for cloze. */
-  const ordinalsFor = (kind: NoteKind, front: string, back: string): number[] => {
-    if (kind === 'basic') {
-      if (!front.trim()) throw new StoreError('invalid', 'The front can’t be empty.');
-      if (!back.trim()) throw new StoreError('invalid', 'The back can’t be empty.');
-      return [1];
-    }
-    const check = deps.checkCloze(front);
-    if (!check.ok) throw new StoreError('invalid', check.error);
-    return check.numbers;
-  };
-
-  const byOrdinal = (a: Card, b: Card) => a.ordinal - b.ordinal;
-  const nextPosition = (rows: unknown[]) => rows.reduce<number>((max, r) => Math.max(max, cardFacts(r).position + 1), 0);
 
   // --- Migration: seal every plain record (setUp, and an interrupted setUp finished by unlock) ---
 
@@ -465,306 +359,6 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
       const cursor = await db.transaction('changes').store.openCursor(null, 'prev');
       return cursor ? Number(cursor.key) : 0;
     },
-
-    async listDecks(now) {
-      requireOpen();
-      const tx = db.transaction(['decks', 'cards']);
-      const [rawDecks, rawCards] = await Promise.all([tx.objectStore('decks').getAll(), tx.objectStore('cards').getAll()]);
-      await tx.done;
-      const decks = await openAll<Deck>('decks', rawDecks);
-      const cards = rawCards.map(cardFacts); // counted from readable fields: no card is decrypted
-      const nowIso = now.toISOString();
-      return decks
-        .map((deck) => {
-          const own = cards.filter((c) => c.deckId === deck.id);
-          const active = own.filter((c) => !c.suspended);
-          return {
-            ...deck,
-            total: own.length,
-            newCount: active.filter((c) => c.phase === 'new').length,
-            dueCount: active.filter((c) => c.phase !== 'new' && c.due <= nowIso).length,
-          };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
-    },
-
-    async getDeck(id) {
-      requireOpen();
-      const row = await db.get('decks', id);
-      return row ? open<Deck>('decks', row) : null;
-    },
-
-    createDeck: (name) =>
-      exclusive(async () => {
-        const clean = deckName(name);
-        const now = iso();
-        const deck: Deck = { id: deps.newId(), name: clean, createdAt: now, updatedAt: now };
-        const [row, log] = await Promise.all([seal('decks', { ...deck }), change('deck', 'put', deck.id, deck)]);
-        const tx = db.transaction(['decks', 'changes'], 'readwrite');
-        await tx.objectStore('decks').add(row as never);
-        await tx.objectStore('changes').add(log as never);
-        await tx.done;
-        return deck;
-      }),
-
-    renameDeck: (id, name) =>
-      exclusive(async () => {
-        const clean = deckName(name);
-        requireOpen();
-        const row = await db.get('decks', id);
-        if (!row) throw new StoreError('not-found', 'That deck no longer exists.');
-        const next: Deck = { ...(await open<Deck>('decks', row)), name: clean, updatedAt: iso() };
-        const [sealed, log] = await Promise.all([seal('decks', { ...next }), change('deck', 'put', id, next)]);
-        const tx = db.transaction(['decks', 'changes'], 'readwrite');
-        await tx.objectStore('decks').put(sealed as never);
-        await tx.objectStore('changes').add(log as never);
-        await tx.done;
-        return next;
-      }),
-
-    deleteDeck: (id) =>
-      exclusive(async () => {
-        requireOpen();
-        const read = db.transaction(['decks', 'notes', 'cards']);
-        const [deck, noteIds, cardIds] = await Promise.all([
-          read.objectStore('decks').get(id),
-          read.objectStore('notes').index('byDeck').getAllKeys(id),
-          read.objectStore('cards').index('byDeck').getAllKeys(id),
-        ]);
-        await read.done;
-        if (!deck) throw new StoreError('not-found', 'That deck no longer exists.');
-        const logs = await Promise.all([
-          ...cardIds.map((cardId) => change('card', 'delete', cardId, null)),
-          ...noteIds.map((noteId) => change('note', 'delete', noteId, null)),
-          change('deck', 'delete', id, null),
-        ]);
-        const tx = db.transaction(['decks', 'notes', 'cards', 'changes'], 'readwrite');
-        for (const cardId of cardIds) await tx.objectStore('cards').delete(cardId);
-        for (const noteId of noteIds) await tx.objectStore('notes').delete(noteId);
-        await tx.objectStore('decks').delete(id);
-        for (const log of logs) await tx.objectStore('changes').add(log as never);
-        await tx.done;
-      }),
-
-    async listNotes(deckId) {
-      requireOpen();
-      const tx = db.transaction(['notes', 'cards']);
-      const [rawNotes, rawCards] = await Promise.all([
-        tx.objectStore('notes').index('byDeck').getAll(deckId),
-        tx.objectStore('cards').index('byDeck').getAll(deckId),
-      ]);
-      await tx.done;
-      const [notes, cards] = await Promise.all([openAll<Note>('notes', rawNotes), openAll<Card>('cards', rawCards)]);
-      return notes
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
-        .map((note) => ({ note, cards: cards.filter((c) => c.noteId === note.id).sort(byOrdinal) }));
-    },
-
-    addNote: (input) =>
-      exclusive(async () => {
-        const ordinals = ordinalsFor(input.kind, input.front, input.back);
-        requireOpen();
-        const read = db.transaction(['decks', 'cards']);
-        const [deck, deckCards] = await Promise.all([
-          read.objectStore('decks').get(input.deckId),
-          read.objectStore('cards').index('byDeck').getAll(input.deckId),
-        ]);
-        await read.done;
-        if (!deck) throw new StoreError('not-found', 'That deck no longer exists.');
-        const now = deps.clock();
-        const stamp = now.toISOString();
-        const note: Note = {
-          id: deps.newId(),
-          deckId: input.deckId,
-          kind: input.kind,
-          front: input.front,
-          back: input.back,
-          createdAt: stamp,
-          updatedAt: stamp,
-        };
-        let position = nextPosition(deckCards);
-        const cards: Card[] = ordinals.map((ordinal) => ({
-          id: deps.newId(),
-          noteId: note.id,
-          deckId: input.deckId,
-          ordinal,
-          position: position++,
-          suspended: false,
-          state: deps.newSchedulingState(now),
-          createdAt: stamp,
-        }));
-        const [noteRow, noteLog, ...rest] = await Promise.all([
-          seal('notes', { ...note }),
-          change('note', 'put', note.id, note),
-          ...cards.flatMap((card) => [seal('cards', { ...card }), change('card', 'put', card.id, card)]),
-        ]);
-        const tx = db.transaction(['notes', 'cards', 'changes'], 'readwrite');
-        await tx.objectStore('notes').add(noteRow as never);
-        await tx.objectStore('changes').add(noteLog as never);
-        for (let i = 0; i < rest.length; i += 2) {
-          await tx.objectStore('cards').add(rest[i] as never);
-          await tx.objectStore('changes').add(rest[i + 1] as never);
-        }
-        await tx.done;
-        return { note, cards };
-      }),
-
-    updateNote: (id, edit) =>
-      exclusive(async () => {
-        requireOpen();
-        const read = db.transaction(['notes', 'cards']);
-        const [noteRow, ownCards] = await Promise.all([
-          read.objectStore('notes').get(id),
-          read.objectStore('cards').index('byNote').getAll(id),
-        ]);
-        await read.done;
-        if (!noteRow) throw new StoreError('not-found', 'That note no longer exists.');
-        const note = await open<Note>('notes', noteRow);
-        const ordinals = ordinalsFor(note.kind, edit.front, edit.back);
-        const existing = await openAll<Card>('cards', ownCards);
-        const deckCards = await db.getAllFromIndex('cards', 'byDeck', note.deckId);
-        const now = deps.clock();
-        const next: Note = { ...note, front: edit.front, back: edit.back, updatedAt: now.toISOString() };
-        const keep = existing.filter((c) => ordinals.includes(c.ordinal));
-        const gone = existing.filter((c) => !ordinals.includes(c.ordinal));
-        const missing = ordinals.filter((n) => !existing.some((c) => c.ordinal === n));
-        let position = nextPosition(deckCards);
-        const added: Card[] = missing.map((ordinal) => ({
-          id: deps.newId(),
-          noteId: id,
-          deckId: note.deckId,
-          ordinal,
-          position: position++,
-          suspended: false,
-          state: deps.newSchedulingState(now),
-          createdAt: now.toISOString(),
-        }));
-        const [sealedNote, noteLog, ...rest] = await Promise.all([
-          seal('notes', { ...next }),
-          change('note', 'put', id, next),
-          ...gone.map((card) => change('card', 'delete', card.id, null)),
-          ...added.flatMap((card) => [seal('cards', { ...card }), change('card', 'put', card.id, card)]),
-        ]);
-        const goneLogs = rest.slice(0, gone.length);
-        const addedRows = rest.slice(gone.length);
-        const tx = db.transaction(['notes', 'cards', 'changes'], 'readwrite');
-        await tx.objectStore('notes').put(sealedNote as never);
-        await tx.objectStore('changes').add(noteLog as never);
-        for (let i = 0; i < gone.length; i++) {
-          await tx.objectStore('cards').delete(gone[i]!.id);
-          await tx.objectStore('changes').add(goneLogs[i] as never);
-        }
-        for (let i = 0; i < addedRows.length; i += 2) {
-          await tx.objectStore('cards').add(addedRows[i] as never);
-          await tx.objectStore('changes').add(addedRows[i + 1] as never);
-        }
-        await tx.done;
-        return { note: next, cards: [...keep, ...added].sort(byOrdinal) };
-      }),
-
-    deleteNote: (id) =>
-      exclusive(async () => {
-        requireOpen();
-        const read = db.transaction(['notes', 'cards']);
-        const [note, cardIds] = await Promise.all([
-          read.objectStore('notes').get(id),
-          read.objectStore('cards').index('byNote').getAllKeys(id),
-        ]);
-        await read.done;
-        if (!note) throw new StoreError('not-found', 'That note no longer exists.');
-        const logs = await Promise.all([
-          ...cardIds.map((cardId) => change('card', 'delete', cardId, null)),
-          change('note', 'delete', id, null),
-        ]);
-        const tx = db.transaction(['notes', 'cards', 'changes'], 'readwrite');
-        for (const cardId of cardIds) await tx.objectStore('cards').delete(cardId);
-        await tx.objectStore('notes').delete(id);
-        for (const log of logs) await tx.objectStore('changes').add(log as never);
-        await tx.done;
-      }),
-
-    async getCard(id) {
-      requireOpen();
-      const cardRow = await db.get('cards', id);
-      if (!cardRow) return null;
-      const card = await open<Card>('cards', cardRow);
-      const noteRow = await db.get('notes', card.noteId);
-      return noteRow ? { card, note: await open<Note>('notes', noteRow) } : null;
-    },
-
-    setSuspended: (cardId, suspended) =>
-      exclusive(async () => {
-        requireOpen();
-        const row = await db.get('cards', cardId);
-        if (!row) throw new StoreError('not-found', 'That card no longer exists.');
-        const next: Card = { ...(await open<Card>('cards', row)), suspended };
-        const [sealed, log] = await Promise.all([seal('cards', { ...next }), change('card', 'put', cardId, next)]);
-        const tx = db.transaction(['cards', 'changes'], 'readwrite');
-        await tx.objectStore('cards').put(sealed as never);
-        await tx.objectStore('changes').add(log as never);
-        await tx.done;
-        return next;
-      }),
-
-    async studyQueue({ deckId, now, timeZone, dayStartHour, newPerDay }) {
-      requireOpen();
-      // Reviews from the last two days are enough to find today's (a study day is 24 hours long,
-      // give or take a clock change); then keep those in today's study day.
-      const since = new Date(now.getTime() - 2 * 86_400_000).toISOString();
-      const tx = db.transaction(['cards', 'reviews']);
-      const [rawCards, rawRecent] = await Promise.all([
-        deckId ? tx.objectStore('cards').index('byDeck').getAll(deckId) : tx.objectStore('cards').getAll(),
-        tx.objectStore('reviews').index('byTime').getAll(IDBKeyRange.lowerBound(since)),
-      ]);
-      await tx.done;
-      const inScope = new Set(rawCards.map((c) => c.id));
-      // Decrypt only what the queue needs: this scope's cards and their recent reviews
-      const [cards, recent] = await Promise.all([
-        openAll<Card>('cards', rawCards),
-        openAll<ReviewRecord>('reviews', rawRecent.filter((r) => inScope.has(r.cardId))),
-      ]);
-      const today = studyDay(now, timeZone, dayStartHour);
-      const newIntroducedToday = recent.filter(
-        (r) => r.phaseBefore === 'new' && studyDay(new Date(r.reviewedAt), timeZone, dayStartHour) === today,
-      ).length;
-      const options: QueueOptions = { now, timeZone, dayStartHour, newPerDay, newIntroducedToday };
-      return deps.buildQueue(
-        cards.map(({ id, noteId, position, suspended, state }) => ({ id, noteId, position, suspended, state })),
-        options,
-      );
-    },
-
-    answer: (cardId, rating, durationMs, now) =>
-      exclusive(async () => {
-        if (![1, 2, 3, 4].includes(rating)) throw new StoreError('invalid', `Unknown rating ${rating}.`);
-        requireOpen();
-        const row = await db.get('cards', cardId);
-        if (!row) throw new StoreError('not-found', 'That card no longer exists.');
-        const card = await open<Card>('cards', row);
-        if (card.suspended) throw new StoreError('invalid', 'That card is suspended.');
-        const outcome = deps.review(card.state, rating, now);
-        const record: ReviewRecord = {
-          ...outcome.entry,
-          id: deps.newId(),
-          cardId,
-          durationMs: Math.max(0, Math.round(durationMs)),
-          deviceId: device,
-        };
-        const next: Card = { ...card, state: outcome.next };
-        const [sealedCard, sealedReview, cardLog, reviewLog] = await Promise.all([
-          seal('cards', { ...next }),
-          seal('reviews', { ...record }),
-          change('card', 'put', cardId, next),
-          change('review', 'put', record.id, record),
-        ]);
-        const tx = db.transaction(['cards', 'reviews', 'changes'], 'readwrite');
-        await tx.objectStore('cards').put(sealedCard as never);
-        await tx.objectStore('reviews').add(sealedReview as never);
-        await tx.objectStore('changes').add(cardLog as never);
-        await tx.objectStore('changes').add(reviewLog as never);
-        await tx.done;
-        return next;
-      }),
 
     async changesSince(seq) {
       requireOpen();

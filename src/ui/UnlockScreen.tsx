@@ -121,7 +121,7 @@ function Unlock({ keyring, onUnlocked }: { keyring: Keyring; onUnlocked: () => v
   return (
     <section className="unlock" aria-labelledby="unlock-title">
       <h2 id="unlock-title">Unlock {APP_NAME}</h2>
-      <p className="muted">Your cards are encrypted on this device.</p>
+      <p className="muted">Your classes and slides are encrypted on this device.</p>
       {prf && passkeys.length > 0 && (
         <button type="button" className="primary" onClick={usePasskey} disabled={busy}>
           Unlock with a passkey
