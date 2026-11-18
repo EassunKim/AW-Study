@@ -25,7 +25,7 @@ export async function makeBackup(store: BackupStore, now: Date): Promise<{ text:
 /** Stores left out of a backup's summary (they aren't things a person counts). */
 const HIDDEN_FROM_COUNTS = new Set(['changes', 'deckFiles', 'deckPages']);
 /** Store names in people's words, for describeCounts. */
-const COUNT_NAMES: Record<string, string> = { courses: 'classes', slideDecks: 'slide decks' };
+const COUNT_NAMES: Record<string, string> = { courses: 'classes', slideDecks: 'slide decks', quizAttempts: 'quizzes' };
 
 /**
  * Checks that `dataKey` opens every record in the backup (each with its own additional data, so a
@@ -61,6 +61,7 @@ export function describeCounts(counts: Record<string, number>): string {
 
 function singular(name: string): string {
   if (name.endsWith('ies')) return `${name.slice(0, -3)}y`;
+  if (name.endsWith('zzes')) return name.slice(0, -3); // quizzes
   if (name.endsWith('sses') || name.endsWith('xes')) return name.slice(0, -2);
   return name.endsWith('s') ? name.slice(0, -1) : name;
 }

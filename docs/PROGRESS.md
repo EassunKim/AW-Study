@@ -34,7 +34,7 @@ slides" and "M6: AI helper and quizzes":
 | Class and lecture screens; remove the flashcard layer | #26 | Nathan's Claude | `src/ui/` (not #17's screens), routes, old flashcard files | **Done** (screens PR #36, removal PR #37) |
 | AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Done and live** (PR #33; server set up Nov 18, Matt's token still to add) |
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
-| Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | Contract in PR #41; storage and screens next |
+| Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | Contract PR #41; storage PR #42; screens next |
 
 ## Milestones
 
@@ -106,6 +106,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** #40 storage (PR #42): schema step 5 (`questions`, `quizAttempts`, both indexed by class
+  and section) and `src/db/quiz.ts`. Questions are checked when added (a slide in the section, four
+  different options, the answer among them, no repeat of the bank; 100 a call, 500 a section), all or
+  none. An attempt is marked by the store against the stored answers (a "right" from the screen is
+  ignored) and only ever added. Deleting a lecture or class takes its questions and attempts.
+  Backups name them "questions" and "quizzes". 8 deliberate bugs each caught. (Nathan's Claude)
 
 - **Nov 18:** #26 part 2, flashcards removed (PR #37): the deck, note and card screens, store
   methods and tests, `src/lib/scheduler.ts`, `src/lib/cloze.ts`, `src/types/study.ts`, and `ts-fsrs`.

@@ -19,12 +19,14 @@
 import { decryptBytes, decryptRecord, encryptBytes, encryptRecord, recordAad } from '../lib/crypto';
 import type { EncryptedRecord, Keyring, KeyringEntry, UnlockMethod } from '../types/crypto';
 import type { LectureStore, Section } from '../types/lecture';
+import type { QuizStore } from '../types/quiz';
 import { lectureMethods } from './lectures';
+import { quizMethods } from './quiz';
 import { DB_VERSION, openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb, type RecordStore } from './schema';
 
 export type StoreStatus = 'new' | 'locked' | 'unlocked';
 
-export interface StudyStore extends LectureStore {
+export interface StudyStore extends LectureStore, QuizStore {
   deviceId(): string;
 
   // --- The lock side (the screens' `Vault`, src/ui/vault.ts) ---
@@ -103,6 +105,8 @@ const READABLE: Record<RecordStore, readonly string[]> = {
   deckPages: ['id'],
   lectures: ['id', 'courseId', 'date'],
   sections: ['id', 'courseId', 'lectureId', 'deckId'], // + nextDue, copied from schedule
+  questions: ['id', 'courseId', 'sectionId'],
+  quizAttempts: ['id', 'courseId', 'sectionId'],
 };
 const KEYCHECK_AAD = 'honed:v1:meta:keycheck';
 
@@ -246,6 +250,8 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
   return {
     // Classes, exams, slide decks, lectures and sections (#24): src/db/lectures.ts
     ...lectureMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
+    // Question banks and quiz attempts (#40): src/db/quiz.ts
+    ...quizMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
 
     deviceId: () => device,
     status,
