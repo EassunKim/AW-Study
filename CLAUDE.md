@@ -5,6 +5,38 @@ their own PC. This file is shared: both Claudes follow it. Keep personal notes i
 memory, not here. The full design is `docs/DESIGN.md`. Read it before any feature work, and update it
 in the same PR when a decision changes.
 
+## Working together (two Claudes on two machines)
+
+Matt's Claude and Nathan's Claude run on different machines and accounts and **cannot message each
+other**. GitHub is the shared channel. Each human relays only when something needs a person.
+
+**At the start of every session**, before any work:
+1. `git switch main && git pull`.
+2. Read `docs/PROGRESS.md` (the status board: who is doing what, decisions, gotchas).
+3. `gh issue list --label agent-task` and `gh pr list`: open tasks and work in progress. Read the
+   comments on any issue you're involved in: the other Claude may have asked you something.
+
+**Taking a task:**
+- Work only on a task that has an issue labelled `agent-task`. No issue yet? Make one first
+  (what, which files, done when).
+- Claim it with a comment: `[Matt's Claude] taking this` or `[Nathan's Claude] taking this`.
+- Branch, and open a **draft PR** at once with `Closes #<issue>`, so `gh pr list` shows the
+  work is in progress.
+- Only edit the files your task owns (its row in `docs/PROGRESS.md`). Need a change elsewhere,
+  especially to the shared contract `src/types/study.ts`? Ask in the issue first.
+
+**Talking to the other Claude:** comment on the task's issue (or the PR), signed `[Matt's Claude]`
+or `[Nathan's Claude]`. Write so it makes sense to a reader with no other context: what you
+need, which file, why. Don't `@`-mention people unless a human must act (it notifies them).
+
+**Finishing:** update your row and add a log line in `docs/PROGRESS.md` in the same PR. Note any
+decision there and in `docs/DESIGN.md`, and any trap you hit under "Gotchas". Mark the PR ready,
+wait for green CI, and leave the merge to the other side's review. If you can't finish, say in
+the issue exactly where you stopped and what's left.
+
+**Before pushing more to a PR,** check it's still open (`gh pr view <n> --json state`): a
+merged PR ignores later pushes.
+
 ## The product in one paragraph
 
 A local-first PWA. Slides, cards and review history live on the user's device, encrypted; the
@@ -30,6 +62,12 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - `src/brand.ts`: the app's name (**Honed**, a working name). Every user-visible name comes from
   here: never type the name anywhere else. The repo, npm package and image stay `aw-study`.
 - `src/`: the app. Pure logic in `src/lib/` with a `*.test.ts` beside each file.
+- `src/types/study.ts`: the shared contract (decks, notes, cards, FSRS state, review log). Plain
+  JSON types only; changes go in their own PR, announced in the task issues.
+- `src/lib/scheduler.ts` (the only file importing ts-fsrs), `src/lib/cloze.ts`: FSRS and cloze.
+- `src/db/`: storage (SQLite in a Web Worker on OPFS) and the `StudyStore` the screens call.
+- `src/ui/`: the screens.
+- `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design.
 - `server/`: the production server (Node's own modules only): serves `dist/`, `/healthz`, and every
   security header (`server/headers.mjs`).
 - `tests/server.test.mjs`: the server. `tests/browsers/`: Playwright against the built app.
