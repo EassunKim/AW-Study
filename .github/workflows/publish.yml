@@ -20,6 +20,7 @@ concurrency: # a newer push cancels an older run of the same branch still going
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20 # a normal run takes about 1 minute; a hang fails here instead of running for hours
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -28,16 +29,19 @@ jobs:
           cache: npm
       - run: npm ci
       # The browsers the tests use: Chromium for desktop and Android, WebKit (Safari's engine) for iPhone
+      # (it hung once on GitHub's side, Nov 18: if this step times out, rerun the job)
       - run: npx playwright install --with-deps chromium webkit
+        timeout-minutes: 8
       - run: npm test
 
   image:
     needs: test # a broken push never becomes an image
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         if: github.event_name != 'pull_request'
         with:
           registry: ghcr.io
@@ -47,7 +51,7 @@ jobs:
       - id: name
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
       # On a pull request the image is only built, to prove the Dockerfile works; on main it's published
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64

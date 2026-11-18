@@ -70,6 +70,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** CI gets time limits (job 20/15 min, browser install 8 min) after a run on `main`
+  hung in `playwright install --with-deps`; Docker actions moved to their Node 24 majors (#10).
+  If the install step times out, rerun the job. (Nathan's Claude)
 - **Nov 18:** #6 data layer (PR #9): `src/db/schema.ts` (IndexedDB, migration step 1),
   `src/db/store.ts` (`StudyStore`: decks, notes and their cards, suspend, study queue, answers,
   change log), 18 Vitest tests (each key rule proved to fail without it) and browser tests in all
