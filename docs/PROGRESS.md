@@ -106,7 +106,7 @@ the "Test and publish" run on `main` to finish, then press Update.
 ## Log (newest first)
 
 - **Nov 18:** #27 AI helper (PR #open C:\Users\mekim\AppData\Local\Temp\claude\4770acc3d7bcc157\8db5b715-72e1-4f77-b80c-1a2a285b63fe\scratchpad\pr27-body.md: The system cannot find the file specified.): `helper/`, a Node server (its own modules only) for
-  `POST /ai/questions`, `/ai/grade`, `/ai/explain`, `/ai/ask`. It checks the Cloudflare Access
+  `POST /ai/questions`, `/ai/grade`, `/ai/explain`, `/ai/ask` (and `GET /ai/whoami` for setup). It checks the Cloudflare Access
   token itself (signature, team, audience, expiry), maps the email to that person's own Claude
   Code token, and runs `claude -p` with **no tools** (`--tools ""`, `--disallowedTools "*"`), no
   MCP, no skills, no saved session, one turn, our own system prompt, the prompt on stdin, a fresh
@@ -114,7 +114,7 @@ the "Test and publish" run on `main` to finish, then press Update.
   nonce markers, marked as data. Replies are checked (4 distinct options, an answer among them, a
   slide that was given; marks in range) and retried once. Limits: per person per day, one at a
   time, sizes. Logs are counts only. Image `ghcr.io/nandminc/aw-study-ai`, checked in CI running
-  read-only as an unprivileged user. 54 tests with a fake `claude`; 32 of 34 deliberate bugs caught (the other two are covered by another check).
+  read-only as an unprivileged user. 55 tests with a fake `claude`; 32 of 34 deliberate bugs caught (the other two are covered by another check).
   (Matt's Claude)
 
 - **Nov 18:** #18 backups (PR #31): `.honed` backup files (the database as stored, no record
