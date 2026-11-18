@@ -30,9 +30,9 @@ slides" and "M6: AI helper and quizzes":
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Contract on `main` (PR #29); storage next |
-| PDF slide viewer component | #25 | Matt's Claude (after #18) | `src/viewer/`, `tests/fixtures/` | Ready (independent) |
+| PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
 | Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Waits for #24's contract and #25 |
-| AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #open C:\Users\mekim\AppData\Local\Temp\claude\4770acc3d7bcc157\8db5b715-72e1-4f77-b80c-1a2a285b63fe\scratchpad\pr27-body.md: The system cannot find the file specified.); Nathan sets up the server side (steps in the PR) |
+| AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #33); Nathan sets up the server side (steps in the PR) |
 
 ## Milestones
 
@@ -105,7 +105,7 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
-- **Nov 18:** #27 AI helper (PR #open C:\Users\mekim\AppData\Local\Temp\claude\4770acc3d7bcc157\8db5b715-72e1-4f77-b80c-1a2a285b63fe\scratchpad\pr27-body.md: The system cannot find the file specified.): `helper/`, a Node server (its own modules only) for
+- **Nov 18:** #27 AI helper (PR #33): `helper/`, a Node server (its own modules only) for
   `POST /ai/questions`, `/ai/grade`, `/ai/explain`, `/ai/ask` (and `GET /ai/whoami` for setup). It checks the Cloudflare Access
   token itself (signature, team, audience, expiry), maps the email to that person's own Claude
   Code token, and runs `claude -p` with **no tools** (`--tools ""`, `--disallowedTools "*"`), no
@@ -116,6 +116,17 @@ the "Test and publish" run on `main` to finish, then press Update.
   time, sizes. Logs are counts only. Image `ghcr.io/nandminc/aw-study-ai`, checked in CI running
   read-only as an unprivileged user. 55 tests with a fake `claude`; 32 of 34 deliberate bugs caught (the other two are covered by another check).
   (Matt's Claude)
+
+- **Nov 18:** #25 slide viewer (PR #32): `src/viewer/` with `<SlideViewer pdf page range
+  onPageChange>` (one slide fitted to the screen; keys, buttons, swipes, thumbnails; pinch, +/−
+  zoom; the section's range marked; a selectable text layer for milestone 7; thumbnails drawn only
+  near the screen) and `extractPageText(pdf)`. PDF.js 6 (`pdfjs-dist`, Apache-2.0), **legacy
+  build**; its worker and data files (fonts, decoders, colour profiles, character maps) come from
+  our own site (`/pdfjs/`, copied by `vite.config.ts`), so the CSP needed **no change**. Test page
+  `/viewer-demo.html` until #26 uses it. Unit tests on PDFs generated in the test
+  (`src/viewer/test-pdf.ts`); browser tests on all three engines (no errors, no CSP
+  violations, every request same-site, a 150-slide deck in under 5 s with under 40 thumbnails
+  drawn). 12 deliberate bugs each caught. (Matt's Claude)
 
 - **Nov 18:** #18 backups (PR #31): `.honed` backup files (the database as stored, no record
   decrypted; format in SECURITY.md "Backups"), download or share from Settings, automatic backups
@@ -186,6 +197,14 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **PDF.js: use the legacy build** (`pdfjs-dist/legacy/build/pdf.mjs`, and its worker). The
+  modern build of PDF.js 6 needs `Uint8Array.prototype.toHex` (Chrome 140, Safari 18.2, Node 25)
+  and `Promise.try`, so it fails in Node 24 and on older iPhones. In v6, `destroy()` is on the
+  loading task, not the document: use `openPdf()`'s `close()` (`src/viewer/pdf.ts`). PDF.js takes
+  ownership of the bytes it's given, so `openPdf` copies them.
+- **A mutation check that breaks the type check proves nothing in browser tests:** `npm run build`
+  fails, and the tests run against the old `dist/`. Check the build succeeded before trusting a
+  "missed" or "caught".
 - WebAuthn (passkeys) refuses an IP-address origin: Playwright's passkey test opens `localhost`, not `127.0.0.1`. Chromium's virtual authenticator supports PRF (`hasPrf: true`); WebKit has none, so iPhone passkeys are tried by hand.
 
 - **Writing to the encrypted store: read, decrypt, compute, encrypt, then write** in a second
