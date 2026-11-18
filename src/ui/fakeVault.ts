@@ -54,12 +54,19 @@ export function fakeVault(storage: Storage = window.localStorage): Vault {
   };
 }
 
-/** The rule #16 keeps too: always a passphrase or passkey, and always a recovery key. */
+/**
+ * The rule #16 keeps too: always a passphrase or passkey, and always a recovery key. Refused with
+ * code 'invalid', like #16's StoreError, so the screens word it themselves.
+ */
 function checkStillOpenable(entries: KeyringEntry[]) {
   if (!entries.some((e) => e.method === 'passphrase' || e.method === 'passkey')) {
-    throw new Error('Keep at least one passphrase or passkey, or you couldn’t unlock.');
+    throw invalid('Keep at least one passphrase or passkey, or you couldn’t unlock.');
   }
-  if (!entries.some((e) => e.method === 'recovery')) throw new Error('Keep a recovery key.');
+  if (!entries.some((e) => e.method === 'recovery')) throw invalid('Keep a recovery key.');
+}
+
+function invalid(message: string): Error {
+  return Object.assign(new Error(message), { code: 'invalid' });
 }
 
 const replaceBytes = (_key: string, value: unknown) =>

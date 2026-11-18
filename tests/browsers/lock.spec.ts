@@ -218,7 +218,7 @@ test.describe('passkeys (Chromium, virtual authenticator)', () => {
     // The last passkey can't be removed while there's no passphrase: that would lock you out
     await page.getByRole('button', { name: 'Remove passkey Second key' }).click();
     await page.getByRole('button', { name: 'Remove passkey', exact: true }).click();
-    await expect(alert(page)).toContainText('Keep at least one passphrase or passkey');
+    await expect(alert(page)).toContainText('without one you couldn’t unlock');
     await expect(page.getByTestId('passkey-row')).toHaveCount(1);
     expect(errors).toEqual([]);
   });

@@ -140,13 +140,20 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
               await vault.removeKeyringEntry(id);
               await finish(`Removed the passkey “${label}”.`);
             } catch (err) {
-              setProblem(messageOf(err));
+              // The store refuses ('invalid') to remove the last way in (#16)
+              setProblem(isInvalid(err) ? LAST_WAY_IN : messageOf(err));
             }
           }}
         />
       )}
     </section>
   );
+}
+
+const LAST_WAY_IN = 'Keep at least one passphrase or passkey: without one you couldn’t unlock. Add another first.';
+
+function isInvalid(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'invalid';
 }
 
 function ChangePassphrase({
