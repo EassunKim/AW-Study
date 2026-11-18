@@ -11,7 +11,7 @@ Milestone 2, **Study by hand**, is split into three tasks. Each has a GitHub iss
 
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
-| Scheduler and cloze: FSRS, the daily queue, cloze parsing | #5 | Matt's Claude | `src/lib/scheduler.ts`, `src/lib/cloze.ts` + tests | Ready to start once the kickoff PR is merged |
+| Scheduler and cloze: FSRS, the daily queue, cloze parsing | #5 | Matt's Claude | `src/lib/scheduler.ts`, `src/lib/cloze.ts` + tests | **Done** (PR #12) |
 | Data layer: IndexedDB, schema, change log, `StudyStore` | #6 | Nathan's Claude | `src/db/` | PR #9: store done and tested; waits for #5 to test notes in browsers |
 | Screens: decks, card editor, review | #7 | Whoever is free after #5 and #6 | `src/ui/`, `src/App.tsx` | Waiting for #5 and #6 |
 
@@ -70,6 +70,11 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** #5 scheduler and cloze (PR #12): `src/lib/scheduler.ts` (ts-fsrs 6, retention 0.9,
+  max 36500 days, deterministic fuzz; the daily queue with the study day, new-card limit,
+  suspended cards and one card per note per day; button labels) and `src/lib/cloze.ts`
+  (`checkCloze`, `renderCloze`), with 71 Vitest tests. Each key rule was proved to fail without it
+  (30 of 32; the other two are already enforced by ts-fsrs). Signatures unchanged. (Matt's Claude)
 - **Nov 18:** #6 data layer (PR #9): `src/db/schema.ts` (IndexedDB, migration step 1),
   `src/db/store.ts` (`StudyStore`: decks, notes and their cards, suspend, study queue, answers,
   change log), 18 Vitest tests (each key rule proved to fail without it) and browser tests in all
@@ -86,6 +91,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- ts-fsrs's review log `due` field is the card's previous review time, not its old due date.
+  `review()` fills `ReviewEntry.dueBefore` from the state passed in instead. ts-fsrs 6 also marks
+  the classic `fsrs()` API we use as deprecated (it still works); only `scheduler.ts` would change.
+- `npm install` on a different Node version (Matt's PC has Node 22) can rewrite
+  `package-lock.json`. Don't commit that unless the PR is about dependencies.
 
 - **Playwright's WebKit has no OPFS** (the browser's private file system): anything built on it
   can't be tested for iPhones here. Real Safari has it; our tests can't show it.
