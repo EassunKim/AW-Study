@@ -1,0 +1,52 @@
+// Which questions a quiz asks (DESIGN, "Questions"): the ones you got wrong last time first, then
+// ones never asked, then the rest, longest-ago first, so recently asked questions wait their turn.
+// Each question's options are shown in a fresh order, so the right one isn't always in one place.
+import type { OptionIndex, Question, QuizAttempt } from '../types/quiz';
+
+/** Questions per quiz until the planner (milestone 5) sets it from the section's scores. */
+export const QUIZ_SIZE = 5;
+
+export interface QuizItem {
+  question: Question;
+  /** order[shown position] = the option's index as stored. */
+  order: OptionIndex[];
+}
+
+/** A random number in [0, 1): Math.random, or a fixed sequence in tests. */
+export type Random = () => number;
+
+function shuffle<T>(items: T[], random: Random): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
+}
+
+export function pickQuiz(questions: Question[], attempts: QuizAttempt[], size = QUIZ_SIZE, random: Random = Math.random): QuizItem[] {
+  // Each question's most recent answer: attempts come newest first
+  const last = new Map<string, { right: boolean; at: string }>();
+  for (const attempt of attempts) {
+    for (const answer of attempt.answers) {
+      if (!last.has(answer.questionId)) last.set(answer.questionId, { right: answer.right, at: attempt.finishedAt });
+    }
+  }
+  const wrong: Question[] = [];
+  const fresh: Question[] = [];
+  const known: Question[] = [];
+  for (const q of questions) {
+    const seen = last.get(q.id);
+    if (!seen) fresh.push(q);
+    else if (!seen.right) wrong.push(q);
+    else known.push(q);
+  }
+  const byOldest = (a: Question, b: Question) => last.get(a.id)!.at.localeCompare(last.get(b.id)!.at);
+  const picked = [...shuffle(wrong, random), ...shuffle(fresh, random), ...known.sort(byOldest)].slice(0, Math.max(0, size));
+  return picked.map((question) => ({ question, order: shuffle([0, 1, 2, 3] as OptionIndex[], random) }));
+}
+
+/** "4 of 5 right (80%)". */
+export function describeScore(right: number, asked: number): string {
+  return `${right} of ${asked} right (${Math.round((100 * right) / Math.max(1, asked))}%)`;
+}

@@ -1,5 +1,6 @@
 // Which screen to show, from the URL's hash: #/ (classes), #/class/<id>, #/class/<id>/slides/<deckId>
-// (a deck in the viewer, optionally .../<first>-<last> for a section), #/settings.
+// (a deck in the viewer, optionally .../<first>-<last> for a section), #/class/<id>/quiz/<sectionId>,
+// #/settings.
 // The hash keeps everything on one page (the service worker serves it offline) while the back
 // button and reloads still work. No router library.
 import { useEffect, useState } from 'react';
@@ -8,6 +9,7 @@ export type Route =
   | { name: 'classes' }
   | { name: 'class'; courseId: string }
   | { name: 'slides'; courseId: string; deckId: string; first?: number; last?: number }
+  | { name: 'quiz'; courseId: string; sectionId: string }
   | { name: 'settings' }
   | { name: 'not-found' };
 
@@ -22,6 +24,7 @@ const PATTERNS: [RegExp, (m: RegExpMatchArray) => Route | null][] = [
     (m) =>
       Number(m[3]) <= Number(m[4]) ? { name: 'slides', courseId: m[1]!, deckId: m[2]!, first: Number(m[3]), last: Number(m[4]) } : null,
   ],
+  [new RegExp(`^#/class/${ID}/quiz/${ID}$`), (m) => ({ name: 'quiz', courseId: m[1]!, sectionId: m[2]! })],
   [/^#\/settings$/, () => ({ name: 'settings' })],
 ];
 
@@ -44,6 +47,8 @@ export function href(route: Exclude<Route, { name: 'not-found' }>): string {
       const deck = `#/class/${route.courseId}/slides/${route.deckId}`;
       return route.first && route.last ? `${deck}/${route.first}-${route.last}` : deck;
     }
+    case 'quiz':
+      return `#/class/${route.courseId}/quiz/${route.sectionId}`;
     case 'settings':
       return '#/settings';
   }

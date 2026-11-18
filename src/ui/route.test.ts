@@ -9,6 +9,7 @@ describe('parseRoute', () => {
     expect(parseRoute('#/class/c1/slides/abc-123')).toEqual({ name: 'slides', courseId: 'c1', deckId: 'abc-123' });
     expect(parseRoute('#/class/c1/slides/abc-123/21-30')).toEqual({ name: 'slides', courseId: 'c1', deckId: 'abc-123', first: 21, last: 30 });
     expect(parseRoute('#/class/c1/slides/abc-123/4-4')).toEqual({ name: 'slides', courseId: 'c1', deckId: 'abc-123', first: 4, last: 4 });
+    expect(parseRoute('#/class/c1/quiz/s-1')).toEqual({ name: 'quiz', courseId: 'c1', sectionId: 's-1' });
     expect(parseRoute('#/settings')).toEqual({ name: 'settings' });
   });
 
@@ -21,6 +22,8 @@ describe('parseRoute', () => {
       '#/class/c1/slides/a/3',
       '#/class/c1/slides/a/1-99999',
       '#/slides/abc',
+      '#/class/c1/quiz/',
+      '#/class/c1/quiz/s1/2',
       '#/cards',
       '#/cards/deck/abc',
       '#/deck/abc',
@@ -39,6 +42,7 @@ describe('parseRoute', () => {
       { name: 'class', courseId: 'c1' },
       { name: 'slides', courseId: 'c1', deckId: 'd1' },
       { name: 'slides', courseId: 'c1', deckId: 'd1', first: 2, last: 4 },
+      { name: 'quiz', courseId: 'c1', sectionId: 's1' },
       { name: 'settings' },
     ];
     for (const route of routes) expect(parseRoute(href(route))).toEqual(route);

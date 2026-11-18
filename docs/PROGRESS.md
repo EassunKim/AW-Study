@@ -34,7 +34,7 @@ slides" and "M6: AI helper and quizzes":
 | Class and lecture screens; remove the flashcard layer | #26 | Nathan's Claude | `src/ui/` (not #17's screens), routes, old flashcard files | **Done** (screens PR #36, removal PR #37) |
 | AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Done and live** (PR #33; server set up Nov 18, Matt's token still to add) |
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
-| Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | Contract PR #41; storage PR #42; screens next |
+| Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
 
 ## Milestones
 
@@ -45,7 +45,7 @@ slides" and "M6: AI helper and quizzes":
 | 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | **In progress** (#15-#18) |
 | 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Done** (#24-#26); not yet tried on a real phone |
 | 5 | Planner and the daily checklist with Play | Not started |
-| 6 | AI helper and quizzes | **Helper starting** (#27); the app side later |
+| 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
 | 7 | Viewer tools: highlights, notes, explain, ask | Not started |
 | 8 | First run (tutorial) and after-class prompts | Not started |
 | 9 | Exams: pulling forward, practice tests with AI-graded short answers | Not started |
@@ -106,6 +106,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** #40 screens (PR #43): each section of a lecture has a **Quiz** link (with its last score) on the
+  class page. "Make questions" fills the section's bank through the AI helper: 3 a slide, at least 10, five
+  slides a request, saved as each answer arrives, repeats dropped; only slide text is sent. The quiz needs
+  no AI: 5 questions (last time's wrong ones first, then new, then the longest-ago), options in a fresh
+  order, instant feedback with the explanation and the slide shown in place, the score saved at the end.
+  A lapsed Access sign-in shows "Sign in for AI" (`/ai/whoami` in a new tab). Browser tests answer `/ai/`
+  like the helper, on all three devices; 8 deliberate bugs each caught. (Nathan's Claude)
 
 - **Nov 18:** #40 storage (PR #42): schema step 5 (`questions`, `quizAttempts`, both indexed by class
   and section) and `src/db/quiz.ts`. Questions are checked when added (a slide in the section, four

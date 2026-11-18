@@ -10,6 +10,9 @@
   --accent-text: #ffffff;
   --border: #e2e8f0;
   --danger: #b91c1c;
+  --right: #15803d;
+  --right-bg: #f0fdf4;
+  --wrong-bg: #fef2f2;
   --radius: 0.75rem;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -26,6 +29,9 @@
     --accent-text: #111827;
     --border: #334155;
     --danger: #f87171;
+    --right: #4ade80;
+    --right-bg: #052e16;
+    --wrong-bg: #450a0a;
   }
 }
 
@@ -418,4 +424,72 @@ label.file input {
 .slides-frame {
   height: min(75vh, 44rem);
   margin: 0.5rem 0 1rem;
+}
+
+/* --- Quizzes (#40) --- */
+
+.quiz .question {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.option {
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.option .letter {
+  font-weight: 700;
+  min-width: 1.5rem;
+}
+
+.option:disabled {
+  opacity: 1; /* the answer stays readable once chosen */
+}
+
+.option.right {
+  border-color: var(--right);
+  background: var(--right-bg);
+}
+
+.option.wrong {
+  border-color: var(--danger);
+  background: var(--wrong-bg);
+}
+
+.option.other {
+  opacity: 0.7;
+}
+
+.verdict {
+  font-weight: 600;
+  margin: 0;
+}
+
+.verdict.right {
+  color: var(--right);
+}
+
+.verdict.wrong {
+  color: var(--danger);
+}
+
+.score {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0.5rem 0;
+}
+
+.quiz-slide {
+  height: min(60vh, 32rem);
 }
