@@ -30,7 +30,7 @@ slides" and "M6: AI helper and quizzes":
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Contract on `main` (PR #29); storage next |
-| PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `tests/fixtures/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
+| PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
 | Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Waits for #24's contract and #25 |
 | AI helper on the server | #27 | unclaimed | `helper/`, its CI job | Ready (independent) |
 
@@ -112,7 +112,7 @@ the "Test and publish" run on `main` to finish, then press Update.
   build**; its worker and data files (fonts, decoders, colour profiles, character maps) come from
   our own site (`/pdfjs/`, copied by `vite.config.ts`), so the CSP needed **no change**. Test page
   `/viewer-demo.html` until #26 uses it. Unit tests on PDFs generated in the test
-  (`tests/fixtures/make-pdf.ts`); browser tests on all three engines (no errors, no CSP
+  (`src/viewer/test-pdf.ts`); browser tests on all three engines (no errors, no CSP
   violations, every request same-site, a 150-slide deck in under 5 s with under 40 thumbnails
   drawn). 12 deliberate bugs each caught. (Matt's Claude)
 

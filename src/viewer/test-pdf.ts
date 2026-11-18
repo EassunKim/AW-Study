@@ -1,6 +1,7 @@
-// Makes small, valid PDF files for tests: landscape "slides" (720 × 540 points, 4:3) with a title
-// and a line of text on each, in Helvetica (one of PDF's standard fonts, not embedded, so the
-// viewer must load its own copy). No real lecture slides are ever committed (CLAUDE.md).
+// Test helper (not used by the app, so not in the build; it lives in src/ because the image build
+// type-checks src/ without tests/). Makes small, valid PDF files for tests: landscape "slides"
+// (720 × 540 points, 4:3) with a title and a line of text on each, in Helvetica (one of PDF's
+// standard fonts, not embedded). No real lecture slides are ever committed (CLAUDE.md).
 
 export interface FixturePage {
   title: string;

@@ -1,9 +1,9 @@
 // The slide viewer (#25) on its test page (/viewer-demo.html), with PDFs made in the test
-// (tests/fixtures/make-pdf.ts). Desktop Chrome, Android and iPhone (WebKit). Checks there are no
+// (src/viewer/test-pdf.ts). Desktop Chrome, Android and iPhone (WebKit). Checks there are no
 // errors and no Content-Security-Policy violations: PDF.js's worker, fonts and decoders must all
 // come from our own site.
 import { expect, test, type Page } from '@playwright/test';
-import { numberedSlides } from '../fixtures/make-pdf';
+import { numberedSlides } from '../../src/viewer/test-pdf';
 
 /** Console errors, page errors and CSP violations, collected from the start. */
 async function watchProblems(page: Page): Promise<() => Promise<string[]>> {

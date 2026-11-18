@@ -1,9 +1,9 @@
-// Page text extraction, on PDFs made in the test (tests/fixtures/make-pdf.ts). PDF.js runs in Node
+// Page text extraction, on PDFs made in the test (src/viewer/test-pdf.ts). PDF.js runs in Node
 // here, with its worker in the same thread and its data files read from node_modules.
 import { fileURLToPath } from 'node:url';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { makePdf, numberedSlides } from '../../tests/fixtures/make-pdf';
+import { makePdf, numberedSlides } from './test-pdf';
 import { extractPageText, openPdf, setPdfAssetBase, textOf } from './pdf';
 
 beforeAll(() => {
