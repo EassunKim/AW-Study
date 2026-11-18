@@ -66,7 +66,8 @@ user secret ──┼── passkey ─────PRF+HKDF─▶ KEK ─┼─�
 ### What stays readable on disk
 
 Only what IndexedDB's indexes need, so lists and the planner work without decrypting everything.
-Milestone 4 (#24) added the lecture stores; #40 the question banks and quiz attempts:
+Milestone 4 (#24) added the lecture stores; #40 the question banks and quiz attempts; #47 the study
+sessions and settings:
 
 | Store | Readable | Encrypted |
 | --- | --- | --- |
@@ -79,6 +80,8 @@ Milestone 4 (#24) added the lecture stores; #40 the question banks and quiz atte
 | sections | id, courseId, lectureId, deckId, nextDue | page range, the rest of the schedule (budget, minutes studied, extra minutes), dates |
 | questions (#40) | id, courseId, sectionId | the slide number, question, options, answer, explanation, dates |
 | quizAttempts (#40) | id, courseId, sectionId | when, every answer, the score |
+| studySessions (#47) | id, courseId, sectionId | which session (first week or extra), when, minutes spent |
+| settings (#47) | id (`study`) | the daily study minutes |
 | changes (log) | seq, entity, entityId, op, at | the record data (PDF bytes are not in the log) |
 | meta | device id, schema step, the keyring (already wrapped) | nothing else is secret |
 
@@ -86,7 +89,7 @@ Milestone 2's flashcard stores (decks, notes, cards, reviews) were removed in #2
 which also deletes their change-log rows).
 
 So someone with the browser's files could see *how many* classes, decks, lectures and sections
-exist, how many questions and quiz attempts each section has, on which dates lectures and exams
+exist, how many questions, quiz attempts and study sessions each section has, on which dates lectures and exams
 fall, and when sections are due, but not a word of the slides, the class names, the questions or
 the scores. (A field may move from "readable" to "encrypted" if no
 index needs it; it must not move the other way without changing this table first.)
