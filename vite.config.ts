@@ -92,7 +92,9 @@ export default defineConfig({
           },
         ],
         navigateFallback: '/index.html', // any page opened offline gets the app
-        navigateFallbackDenylist: [/^\/healthz/],
+        // Never for the AI helper (helper/, behind Cloudflare Access): its pages must reach the network,
+        // or Access never gets to show its sign-in and the browser never gets the Access cookie
+        navigateFallbackDenylist: [/^\/healthz/, /^\/ai(\/|$)/],
       },
     }),
   ],
