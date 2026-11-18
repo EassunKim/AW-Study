@@ -33,6 +33,7 @@ slides" and "M6: AI helper and quizzes":
 | PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
 | Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Ready (#24 and #25 done) |
 | AI helper on the server | #27 | unclaimed | `helper/`, its CI job | Ready (independent) |
+| AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #AIPR) |
 
 ## Milestones
 
@@ -104,6 +105,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** #34 the app's AI client (PR #AIPR): `src/ai/` with the `AiBackend` interface
+  (`makeQuestions`, `gradeAnswer`, `explain`, `ask`), `HttpAiBackend` (posts JSON to `/ai/` on our
+  own site only, the Access cookie only same-site, never follows redirects, so a lapsed Access
+  sign-in shows as `'signed-out'` and the screen can open `signInUrl()`), every reply checked again
+  on the device (`check.ts`), and `FakeAiBackend` for tests and screens. 10 tests on a fake fetch;
+  14 of 16 deliberate bugs caught (the other two are covered by another check). (Matt's Claude)
 
 - **Nov 18:** #24 storage (PR #30): schema step 3 (`courses`, `exams`, `slideDecks`, `deckFiles`,
   `deckPages`, `lectures`, `sections`) and `src/db/lectures.ts`, every `LectureStore` method. PDFs are
