@@ -31,7 +31,7 @@ slides" and "M6: AI helper and quizzes":
 | --- | --- | --- | --- | --- |
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | **Done** (contract PR #29, storage PR #30) |
 | PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
-| Class and lecture screens; remove the flashcard layer | #26 | Nathan's Claude | `src/ui/` (not #17's screens), routes, old flashcard files | Screens in PR #36; removing the flashcards next |
+| Class and lecture screens; remove the flashcard layer | #26 | Nathan's Claude | `src/ui/` (not #17's screens), routes, old flashcard files | **Done** (screens PR #36, removal PR #37) |
 | AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #33); Nathan sets up the server side (steps in the PR) |
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 
@@ -40,9 +40,9 @@ slides" and "M6: AI helper and quizzes":
 | # | Milestone | State |
 | --- | --- | --- |
 | 1 | Skeleton: installable offline PWA, server, tests, CI | **Done** (#2, #3). Live at https://honed.pacificfish.ca |
-| 2 | Study by hand (flashcards, FSRS) | **Done**, then **superseded** by the Nov 18 redesign; removed in #26 |
+| 2 | Study by hand (flashcards, FSRS) | **Done**, then **superseded** by the Nov 18 redesign; **removed** (PR #37) |
 | 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | **In progress** (#15-#18) |
-| 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Starting** (#24-#26) |
+| 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Done** (#24-#26); not yet tried on a real phone |
 | 5 | Planner and the daily checklist with Play | Not started |
 | 6 | AI helper and quizzes | **Helper starting** (#27); the app side later |
 | 7 | Viewer tools: highlights, notes, explain, ask | Not started |
@@ -105,6 +105,15 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** #26 part 2, flashcards removed (PR #37): the deck, note and card screens, store
+  methods and tests, `src/lib/scheduler.ts`, `src/lib/cloze.ts`, `src/types/study.ts`, and `ts-fsrs`.
+  **Schema step 4** deletes the `decks`, `notes`, `cards` and `reviews` stores and their change-log
+  rows (step 1 still makes them, as shipped, so a fresh install makes and drops them). The store,
+  encryption and backup tests now use classes as their data; a browser test upgrades a version 3
+  database holding cards (desktop, Android, iPhone). The lock screens say "classes and slides".
+  Open: `docs/SECURITY.md` doesn't mention the AI helper yet (slide text will go to it for
+  questions). (Nathan's Claude)
 
 - **Nov 18:** #26 part 1, the screens (PR #36). Home is now the classes list, with reminders for
   lectures not filled in yet and the latest lectures. A class page has its lecture times, "What was

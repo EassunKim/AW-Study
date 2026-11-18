@@ -203,3 +203,71 @@ test('a missing class or deck says so', async ({ page }) => {
   await page.goto('/#/class/does-not-exist/slides/nope/1-2');
   await expect(page.getByRole('heading', { name: 'Slides not found' })).toBeVisible();
 });
+
+test('a device with milestone 2’s flashcards upgrades: the cards are dropped, the app works', async ({ page }) => {
+  const problems = await watchProblems(page);
+  await page.goto('/viewer-demo.html'); // same site, but the app (and its database) isn't opened
+  // The database as the live site left it before #26: version 3, with a deck, a card, and changes for
+  // the deck (to drop) and a class (to keep)
+  await page.evaluate(
+    () =>
+      new Promise<void>((done, fail) => {
+        const req = indexedDB.open('honed', 3);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          db.createObjectStore('meta', { keyPath: 'key' });
+          db.createObjectStore('decks', { keyPath: 'id' });
+          db.createObjectStore('notes', { keyPath: 'id' }).createIndex('byDeck', 'deckId');
+          const cards = db.createObjectStore('cards', { keyPath: 'id' });
+          cards.createIndex('byDeck', 'deckId');
+          cards.createIndex('byNote', 'noteId');
+          const reviews = db.createObjectStore('reviews', { keyPath: 'id' });
+          reviews.createIndex('byCard', 'cardId');
+          reviews.createIndex('byTime', 'reviewedAt');
+          db.createObjectStore('changes', { keyPath: 'seq', autoIncrement: true });
+          db.createObjectStore('courses', { keyPath: 'id' });
+          for (const s of ['exams', 'slideDecks', 'lectures']) db.createObjectStore(s, { keyPath: 'id' }).createIndex('byCourse', 'courseId');
+          db.createObjectStore('deckFiles', { keyPath: 'id' });
+          db.createObjectStore('deckPages', { keyPath: 'id' });
+          const sections = db.createObjectStore('sections', { keyPath: 'id' });
+          sections.createIndex('byCourse', 'courseId');
+          sections.createIndex('byLecture', 'lectureId');
+          sections.createIndex('byDeck', 'deckId');
+        };
+        req.onerror = () => fail(req.error);
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction(['decks', 'cards', 'changes'], 'readwrite');
+          tx.objectStore('decks').put({ id: 'old', name: 'Old flashcards', createdAt: '2026-11-17T00:00:00Z', updatedAt: '2026-11-17T00:00:00Z' });
+          tx.objectStore('cards').put({ id: 'card', deckId: 'old', noteId: 'n' });
+          tx.objectStore('changes').put({ id: 'c1', deviceId: 'd', at: '2026-11-17T00:00:00Z', entity: 'deck', entityId: 'old', op: 'put', data: null });
+          tx.objectStore('changes').put({ id: 'c2', deviceId: 'd', at: '2026-11-17T00:00:00Z', entity: 'course', entityId: 'gone', op: 'delete', data: null });
+          tx.oncomplete = () => (db.close(), done());
+          tx.onerror = () => fail(tx.error);
+        };
+      }),
+  );
+
+  await openUnlocked(page); // sets up: nothing to encrypt but the database itself
+  await expect(page.getByText('No classes yet')).toBeVisible();
+  await addClass(page, 'After the upgrade');
+  const state = await page.evaluate(
+    () =>
+      new Promise<{ version: number; stores: string[]; changes: string[] }>((done, fail) => {
+        const req = indexedDB.open('honed');
+        req.onerror = () => fail(req.error);
+        req.onsuccess = () => {
+          const db = req.result;
+          const all = db.transaction('changes').objectStore('changes').getAll();
+          all.onsuccess = () => {
+            done({ version: db.version, stores: [...db.objectStoreNames], changes: all.result.map((c: { entity: string }) => c.entity) });
+            db.close();
+          };
+        };
+      }),
+  );
+  expect(state.version).toBe(4);
+  expect(state.stores.filter((s) => ['decks', 'notes', 'cards', 'reviews'].includes(s))).toEqual([]);
+  expect(state.changes).toEqual(['course', 'course']); // the old class change stays; the new class's is added
+  expect(await problems()).toEqual([]);
+});

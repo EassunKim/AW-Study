@@ -4,11 +4,11 @@
 
 Learn each lecture in the time you have. After a lecture, give Honed the slides and what was
 covered; it plans that material into your daily study minutes, shows you the original slides in a
-built-in viewer, then quizzes you. Quiz scores decide when each part comes back. Your slides and
-notes stay encrypted on your own device.
+built-in viewer, then quizzes you. Quiz scores decide when each part comes back. Your classes and
+slides stay encrypted on your own device.
 
-Status: being rebuilt around lectures and quizzes (Nov 18 redesign). The live version still shows
-the earlier flashcard prototype, which is being replaced. The plan is in
+Status: being rebuilt around lectures and quizzes (Nov 18 redesign). Classes, slides and lectures
+work; the planner, the daily checklist and quizzes are next. The plan is in
 [docs/DESIGN.md](docs/DESIGN.md) and progress in [docs/PROGRESS.md](docs/PROGRESS.md).
 
 ## Run it
