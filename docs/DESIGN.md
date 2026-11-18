@@ -1,286 +1,298 @@
-# AW-Study: Design
+# Honed: Design
 
-Nov 17, 2026 · Nathan, with Claude. Exported from the shared design doc; edit here once we start building, and keep it current.
+Nov 18, 2026 · Nathan and Matt, with Claude. Rewritten after the prototype review (the first, flashcard-based design is in git history). The shared Claude doc is a snapshot; **this file is the one to keep current**: update it in the same PR as any decision that changes it.
 
 ## Summary
 
-Honed (working name; the repo is AW-Study) is a spaced-repetition app for lecture content that keeps each user's data on their own devices. You give it a daily time budget (say 60 minutes); it shows you new material and reviews at the right intervals, and never lets the review pile grow past that budget. Lecture slides often aren't meant to be shared, so slides and cards are stored encrypted on the device, and anything that syncs between devices is encrypted before it leaves. Cards come from slides (AI drafts you approve) or are written by hand, and reviewing should feel rewarding without rewarding fake progress.
+Honed helps you learn each lecture's material in the time you have: after every lecture you give it the slides and what was covered, it plans that material into your daily study minutes, shows you the original slides in a built-in viewer, and then quizzes you with AI. Quiz results decide how soon, and how heavily, each part comes back.
 
-Goals for the first version:
+The prototype is a web app (installable on a phone or computer) that keeps everything on your own device, handles PDF slides, and uses Claude Code (on Matt's and Nathan's subscriptions) for the AI.
 
-- Local-first: slides, cards and review history live on the device, encrypted; our server only serves the app's code.
-- Reviews scheduled by FSRS, the open algorithm Anki now uses, not a home-made one.
-- A daily time budget that sets how many new cards you get.
-- Cards from slides: open a PDF or PPTX, approve the drafts.
-- Works well on a phone, installable, offline, and quick to open for a few minutes.
+**What changed from the first design (Nov 17):** the first design was a flashcard app built around FSRS, with AI turning slides into cards. FSRS was meant as a reference idea, not the product. The core is now the **lecture**: classes, slides studied in their original form, and quizzes. Flashcards are left out for now (maybe a feature later). Spaced repetition survives as the idea behind the schedule, driven by quiz scores instead of card-by-card grades.
 
-End-to-end encrypted sync between devices follows in the second version.
+Code: [github.com/NandMinc/AW-Study](https://github.com/NandMinc/AW-Study).
 
-Code: [github.com/NandMinc/AW-Study](https://github.com/NandMinc/AW-Study) (the NandMinc organisation; Matt and Nathan are admins).
+## Decisions so far
 
-## Who it's for and scope
-
-The first version is for Matt and Nathan, built so classmates can join later without a rewrite. Because data stays on each device, the first version has no accounts; the second version adds sync, which needs a sign-in.
-
-| In the first version | Later |
+| Topic | Decision (Nov 18) |
 | --- | --- |
-| Decks and cards (Q/A and fill-in-the-blank), encrypted on the device | End-to-end encrypted sync between devices (v2) |
-| FSRS reviews with a daily time budget | FSRS tuned to each user from their review log |
-| Slides read in the browser, optional AI drafts to approve | Images and diagrams as card content |
-| Backup and restore to a file or folder the user picks | Shared decks between users |
-| Streak, daily ring, simple stats | Leaderboards, friends, achievements |
-| Installable web app (PWA) that works offline | Anki `.apkg` import |
+| Where data lives | In the app, on each device, encrypted. No accounts for now; revisit later. |
+| AI | Matt's and Nathan's Claude subscriptions, through Claude Code running in a locked-down helper on Nathan's home server (each person's own token). Not for other users. |
+| Quizzes | Multiple choice for normal studying (graded instantly, no AI). Short answers, graded by AI, for tests and exam practice. |
+| Slide formats | PDF only for the prototype. Faithful PowerPoint viewing matters later, because exporting some decks to PDF mangles them. |
+| Study budget | A lecture's length becomes its first study budget, spread over its first week; quiz results take over after that. Can change. |
+| Low scores | A low score marks the section as needing more study, and the planner adds study time in the coming days. It never sends you back into the slides on the spot. |
+| Flashcards | Left out for now; maybe a feature later. |
 
-Which AI options to offer is an open question below.
+**Still standing:** TypeScript, React and Vite; IndexedDB storage, encrypted as in `docs/SECURITY.md`; the encrypted store and crypto core already built (#15, #16); the name Honed (working); hosting at honed.pacificfish.ca; GitHub at NandMinc/AW-Study, where both Claudes coordinate through `agent-task` issues and either may merge a green PR.
 
-## The daily loop and scheduling
+## How it's used
 
-You set a time budget, not a card count; the app fills it with due reviews first, then as many new cards as the next two weeks can absorb. This fixes Anki's classic problem: a fixed "20 new a day" that turns into a wall of reviews two weeks later.
+Three moments: setting up once, telling Honed what each lecture covered, and the daily Play button.
 
-**Scheduler: FSRS.** Each card keeps a stability, a difficulty and a due date; each answer (Again / Hard / Good / Easy) updates them. Use the maintained MIT library (`ts-fsrs` for JS/TS; ports exist for Python and Rust) with a target retention of 90%. Every review is logged (card, grade, time taken, timestamp) so FSRS can later fit its parameters to each person.
+**First run**
 
-**Daily session:**
+1. Set up how you unlock (a passphrase or passkey, and the recovery key), since everything is encrypted on the device (#17).
+2. A short tutorial shows the main ideas, then helps you **add your classes**: name, which days and times lectures happen, how long they are, and optionally the term's start and end dates and the dates of midterms and finals.
+3. Add content from a class: upload a lecture's slides (PDF) and say what was covered.
+4. Offer the first study session.
 
-1. Due reviews, oldest-overdue first. If they alone exceed the budget, show the most overdue and carry the rest (FSRS handles late reviews).
-2. New cards, in the order of the lecture they came from, until the budget is used.
-3. Cards failed today come back a few minutes later in the same session (learning steps).
+**After each lecture**
 
-**Pacing new cards:** measure each user's average seconds per review and per new card. Using FSRS's predicted due dates, estimate the review minutes for each of the next 14 days. Add a new card only if no day in that window goes over the budget. Until there's history, assume 10 s per review and 30 s per new card.
+- Honed knows when your classes happen, so after one it asks: *What did you cover today?* (in the prototype, when you next open the app; see Open questions).
+- You answer with the slides and a range, e.g. *slides 21–30 of Week 4.pdf*, or by uploading a new file. The lecture's length (from the class) becomes that section's study budget.
 
-**The day** ends at a set hour (default 4 a.m., local time), so late-night study counts for the night it was done.
+**A normal day**
 
-**Exams:** later, a deck can have an exam date; cards then get scheduled to be reviewed at least once in the days before it, even if FSRS says they could wait.
+- The home screen is **a short checklist** of today's work, such as *Study CHEM 101, slides 21–30 (25 min)* or *Quiz: Week 3 (5 questions)*, with how much of today's time it uses.
+- A big **Play** button runs through the whole checklist in order. Each item is a **study session**: the slides in the viewer for most of the time, then a multiple-choice quiz when the time is up or when you press *I'm ready*. The score decides when that section comes back.
+- You can stop at any point; what's left stays on the list.
 
-**Rules that keep FSRS honest** (FSRS learns only from grades and dates, so these protect its data):
+```mermaid
+flowchart LR
+    lecture["Lecture<br/>50 min, Mon 10:30"] --> covered["What was covered?<br/>slides 21–30 of a PDF"]
+    covered --> section["New section<br/>budget: 50 min, week 1"]
+    section --> planner["Planner<br/>daily minutes, exams"]
+    planner --> checklist["Today's checklist<br/>press Play"]
+    checklist --> study["Study the slides<br/>about 80% of the time"]
+    study --> quiz["Quiz<br/>multiple choice"]
+    quiz --> score["Score<br/>4 of 5 = 80%"]
+    score -->|"next date, quiz size, any extra study time"| planner
+```
 
-1. Only the user's confirmed grade reaches FSRS, never an AI-suggested one.
-2. The review log is never edited, only added to.
-3. Reading a card or its explanation is not a review.
-4. A small fix to a card (wording, a hint) keeps its FSRS state; a real change (a split, a different question) retires it and starts fresh cards, with the old history kept in the log.
-5. Practice questions stay outside FSRS and its optimizer.
-6. One fact per card and no duplicates: FSRS models one memory per card.
+A lecture becomes a section with a study budget; the planner fits it into your days; each session ends in a quiz, and the score decides when the section comes back, how big its next quiz is, and whether it needs more study time in the coming days. A low score never sends you back into the slides on the spot.
 
-## Making cards
+## Classes, lectures and sections
 
-AI writes drafts; nothing joins a deck until the user approves it. Bad AI cards are the main way apps like this fail, and approving them is itself a first pass over the material.
+The **section** is what gets scheduled and quizzed: a range of slides covered in one lecture. Everything else hangs off it.
 
-**By hand:** a quick editor for question/answer and fill-in-the-blank (`{{c1::word}}` style), with simple formatting and maths (KaTeX).
-
-**From slides** (all in the browser; the file never goes to our server):
-
-1. Open a PDF or PPTX. PDFs are read with PDF.js; a PPTX is a zip of XML files, unpacked in the browser.
-2. Split into one record per slide: its text, its speaker notes, and (for PDFs) a rendered image of the page.
-3. If the user turns AI on for this lecture, send slides in batches to the chosen model with a fixed prompt: make 0-3 atomic cards per slide, one fact each, skip title and agenda slides, quote the slide's own terms. Slides that are mostly a diagram are sent as the image.
-4. Show the drafts beside their slide: keep, edit, or discard each, or keep all from a slide.
-5. Kept cards remember their lecture and slide number, so during review you can tap through to the original slide.
-
-**AI and privacy:** sending slides to an AI is the one step where content can leave the device, so it is the user's choice per lecture, made before anything is sent.
-
-| Option | Where the slides go | Trade-off |
+| Thing | What it holds | Example |
 | --- | --- | --- |
-| Own API key | Straight from the browser to the AI provider, never through our server | The provider sees the slides, under its API terms; the user pays per use |
-| Local model (e.g. Ollama on the user's PC) | Nowhere: they stay on the machine | Weaker cards, needs a decent GPU, not on phones |
-| No AI | Nowhere | Cards made by hand |
+| Class | Name; lecture days, start times and length; optional term start/end | CHEM 101: Mon/Wed/Fri 10:30, 50 min |
+| Exam | Class, date, kind (midterm, final, test), which lectures it covers (default: all so far) | Midterm, Oct 20, lectures 1–12 |
+| Slide deck | The PDF itself (encrypted), its title and page count, the text of each page | Week 4.pdf, 42 pages |
+| Lecture | Class, date, how long it ran, and the section(s) it covered | Nov 18, 50 min |
+| Section | Deck + page range, its lecture, its schedule state (budget left, next quiz date, last scores) | Week 4.pdf, slides 21–30 |
+| Annotation | A note, text highlight or area highlight on one page of a deck | Yellow box around the diagram on slide 24 |
+| Question | A multiple-choice question for a section: text, options, the right answer, which slide it comes from | "Which bond forms when…?" (slide 26) |
+| Quiz attempt | Section, when, questions asked, answers, score, time taken | Nov 19: 4 of 5 |
+| Study session | Section, start, minutes on slides, whether a quiz followed | 22 min on slides 21–30 |
 
-The API key is stored encrypted with the rest of the data. Cap the pages per run, and keep drafts so reopening a lecture never pays twice.
+- A lecture can cover parts of more than one deck (more than one section), and a deck can be spread over several lectures.
+- Quiz attempts and study sessions are only ever added to, never edited: they are the history the schedule learns from.
+- **Questions are generated once per section and kept**, so each quiz is drawn from that bank instead of asking the AI every time (see AI).
 
-## AI
+## Planning the day
 
-AI suggests and the user decides; FSRS stays in charge of scheduling. Every AI feature obeys the lecture's AI switch (off, local model, or provider), so a lecture kept private never reaches a provider.
+The planner turns your sections, their quiz history, upcoming exams and **your daily study minutes** (a setting, e.g. 60) into today's checklist. It never plans more than your daily minutes, except in the days before an exam, and then it says so.
 
-**Features:**
+**A new section (its first week)**
 
-| Feature | What it does | When |
-| --- | --- | --- |
-| Cards from slides | Drafts 0-3 single-fact cards per slide, each quoting its slide, for the user to approve | v1 |
-| Fix problem cards | For cards FSRS flags (difficulty near 10, repeated misses), suggests why and offers a rewrite or a split | v1 |
-| Explain this | After a miss, explains the answer from the original slide; follow-up questions allowed | v1 |
-| Spot duplicates | Flags drafts that repeat an existing card, and keeps sibling cards off the same day | v1 |
-| Exam practice | Practice questions on the topics with the lowest predicted recall on exam day; kept outside FSRS | later |
-| Typed answers | Compares a typed answer with the card and suggests a grade the user confirms | later, optional |
-| Rephrased questions | New wordings of a card, approved like drafts | later |
-| Lecture recordings | Whisper transcribes on the user's PC; cards are drafted from the transcript | much later |
+- Its budget is the lecture's length, shared between the lecture's sections by page count. A 50-minute lecture covering one section gives that section 50 minutes.
+- That budget is spread over three study sessions in the first week: roughly **day 1, day 3 and day 7** after the lecture, each about a third of the budget, each ending in a quiz.
 
-Ordering new cards with AI was considered and dropped: the lecturer's slide order is already a good teaching order.
+**After the first week: quizzes keep it fresh**
 
-**Models per step** (Anthropic list prices, Nov 2026, per million input / output tokens: Claude Opus 5.5 $4 / $20, Sonnet 5.5 $2 / $10, Haiku 5.5 $0.10 / $0.50):
+The section moves to short quizzes. Each score sets the next date, the next quiz's size, and any extra study time:
 
-| Step | Default | Cheaper candidate to test | Local option |
+| Last score | Next quiz | Questions | Extra study time, planned in the coming days |
 | --- | --- | --- | --- |
-| Cards from slides | Claude Opus 5.5 (`claude-opus-5-5`), effort medium | Sonnet 5.5; effort low | A vision model through Ollama (7-12B); weaker on diagrams |
-| Fix problem cards | Opus 5.5 | none | A local text model |
-| Explain this | Opus 5.5, effort low, streamed | Haiku 5.5 | A local text model |
-| Spot duplicates | No chat model: a small embedding model in the browser (e.g. all-MiniLM through transformers.js) | none | Runs on phones too |
-| Exam practice | Opus 5.5 | none | Not recommended: wrong answers teach errors |
-| Typed answers | Haiku 5.5 | none | A small local model (3-4B) |
-| Rephrased questions | Opus 5.5 | Sonnet 5.5 | A local text model |
-| Lecture recordings | Whisper (whisper.cpp) on the user's PC, then the cards step | none | Only local |
+| 90% or more | 2.5× the last gap (at least 3 days) | 3 | None |
+| 70–89% | 1.5× the last gap | 5 | None |
+| 50–69% | in 2 days | 8 | About 10 min more, before the next quiz |
+| Under 50% | tomorrow | 10 | About 20 min more, before the next quiz, until scores recover |
 
-A step moves to a cheaper model only when the test set shows it holds up.
+The first gap after week one is 7 days. These numbers are a starting point, kept in one settings file so they can be tuned; every quiz and session is recorded, so later they can be fitted to how you actually do (that's where a model like FSRS could come back, underneath).
 
-**Keeping costs down** (estimate: from about $0.30 to $0.05-0.10 per 40-slide lecture on Opus 5.5, about half that overnight; to be measured):
+**Exams**
 
-1. **Only slides worth reading:** collapse animation builds (consecutive pages whose text only grows), skip title, agenda and divider slides, and on a re-import send only the changed slides.
-2. **Text first:** send a slide's image only when the slide is mostly picture, shrunk to about 1000 px wide.
-3. **Short replies:** compact JSON, no explanations, short quotes, at most 3 cards per slide, and the lowest effort that holds quality (output costs 5x input).
-4. **Prompt caching** for the fixed instructions and example cards repeated in every chunk.
-5. **Never pay twice:** drafts, explanations and rephrasings are stored on the device and reused.
-6. **No AI where code does the job:** slide order for new cards, embeddings for duplicates.
-7. **Overnight (half price):** card-making through the Batch API, picked up the next time the app opens.
-8. **Cheaper models per step** only where the test set shows they hold up.
-9. **Free options:** Ollama and Whisper on the user's own PC.
+- From **10 days before** an exam, every section it covers is pulled forward so it's quizzed at least twice before the day, weakest sections first.
+- In the last **2 days**, an *exam practice* item appears: a mixed test with short-answer questions graded by AI.
 
-Before sending, the app counts the request's tokens and shows the cost.
+**Fitting the day**
 
-**Quality:**
+1. Collect what's due today or overdue: new-lecture sessions, quizzes, extra study.
+2. Order by priority: an exam soon, then the lowest recent scores, then new lectures (fresh material), then the most overdue.
+3. Fill today's minutes in that order. What doesn't fit moves to the next days, spread so no day goes over budget.
+4. Time estimates: a study item uses its planned minutes; a quiz is counted at about 40 seconds a question until Honed has measured your own pace.
 
-- Each draft must quote the slide text it comes from; the app checks the quote is on that slide and drops drafts that fail.
-- Replies use structured outputs (a JSON schema), so malformed drafts never reach the approve screen.
-- The prompt lives in the repo, versioned and reviewed like code.
-- A test set of 3-4 public lecture decks (e.g. from MIT OpenCourseWare) with the cards a good student would make scores every prompt or model change. It runs by hand, not in CI, because it costs money.
-- Which drafts users keep, edit or discard is recorded on the device, to learn what the AI gets wrong.
+The day starts at 4 a.m. (`src/lib/studyDay.ts`), so late-night studying counts for the evening before. Missed days simply roll forward into the next days' plans; a proper *catch up* mode is a future idea.
 
-**In code:** one `AiBackend` interface (`draftCards`, `explain`, `fixCard`, ...), one implementation per provider and one for Ollama, each declaring which steps it supports. The browser calls the provider with the official TypeScript SDK and the user's own key. Tests use a fake backend, so CI never spends money or sends data.
+## Study sessions and quizzes
 
-## Motivation
+A session is the slides for most of its time, then a quiz; the quiz is what moves the schedule.
 
-Reward finishing the day's work and remembering honestly, never pressing buttons. If grading yourself "Easy" earns more points, people inflate their grades and FSRS schedules them wrong, which hurts their exam.
+**A study session** (e.g. 25 minutes)
 
-| Mechanic | What earns it | Guardrail |
-| --- | --- | --- |
-| Daily ring | Fills as the day's budget is worked through; a burst when it closes | Fills by time spent on due cards, not cards skipped |
-| Streak | Every day the ring closes | One freeze day a week, earned, so one bad day doesn't erase a month |
-| Combo | Consecutive correct answers in a session; sound and a small animation | Same reward for Hard and Good; Easy earns nothing extra |
-| XP and levels | Reviews done and new cards learned | No XP for reviewing cards that aren't due |
-| Stats | Cards mastered per lecture, predicted retention, a calendar heatmap | Shows true retention, even when it drops |
-| Reminder | A notification when today's session is ready, at a time the user picks (needs the v2 server) | Off by default; at most one a day |
+1. The section's slides open in the viewer, at its first slide. A quiet timer shows the time left; nothing interrupts.
+2. At about **80% of the time** (20 of 25 minutes), Honed offers the quiz; you can also press **I'm ready** at any point, or take a few more minutes.
+3. The quiz: multiple choice, drawn from the section's question bank, one question at a time, instant feedback with the right answer and **a link to the slide it came from**.
+4. The score is saved and the section's next date and quiz size are set (Planning the day). If it was low, the section is marked as needing more study, and the planner gives it extra study time over the coming days; the session itself simply ends.
 
-Feel matters as much as the rules: answers should respond instantly (no waiting on the network), with sound that can be turned off.
+**Quiz-only items** (later reviews) skip step 1: just the questions, with *Show me the slide* on each one.
 
-## Privacy, storage and sync
+**Questions**
 
-Everything is encrypted on the device with a key only the user holds, so our server never stores anything it can read, in v1 or once sync exists.
+- **Multiple choice** for normal studying: four options, one right, graded on the device instantly with no AI call.
+- Generated by AI once per section (about 3 per slide, at least 10), checked when made: each must name the slide it's from, and its right answer must be among its options. More are generated when a section runs low or keeps being quizzed.
+- Within a quiz, questions you got wrong last time come first, and recently asked ones are avoided.
+- **Score** = right answers ÷ questions asked.
 
-**Storage on the device:**
+**Tests and exam practice**
 
-- The collection lives in IndexedDB, the browser's built-in database, with each record's contents encrypted (milestone 3). SQLite on OPFS was tried first and dropped on Nov 18: Playwright's WebKit has no working OPFS, so it could never be tested for iPhones (details in `PROGRESS.md`).
-- The app asks the browser to keep its storage permanently (`navigator.storage.persist()`) and asks to be installed to the Home Screen, where Safari is much less likely to clear it.
-- Backups: on Chrome and Edge on a computer, the app automatically writes an encrypted backup into a folder the user picks (e.g. in OneDrive). Elsewhere it reminds the user to save one (on iPhone, to Files). Restore takes the same file.
+- A mixed test across the lectures an exam covers: multiple choice plus **short-answer questions graded by AI** against the slides, with a mark and one line of feedback each.
+- Its results feed each section's schedule like any quiz.
 
-**Encryption:**
+**Keeping it honest:** the score comes from your answers, never from how long you looked at the slides, so the schedule reflects what you actually know.
 
-- Data is encrypted with the browser's WebCrypto (AES-GCM) under a random data key.
-- The data key is unlocked by a passkey (Face ID, Windows Hello) through the WebAuthn PRF extension, or by a passphrase where the browser lacks PRF.
-- At setup the user gets a recovery key to print or keep in a password manager. Losing every device and the recovery key means the data is gone: nobody else can unlock it.
-- Only standard building blocks and a written-down design; no home-made cryptography.
+## The slide viewer
 
-**What it protects against:** our server, a stolen backup file, and other people using the same computer account; the device's own lock and disk encryption cover a lost device. It cannot stop malicious code running in the page itself once unlocked, so the app has a strict Content-Security-Policy, no outside scripts or analytics, and few dependencies.
+Slides are shown exactly as the PDF draws them, with your notes and highlights on top, and AI help one tap away.
 
-**Sync (v2):**
+**Showing slides**
 
-1. From v1 on, every change goes into an append-only log with a device id, so sync means shipping that log.
-2. Each device encrypts its new log entries before upload. The server stores blobs it cannot read and sees only sizes and times.
-3. Reviews never conflict: FSRS state is rebuilt by replaying the review log, so two devices reviewing offline simply merge. Card edits use latest-edit-wins; deletions are recorded as markers.
-4. A new device joins by scanning a QR code shown on an existing one (it carries the data key), or by signing in with a passkey synced through iCloud Keychain or Google Password Manager.
-5. The server knows whose blobs are whose through a sign-in, and keeps a size limit per user. Whether slides sync or stay on the device that imported them is open.
+- **PDF.js** (Mozilla's PDF renderer, open source, Apache-2.0) draws each page in the browser, entirely on the device. It also gives each page's text, which highlighting, search and the AI need.
+- One slide at a time, fitted to the screen, with swipe or arrow keys, pinch-zoom on phones, and a strip of thumbnails. Pages render only when near the screen, so a 200-page deck stays quick.
+- The section's range is marked (e.g. slides 21–30); the rest of the deck stays reachable for context.
 
-## Platform and architecture
+**Notes and highlights** (stored as annotations, encrypted; the PDF itself is never changed)
 
-A static web app, installable as a PWA, that does all its work in the browser; the server only hands out the app's files (and, in v2, stores encrypted sync blobs).
+- **Text highlight:** select words on a slide, pick a colour.
+- **Area highlight:** drag a box over any part of a slide, for diagrams and images.
+- **Notes:** attach a note to a highlight, or pin one anywhere on a slide.
+- Positions are saved relative to the page, so they line up at any zoom level and screen size.
+
+**AI in the viewer**
+
+- **Explain this:** select text or an area, and get a fuller explanation in a side panel, based on that slide and its neighbours.
+- **Ask about this:** the same, with your own question.
+- Either answer can be **kept as a note** on the slide.
+
+**PowerPoint later.** Browsers can't draw .pptx files faithfully. Options when it's time: (1) convert to PDF on Nathan's server with LibreOffice, which keeps fonts and layout better than most exports but isn't perfect; (2) a JavaScript .pptx renderer in the browser (keeps files on the device; weaker fidelity); (3) keep asking for a PDF export. Test with real problem decks before choosing.
+
+## AI in the prototype
+
+The AI runs as **Claude Code on Nathan's home server**, inside a locked-down helper app, each request on the subscription of whoever made it. That works from phones too. It's for Matt and Nathan only: other users would need another route (e.g. an API key).
+
+**What the AI does**
+
+| Job | When | Input | Output |
+| --- | --- | --- | --- |
+| Make questions | When a section is added (and when its bank runs low) | The section's slide text | Multiple-choice questions, each with its slide number |
+| Grade a short answer | Tests and exam practice | Question, expected points, your answer, the slide text | A mark and one line of feedback |
+| Explain this | In the viewer | The selection and the slide (plus neighbours) | A short explanation |
+| Ask about this | In the viewer | The same, plus your question | An answer |
+
+Multiple-choice quizzes need **no AI at the moment you take them**: the bank was made earlier, so quizzes work offline and cost nothing.
+
+**How a request travels**
+
+1. The app sends the request to `honed.pacificfish.ca/ai/…`, the same site, so nothing is shared with another domain.
+2. That path is protected by a **Cloudflare Access** application (Google sign-in, Matt and Nathan only), like the admin site. The first time, the app asks you to sign in once.
+3. The tunnel sends `/ai/` to the **helper**: a small server in its own TrueNAS app. It knows who you are from Access, and picks **your** Claude Code sign-in token.
+4. The helper builds a **fixed prompt** for that job (no free-form commands), runs Claude Code headless (`claude -p`, JSON output), checks the answer's shape (e.g. every question has 4 options, one right, a slide number), retries once if not, and returns it.
+
+**Locked down** (Claude Code is an agent that can run commands, and slide text is untrusted input):
+
+- **All of Claude Code's tools are turned off**: it may only read the prompt and answer in text.
+- The helper's container has **no access** to the server's pools or other apps, a read-only filesystem, an unprivileged user, and a memory limit.
+- **Nothing is kept:** no request content is logged, and Claude Code's own conversation history is switched off or wiped after each request (to confirm when building).
+- **Limits per person** (requests per day, size of each request, a time limit), so a bug can't use up anyone's Claude allowance.
+- The sign-in tokens are created by Matt and Nathan (`claude setup-token`) and put on the server by them, never by a Claude.
+
+**In the app**, every AI job goes through one `AiBackend` interface (`makeQuestions`, `gradeAnswer`, `explain`, `ask`). Tests use a fake, so they never spend usage or send data. Switching later to an API key or a local model means one new backend, not new screens.
+
+**Privacy note:** slide text travels device → Nathan's server → Anthropic for these jobs. The server passes it through without storing it. Data at rest stays only on your devices.
+
+## Data and privacy
+
+Everything stays on the device, encrypted with a key only you can unlock, exactly as built in #15 and #16; only the kinds of records change.
+
+- **Storage:** IndexedDB, with each record's private part encrypted (AES-GCM) under the data key, unlocked by your passphrase or passkey, with a recovery key as backup (`docs/SECURITY.md`).
+- **Slide PDFs** are stored encrypted too, as their own records; the viewer decrypts a deck when you open it.
+- **What stays readable on disk** (for the database's indexes): ids, which class/lecture/deck/section a record belongs to, and dates (lecture dates, next quiz dates, exam dates, attempt times). Names, slide text, the PDFs, notes, highlights, questions, answers and scores are encrypted. `docs/SECURITY.md` gets an updated table before the new stores are built.
+- **Space:** slide decks are a few MB each; a term's worth fits easily, but the app shows how much it uses and asks the browser to keep it permanently (`navigator.storage.persist()`).
+- **No accounts:** each device has its own data. Moving to a new device is a backup and restore (#18). Sync between devices is a later decision.
+- **What leaves the device:** only the AI jobs' inputs (slide text and your selections or answers), through the helper to Anthropic, never stored on the way.
+
+## Architecture
+
+The app does its work on the device; the server only hands out the app and passes AI jobs to Anthropic.
 
 ```mermaid
 flowchart LR
     subgraph device["Your device: the installed app"]
-        app["App code<br/>Reviews, FSRS, slide reader; works offline"]
-        storage["Encrypted storage (IndexedDB)<br/>decks, notes, cards, reviews, slides"]
-        key["Key unlock<br/>Passkey (Face ID, Hello) or passphrase"]
+        checklist["Checklist, Play, quizzes<br/>multiple choice graded right here"]
+        viewer["Slide viewer<br/>PDF.js, notes, highlights"]
+        storage["Encrypted storage<br/>IndexedDB: slides, notes, scores"]
     end
-    site["Static site<br/>Serves the app's files only"]
-    ai["AI (optional, per lecture)<br/>Provider with your own key,<br/>or a local model on your PC"]
-    sync["Sync server (v2)<br/>Stores blobs it can't read<br/>Sees only sizes and times"]
-    other["Your other devices (v2)<br/>Join by QR code or passkey"]
-    backup["Backup file<br/>Encrypted, in a folder you pick"]
+    cf["Cloudflare<br/>tunnel + Access (Google sign-in)"]
+    subgraph server["Nathan's home server"]
+        site["Static site<br/>serves the app's files"]
+        helper["AI helper<br/>Claude Code, tools off,<br/>your own token, stores nothing"]
+    end
+    anthropic["Anthropic<br/>your Claude subscription"]
+    backup["Backup file<br/>encrypted, a folder you pick"]
     site -->|"app files"| device
-    device -->|"slides you choose"| ai
-    device <-->|"encrypted log"| sync
-    sync <--> other
+    device <-->|"slide text, selections"| cf
+    cf <--> helper
+    helper <--> anthropic
     device --> backup
-    classDef v2 stroke-dasharray: 5 4
-    class sync,other v2
 ```
 
-Dashed boxes come with sync in v2. The page and its service worker are cached on the device, so the app opens and works offline. The stack is TypeScript, React and Vite, and everything runs in the browser: `ts-fsrs`, IndexedDB (through the small `idb` library), PDF.js and WebCrypto.
+One web app (TypeScript, React, Vite) installed as a PWA: the checklist, planner, quizzes and viewer all run on the device, offline except for AI jobs. Nathan's server runs two small apps: the static site (already live) and the AI helper (milestone 6), both behind the existing Cloudflare Tunnel, with Access in front of the helper.
 
-**Main data (all on the device):**
+## What happens to what's already built
 
-| Table | Holds |
-| --- | --- |
-| settings | Time budget, day-start hour, time zone, AI choice (API key encrypted) |
-| decks | Name, optional exam date |
-| lectures | Original file, title, slide count, deck |
-| slides | Lecture, page number, text, notes, rendered image |
-| notes | What the user writes: deck, kind (basic or cloze), front, back |
-| cards | What gets reviewed, one or more per note: note, deck, cloze number, new-card order, suspended, FSRS state (incl. due date) |
-| drafts | AI-made cards waiting for approval, per slide |
-| reviews | Card, grade, seconds taken, time, device; never edited, only added |
-| changes | Every change with its device id and time: the log that v2 syncs |
+The foundations stay; the flashcard layer on top goes.
 
-The `reviews` table is the most valuable data: stats, streaks and per-user FSRS tuning are all computed from it.
+| Built | What happens | Why |
+| --- | --- | --- |
+| Skeleton, server, CI, deploys, honed.pacificfish.ca | **Keep** | Unaffected |
+| Study day (`studyDay.ts`, 4 a.m.) | **Keep** | The daily checklist needs it |
+| Crypto core (#15), `SECURITY.md` | **Keep** | Slides need it more than cards did |
+| Encrypted store pattern, lock/unlock, keyring, migration (#16) | **Keep the machinery, change the records** | A new schema step for classes, lectures, decks, sections, annotations, questions, attempts, sessions |
+| Setup and unlock screens (#17, PR #21) | **Keep** | Still the first-run step |
+| Backup and restore (#18) | **Keep** | The way to move to a new device |
+| Decks, notes and cards: store methods and screens (#6, #7) | **Remove** (kept in git history) | Flashcards are out for now |
+| FSRS card scheduling, `buildQueue`, cloze (#5) | **Remove** (kept in git history); FSRS may return underneath the section schedule later | The schedule is now per section, driven by quiz scores |
+| `ts-fsrs` dependency | **Remove** with the scheduler | Not used |
+| Existing milestone 2 test data on your devices | **Dropped** at the new schema step (it's only test cards) | No migration from cards to sections makes sense |
 
-## Hosting and deploys
+Removing goes in its own PR after the new pieces exist, so the live site never shows an empty app in between.
 
-The app is a static site, so hosting holds nothing private. Nathan's home server serves it, deployed like his other sites: merge to `main`, wait for the green tick, then press **Update from GitHub** at apps.pacificfish.ca.
+## Milestones for the prototype
 
-- **Deploy form:** Vite builds the site, so GitHub Actions publishes it as a small image that serves the built files with the headers below, deployed by digest with a health check and rollback (as the chess site is).
-- **Address:** a subdomain such as study.pacificfish.ca, through the existing Cloudflare Tunnel. v1 needs no sign-in to protect data; keeping the site behind Cloudflare Access is a preference.
-- **Headers:** a strict Content-Security-Policy, `no-transform` (so Cloudflare injects nothing), and no-cache on the page so an update reaches everyone at once.
-- **Sync server (v2):** a small service that stores and returns encrypted blobs per user, with a size limit per user and a sign-in. It holds no keys and can't read anything.
-- **No secrets on the server:** each user's AI key stays on their own device.
+Finish milestone 3 (encryption) first, then build the lecture loop in slices that are each usable; the AI helper on the server can be built alongside.
 
-Nathan sets up the server side (app entry, subdomain) once the skeleton exists.
+| # | Milestone | What's in it | Needs |
+| --- | --- | --- | --- |
+| 3 | Lock it down (in progress) | Encryption, setup and unlock (#17), backup and restore (#18) | — |
+| 4 | Classes and slides | Classes and exams; uploading PDFs; the viewer (pages, zoom, thumbnails); "what did we cover" creating lectures and sections; schema step 3; removing the card screens | 3 |
+| 5 | Planner and the daily checklist | Daily minutes setting; the planning rules; today's checklist and **Play**; study sessions with the timer and *I'm ready* (quiz faked until 6) | 4 |
+| 6 | AI helper and quizzes | The helper app on the server (locked down, Access, per-person tokens); `AiBackend`; question banks; multiple-choice quizzes; scores moving the schedule | Helper: nothing (can start now). Quizzes in the app: 5 |
+| 7 | Viewer tools | Text and area highlights, notes, *Explain this*, *Ask about this* | 4 (AI parts: 6) |
+| 8 | First run and prompts | The tutorial; adding classes and first content; "what did you cover?" when you open the app after a class | 5 |
+| 9 | Exams | Pulling sections forward before exams; tests and exam practice with AI-graded short answers | 6 |
 
-## Working together
+The prototype is usable for real studying after **6**. Each milestone becomes `agent-task` issues split so Matt's Claude and Nathan's Claude don't touch the same files.
 
-Matt and Nathan each work with Claude Code on their own PC, so the repo itself must hold the rules both Claudes follow.
+## Open questions and future ideas
 
-- **`CLAUDE.md` in the repo:** the stack, how to run and test, the rules below, and decisions made. Personal notes stay in each person's own Claude memory, not the repo.
-- **Branches and PRs only:** nobody pushes to `main`. CI runs every test on each PR; once it's green, either side may merge it (anyone's PR, Nov 18). Review is optional, asked for when wanted. `main` deploys only when someone presses Update.
-- **Owners by area** to avoid colliding PRs (to be agreed): for example Matt on slide import and AI, Nathan on scheduling, review screen, storage and hosting.
-- **Small PRs, merged often.** A PR open for days drifts from `main` and conflicts.
-- **Tests are the contract:** the scheduler and pacing get unit tests with fixed dates; the review screen gets browser tests on phone and desktop sizes. A new rule is proved by a test that fails without it.
-- **Privacy is tested too:** tests check that nothing readable is ever sent to the sync server, and that no slide leaves the device unless AI is on for that lecture.
-- **Few dependencies:** no scripts, fonts or analytics loaded from other sites at runtime (libraries are copied into the repo), and each new dependency is agreed in its PR.
-- **Nothing secret in git:** `.env` files, keys and any test data from real lectures are in `.gitignore` from the first commit.
+Tick a question once Matt and Nathan agree, and write the answer under it.
 
-## Milestones
+- [ ] **After-class prompts:** a real notification on your phone needs the server to send pushes (and to know your class times). For the prototype, is asking *when you next open the app* enough, with push later?
+- [ ] **Motivation:** the first design had a daily ring, streaks and combos. Keep those ideas for the checklist and Play (e.g. the ring fills as today's list gets done), or leave them for later with leaderboards?
+- [ ] **Default daily minutes:** 60? And should some classes get more of the time than others (e.g. a weight per class)?
+- [ ] **Tuning numbers:** the 80% point for the quiz, about 3 questions per slide, the score table and the day 1/3/7 first week are guesses. Fine to start with and adjust after a few weeks of use?
+- [ ] **Anthropic's terms:** confirm that running Claude Code headless on the server for your own studying, each on your own subscription, is within them, before the helper goes live.
+- [ ] **Who sets up the helper's tokens:** each of you runs `claude setup-token` and puts the token on the server (Nathan can add Matt's to the app's settings with him).
 
-Each milestone is usable on its own and deployed before the next starts. No dates yet: set them once the stack is chosen.
+**Future ideas**
 
-1. **Skeleton:** `CLAUDE.md`, `.gitattributes`, CI that runs the tests, the static site deployed at the subdomain with its headers, installable and opening offline.
-2. **Study by hand:** decks, hand-made cards, FSRS reviews and the review log, in on-device storage, with the change log in place.
-3. **Lock it down:** encryption with a passkey or passphrase, the recovery key, persistent storage, backup and restore. Daily use starts here.
-4. **Time budget:** per-user timing, new-card pacing over 14 days, the daily ring and streak.
-5. **Slides to cards:** PDF in the browser, the AI choice per lecture (own key, local model, none), drafts with quote checks, duplicate spotting, the approve screen, tap-through to the slide and the cost measures. Then Explain this, fixing problem cards, Overnight batches and PPTX.
-6. **Polish the reward loop:** combos, sounds, XP, stats.
-7. **v2, sync:** the sync server, encrypted log upload, QR pairing, the daily reminder.
-8. **Later:** Anki import, FSRS fitted per user, exam dates, classmates and shared decks.
-
-## Open questions
-
-Tick each once Matt and Nathan agree, and write the answer under it (then copy it into `CLAUDE.md`).
-
-- [x] **Stack:** it must run entirely in the browser. Plain JavaScript (like Yagoodle's pages) or TypeScript? A framework, or none? Whether it needs a build step decides static files or a small image.
-
-    Decided Nov 17: TypeScript, React and Vite. Vitest tests the logic, Playwright tests real browsers at phone and desktop sizes. GitHub Actions builds the site and it ships as a small image, like the chess site.
-- [ ] **AI options:** recommended in the AI section: own key with Claude first, Ollama second. Confirm, and agree a small budget for running the test set.
-- [x] **Encryption at rest:** encrypt each IndexedDB record's contents, leaving only what the indexes need readable (ids, which deck or note it belongs to, review times), with slide images as separate encrypted blobs? Decide when building milestone 3.
-
-    Decided Nov 18 (#15): yes, per record. Each record's private part is AES-GCM encrypted; only ids, links and due/review times stay readable for the indexes. The full scheme is in `docs/SECURITY.md`.
-- [ ] **Slides in sync (v2):** sync slides too, or only cards and reviews, with slides staying on the device that imported them?
-- [ ] **Sync sign-in (v2):** Cloudflare Access for us two, or simple accounts so classmates can join?
-- [ ] **Area owners:** who takes which part of the milestones?
-- [ ] **Subdomain name:** study.pacificfish.ca, or something else?
-- [ ] **Card types beyond Q/A and fill-in-the-blank:** image occlusion (hide part of a diagram)? Worth it in the first version?
-- [x] **App name:** keep AW-Study?
-
-    Decided Nov 17: **Honed**, as a working name that may change ("academic weapon" was the idea; "weapon" trips filters). It lives only in `src/brand.ts`; the repo, package and image stay `aw-study`.
+- **Catch up:** a backlog for missed lectures, spread over the coming days as extra (cram) time.
+- **Practice tests:** upload past tests so the AI's questions match the real ones, or generate full practice exams.
+- **Leaderboards** (needs accounts and a server).
+- **Faithful PowerPoint viewing** (see The slide viewer), and other resources: notes, textbook chapters.
+- **Accounts and sync** between devices, with email or Google sign-in, keeping content end-to-end encrypted.
+- **Flashcards** as a side feature.

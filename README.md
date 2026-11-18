@@ -2,13 +2,14 @@
 
 *(Working name; the repository stays AW-Study.)*
 
-Spaced repetition for lecture content. Set a daily time budget, turn lecture slides into cards
-(written by hand, or drafted by AI and approved by you), and review them at the right moments with
-[FSRS](https://github.com/open-spaced-repetition). Your slides and cards stay on your own device.
+Learn each lecture in the time you have. After a lecture, give Honed the slides and what was
+covered; it plans that material into your daily study minutes, shows you the original slides in a
+built-in viewer, then quizzes you. Quiz scores decide when each part comes back. Your slides and
+notes stay encrypted on your own device.
 
-Status: early. You can make decks, write basic and cloze cards by hand, and review them with
-FSRS, on your phone or computer, offline. Slides-to-cards and the daily time budget come next.
-The plan is in [docs/DESIGN.md](docs/DESIGN.md).
+Status: being rebuilt around lectures and quizzes (Nov 18 redesign). The live version still shows
+the earlier flashcard prototype, which is being replaced. The plan is in
+[docs/DESIGN.md](docs/DESIGN.md) and progress in [docs/PROGRESS.md](docs/PROGRESS.md).
 
 ## Run it
 
