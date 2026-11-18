@@ -216,17 +216,19 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
       exclusive(async () => {
         requireOpen();
         await getCourseOrThrow(id);
-        const [examIds, deckIds, lectureIds, sectionIds, questionIds, attemptIds] = await Promise.all([
+        const [examIds, deckIds, lectureIds, sectionIds, questionIds, attemptIds, sessionIds] = await Promise.all([
           db.getAllKeysFromIndex('exams', 'byCourse', id),
           db.getAllKeysFromIndex('slideDecks', 'byCourse', id),
           db.getAllKeysFromIndex('lectures', 'byCourse', id),
           db.getAllKeysFromIndex('sections', 'byCourse', id),
           db.getAllKeysFromIndex('questions', 'byCourse', id),
           db.getAllKeysFromIndex('quizAttempts', 'byCourse', id),
+          db.getAllKeysFromIndex('studySessions', 'byCourse', id),
         ]);
         const deletes = [
           ...questionIds.map((i) => ({ store: 'questions' as const, id: i })),
           ...attemptIds.map((i) => ({ store: 'quizAttempts' as const, id: i })),
+          ...sessionIds.map((i) => ({ store: 'studySessions' as const, id: i })),
           ...sectionIds.map((i) => ({ store: 'sections' as const, id: i })),
           ...lectureIds.map((i) => ({ store: 'lectures' as const, id: i })),
           ...examIds.map((i) => ({ store: 'exams' as const, id: i })),
@@ -240,6 +242,7 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
         const logs = await Promise.all([
           ...questionIds.map((i) => change('question', 'delete', i, null)),
           ...attemptIds.map((i) => change('quizAttempt', 'delete', i, null)),
+          ...sessionIds.map((i) => change('studySession', 'delete', i, null)),
           ...sectionIds.map((i) => change('section', 'delete', i, null)),
           ...lectureIds.map((i) => change('lecture', 'delete', i, null)),
           ...examIds.map((i) => change('exam', 'delete', i, null)),
@@ -482,14 +485,16 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
         requireOpen();
         if (!(await db.get('lectures', id))) throw new StoreError('not-found', 'That lecture no longer exists.');
         const sectionIds = await db.getAllKeysFromIndex('sections', 'byLecture', id);
-        // Its sections' question banks and quiz attempts go with them
-        const [questionIds, attemptIds] = await Promise.all([
+        // Its sections' question banks, quiz attempts and study sessions go with them
+        const [questionIds, attemptIds, sessionIds] = await Promise.all([
           Promise.all(sectionIds.map((s) => db.getAllKeysFromIndex('questions', 'bySection', s))).then((l) => l.flat()),
           Promise.all(sectionIds.map((s) => db.getAllKeysFromIndex('quizAttempts', 'bySection', s))).then((l) => l.flat()),
+          Promise.all(sectionIds.map((s) => db.getAllKeysFromIndex('studySessions', 'bySection', s))).then((l) => l.flat()),
         ]);
         const logs = await Promise.all([
           ...questionIds.map((q) => change('question', 'delete', q, null)),
           ...attemptIds.map((a) => change('quizAttempt', 'delete', a, null)),
+          ...sessionIds.map((x) => change('studySession', 'delete', x, null)),
           ...sectionIds.map((s) => change('section', 'delete', s, null)),
           change('lecture', 'delete', id, null),
         ]);
@@ -498,6 +503,7 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
           [
             ...questionIds.map((q) => ({ store: 'questions' as const, id: q })),
             ...attemptIds.map((a) => ({ store: 'quizAttempts' as const, id: a })),
+            ...sessionIds.map((x) => ({ store: 'studySessions' as const, id: x })),
             ...sectionIds.map((s) => ({ store: 'sections' as const, id: s })),
             { store: 'lectures', id },
           ],
