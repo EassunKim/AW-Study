@@ -59,25 +59,34 @@ user secret ──┼── passkey ─────PRF+HKDF─▶ KEK ─┼─�
 - Stored as `{ v: 1, iv, ct }` (bytes as `Uint8Array`; backups encode them as base64url).
 - The plaintext is the JSON of the record's private fields. Random IVs are safe for far more
   records than anyone will write with one key (the limit is around four billion).
+- **Files** (slide PDFs) are encrypted the same way but as raw bytes (`encryptBytes`), one record
+  per deck, so the ciphertext is the file's size plus a 16-byte tag. Their page text is a separate
+  sealed record, so listing decks never decrypts a whole PDF.
 
 ### What stays readable on disk
 
-Only what IndexedDB's indexes need, so lists and the study queue work without decrypting
-everything:
+Only what IndexedDB's indexes need, so lists and the planner work without decrypting everything.
+Milestone 4 (#24) adds the lecture stores:
 
 | Store | Readable | Encrypted |
 | --- | --- | --- |
-| decks | id | name, dates |
-| notes | id, deckId | kind, front, back, dates |
-| cards | id, noteId, deckId, suspended, due, phase, position | the rest of the FSRS state, ordinal, dates |
-| reviews | id, cardId, reviewedAt | rating, time taken, FSRS numbers, device |
-| changes (log) | seq, entity, entityId, op, at | the record data |
+| courses (classes) | id | name, meeting days and times, term dates, dates |
+| exams | id, courseId, date | title, kind, which lectures, dates |
+| slideDecks | id, courseId | title, file name, page count, size, dates |
+| deckFiles | id (the deck's) | the whole PDF |
+| deckPages | id (the deck's) | the text of every page |
+| lectures | id, courseId, date | minutes, dates |
+| sections | id, courseId, lectureId, deckId, nextDue | page range, the rest of the schedule (budget, minutes studied, extra minutes), dates |
+| changes (log) | seq, entity, entityId, op, at | the record data (PDF bytes are not in the log) |
 | meta | device id, schema step, the keyring (already wrapped) | nothing else is secret |
 
-So someone with the browser's files could see *how many* decks, notes and cards exist, when
-cards are due and when reviews happened, but not one word of them, nor how well they were
-remembered. (#16 may move a field from "readable" to "encrypted" if no index needs it; it must not
-move one the other way without changing this table first.)
+The milestone 2 flashcard stores (decks, notes, cards, reviews) are removed in #26; until then
+they follow the same rule (ids and links readable; text, FSRS numbers and dates encrypted).
+
+So someone with the browser's files could see *how many* classes, decks, lectures and sections
+exist, on which dates lectures and exams fall, and when sections are due, but not a word of the
+slides, the class names, notes or scores. (A field may move from "readable" to "encrypted" if no
+index needs it; it must not move the other way without changing this table first.)
 
 ## How the store applies it (#16, `src/db/store.ts`)
 
