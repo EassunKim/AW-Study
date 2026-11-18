@@ -17,11 +17,13 @@
 // FSRS and cloze come in as `deps` (the real ones by default), so tests can use stand-ins. The
 // review log is only ever added to (FSRS rule 2). Deleting a card or deck keeps its reviews.
 import { checkCloze } from '../lib/cloze';
-import { decryptRecord, encryptRecord, recordAad } from '../lib/crypto';
+import { decryptBytes, decryptRecord, encryptBytes, encryptRecord, recordAad } from '../lib/crypto';
 import { buildQueue, newSchedulingState, review } from '../lib/scheduler';
 import { studyDay } from '../lib/studyDay';
 import type { EncryptedRecord, Keyring, KeyringEntry, UnlockMethod } from '../types/crypto';
+import type { LectureStore, Section } from '../types/lecture';
 import type { Card, Deck, Note, NoteKind, QueueOptions, Rating, ReviewRecord } from '../types/study';
+import { lectureMethods } from './lectures';
 import { DB_VERSION, openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb, type RecordStore } from './schema';
 
 export type StoreStatus = 'new' | 'locked' | 'unlocked';
@@ -52,7 +54,7 @@ export interface StudyQueueOptions {
   newPerDay: number;
 }
 
-export interface StudyStore {
+export interface StudyStore extends LectureStore {
   deviceId(): string;
 
   // --- The lock side (the screens' `Vault`, src/ui/vault.ts) ---
@@ -159,6 +161,13 @@ const READABLE: Record<RecordStore, readonly string[]> = {
   cards: ['id', 'noteId', 'deckId', 'suspended', 'position'],
   reviews: ['id', 'cardId', 'reviewedAt'],
   changes: ['seq', 'id', 'at', 'entity', 'entityId', 'op'],
+  courses: ['id'],
+  exams: ['id', 'courseId', 'date'],
+  slideDecks: ['id', 'courseId'],
+  deckFiles: ['id'], // sealed as raw bytes (encryptBytes), see seal()
+  deckPages: ['id'],
+  lectures: ['id', 'courseId', 'date'],
+  sections: ['id', 'courseId', 'lectureId', 'deckId'], // + nextDue, copied from schedule
 };
 const KEYCHECK_AAD = 'honed:v1:meta:keycheck';
 
@@ -239,6 +248,11 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
       requireOpen();
       return plain;
     }
+    if (name === 'deckFiles') {
+      // A PDF: encrypted as raw bytes, so the ciphertext is the file's size plus a 16-byte tag
+      const aad = recordAad(name, String(plain.id));
+      return { id: plain.id, enc: await encryptBytes(key, aad, plain.data as Uint8Array) };
+    }
     const readable: Row = {};
     const secret: Row = {};
     for (const [field, value] of Object.entries(plain)) {
@@ -251,6 +265,9 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
       readable.phase = state.phase;
       readable.due = state.due;
     }
+    if (name === 'sections') {
+      readable.nextDue = (plain.schedule as Section['schedule']).nextDue;
+    }
     return { ...readable, enc: await encryptRecord(key, recordAad(name, String(plain.id)), secret) };
   };
 
@@ -258,6 +275,9 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
   const open = async <T>(name: RecordStore, stored: unknown): Promise<T> => {
     if (!isSealed(stored)) return stored as T; // plain: before setup, or not yet migrated
     if (!key) throw new StoreError('locked', 'Unlock first.');
+    if (name === 'deckFiles') {
+      return { id: stored.id, data: await decryptBytes(key, recordAad(name, String(stored.id)), stored.enc) } as T;
+    }
     const secret = await decryptRecord<Row>(key, recordAad(name, String(stored.id)), stored.enc);
     const readable: Row = {};
     for (const field of READABLE[name]) if (field in stored) readable[field] = stored[field];
@@ -330,6 +350,9 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
     });
 
   return {
+    // Classes, exams, slide decks, lectures and sections (#24): src/db/lectures.ts
+    ...lectureMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
+
     deviceId: () => device,
     status,
 

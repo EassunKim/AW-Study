@@ -76,8 +76,9 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   milestone 4; plain JSON types, changed only in their own PR, announced in the task issues.
 - `src/lib/crypto.ts`, `src/lib/passkey.ts`, `src/types/crypto.ts`: encryption, exactly as
   `docs/SECURITY.md` describes. Change SECURITY.md first, in its own PR, then the code.
-- `src/db/`: storage. `schema.ts` (IndexedDB stores, numbered migrations, sealed record shapes)
-  and `store.ts` (the `StudyStore` the screens call, including lock/unlock and the keyring; the
+- `src/db/`: storage. `schema.ts` (IndexedDB stores, numbered migrations, sealed record shapes),
+  `lectures.ts` (the `LectureStore` methods: classes, exams, slide decks, lectures, sections) and
+  `store.ts` (the `StudyStore` the screens call, including lock/unlock and the keyring; the
   only code that touches the database). Read the top of `store.ts` before changing it: records are
   sealed (encrypted) per `docs/SECURITY.md`, and every write is read, compute, encrypt, then
   write, inside `exclusive()`.

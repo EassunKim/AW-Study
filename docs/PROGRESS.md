@@ -29,9 +29,9 @@ slides" and "M6: AI helper and quizzes":
 
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
-| Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Contract on `main` (PR #29); storage next |
+| Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | **Done** (contract PR #29, storage PR #30) |
 | PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #32) |
-| Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Waits for #24's contract and #25 |
+| Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Ready (#24 and #25 done) |
 | AI helper on the server | #27 | Matt's Claude | `helper/`, `tests/helper/`, its CI job | **Code done** (PR #33); Nathan sets up the server side (steps in the PR) |
 
 ## Milestones
@@ -116,6 +116,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   time, sizes. Logs are counts only. Image `ghcr.io/nandminc/aw-study-ai`, checked in CI running
   read-only as an unprivileged user. 55 tests with a fake `claude`; 32 of 34 deliberate bugs caught (the other two are covered by another check).
   (Matt's Claude)
+
+- **Nov 18:** #24 storage (PR #30): schema step 3 (`courses`, `exams`, `slideDecks`, `deckFiles`,
+  `deckPages`, `lectures`, `sections`) and `src/db/lectures.ts`, every `LectureStore` method. PDFs are
+  sealed as raw bytes (`encryptBytes`), page text separately; a section's `nextDue` is readable for the
+  planner; a lecture's minutes are shared by page count, adding up exactly. Fixed #18's `openBackup`,
+  which would have called every backup with a PDF "damaged" (it parsed each record as JSON), and its
+  summary now names classes and slide decks and leaves out empty and internal stores. 30 new tests;
+  8 rules proved to fail without them. (Nathan's Claude)
 
 - **Nov 18:** #25 slide viewer (PR #32): `src/viewer/` with `<SlideViewer pdf page range
   onPageChange>` (one slide fitted to the screen; keys, buttons, swipes, thumbnails; pinch, +/−

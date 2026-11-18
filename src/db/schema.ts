@@ -13,10 +13,11 @@
 //   an `enc` field.
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { EncryptedRecord } from '../types/crypto';
+import type { Course, Exam, Lecture, Section, SlideDeck } from '../types/lecture';
 import type { Card, CardPhase, Deck, Note, ReviewRecord } from '../types/study';
 
 export const DB_NAME = 'honed';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 /**
  * One row of the change log: every write, in order, with the device that made it. v2's sync ships
@@ -27,10 +28,10 @@ export interface ChangeRecord {
   id: string;
   deviceId: string;
   at: string;
-  entity: 'deck' | 'note' | 'card' | 'review';
+  entity: 'deck' | 'note' | 'card' | 'review' | 'course' | 'exam' | 'slideDeck' | 'lecture' | 'section';
   entityId: string;
   op: 'put' | 'delete';
-  data: Deck | Note | Card | ReviewRecord | null;
+  data: Deck | Note | Card | ReviewRecord | Course | Exam | SlideDeck | Lecture | Section | null; // never PDF bytes
 }
 
 export interface SealedDeck {
@@ -68,6 +69,56 @@ export interface SealedChange {
   enc: EncryptedRecord;
 }
 
+// --- Milestone 4 (#24): lectures. Readable fields as in docs/SECURITY.md ---
+
+export interface SealedCourse {
+  id: string;
+  enc: EncryptedRecord;
+}
+export interface SealedExam {
+  id: string;
+  courseId: string;
+  date: string;
+  enc: EncryptedRecord;
+}
+export interface SealedSlideDeck {
+  id: string;
+  courseId: string;
+  enc: EncryptedRecord;
+}
+/** A deck's PDF. Plain before setup; sealed with encryptBytes (raw bytes, not JSON). */
+export interface DeckFile {
+  id: string; // the deck's id
+  data: Uint8Array;
+}
+export interface SealedDeckFile {
+  id: string;
+  enc: EncryptedRecord;
+}
+/** A deck's page text, in page order. */
+export interface DeckPages {
+  id: string; // the deck's id
+  pages: string[];
+}
+export interface SealedDeckPages {
+  id: string;
+  enc: EncryptedRecord;
+}
+export interface SealedLecture {
+  id: string;
+  courseId: string;
+  date: string;
+  enc: EncryptedRecord;
+}
+export interface SealedSection {
+  id: string;
+  courseId: string;
+  lectureId: string;
+  deckId: string;
+  nextDue: string | null; // a copy of schedule.nextDue, readable for the planner
+  enc: EncryptedRecord;
+}
+
 export interface HonedSchema extends DBSchema {
   // deviceId (string), keyring (Keyring), keycheck (EncryptedRecord), migration ('running')
   meta: { key: string; value: { key: string; value: unknown } };
@@ -76,11 +127,48 @@ export interface HonedSchema extends DBSchema {
   cards: { key: string; value: Card | SealedCard; indexes: { byDeck: string; byNote: string } };
   reviews: { key: string; value: ReviewRecord | SealedReview; indexes: { byCard: string; byTime: string } };
   changes: { key: number; value: ChangeRecord | SealedChange };
+  courses: { key: string; value: Course | SealedCourse };
+  exams: { key: string; value: Exam | SealedExam; indexes: { byCourse: string } };
+  slideDecks: { key: string; value: SlideDeck | SealedSlideDeck; indexes: { byCourse: string } };
+  deckFiles: { key: string; value: DeckFile | SealedDeckFile };
+  deckPages: { key: string; value: DeckPages | SealedDeckPages };
+  lectures: { key: string; value: Lecture | SealedLecture; indexes: { byCourse: string } };
+  sections: {
+    key: string;
+    value: Section | SealedSection;
+    indexes: { byCourse: string; byLecture: string; byDeck: string };
+  };
 }
 
 export type HonedDb = IDBPDatabase<HonedSchema>;
-export type RecordStore = 'decks' | 'notes' | 'cards' | 'reviews' | 'changes';
-export const RECORD_STORES: RecordStore[] = ['decks', 'notes', 'cards', 'reviews', 'changes'];
+export type RecordStore =
+  | 'decks'
+  | 'notes'
+  | 'cards'
+  | 'reviews'
+  | 'changes'
+  | 'courses'
+  | 'exams'
+  | 'slideDecks'
+  | 'deckFiles'
+  | 'deckPages'
+  | 'lectures'
+  | 'sections';
+/** Every store of records (everything but meta): what setUp seals and backups (#18) copy. */
+export const RECORD_STORES: RecordStore[] = [
+  'decks',
+  'notes',
+  'cards',
+  'reviews',
+  'changes',
+  'courses',
+  'exams',
+  'slideDecks',
+  'deckFiles',
+  'deckPages',
+  'lectures',
+  'sections',
+];
 
 export async function openHonedDb(name: string = DB_NAME): Promise<HonedDb> {
   const db = await openDB<HonedSchema>(name, DB_VERSION, {
@@ -101,6 +189,19 @@ export async function openHonedDb(name: string = DB_NAME): Promise<HonedDb> {
       // Step 2 (Nov 18, 2026, #16): records may now be sealed (encrypted, with an `enc` field). No
       // stores change; the version goes up so that an old milestone 2 tab, which would read sealed
       // records as plain ones and write plain ones among them, can no longer open the database.
+      // Step 3 (Nov 18, 2026, #24): the lecture stores. The flashcard stores stay until #26.
+      if (oldVersion < 3) {
+        db.createObjectStore('courses', { keyPath: 'id' });
+        db.createObjectStore('exams', { keyPath: 'id' }).createIndex('byCourse', 'courseId');
+        db.createObjectStore('slideDecks', { keyPath: 'id' }).createIndex('byCourse', 'courseId');
+        db.createObjectStore('deckFiles', { keyPath: 'id' });
+        db.createObjectStore('deckPages', { keyPath: 'id' });
+        db.createObjectStore('lectures', { keyPath: 'id' }).createIndex('byCourse', 'courseId');
+        const sections = db.createObjectStore('sections', { keyPath: 'id' });
+        sections.createIndex('byCourse', 'courseId');
+        sections.createIndex('byLecture', 'lectureId');
+        sections.createIndex('byDeck', 'deckId');
+      }
     },
   });
   // Another tab opened a newer version of the app: close, so its upgrade isn't blocked. This tab
