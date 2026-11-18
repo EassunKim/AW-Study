@@ -13,7 +13,7 @@ Milestone 2, **Study by hand**, is split into three tasks. Each has a GitHub iss
 | --- | --- | --- | --- | --- |
 | Scheduler and cloze: FSRS, the daily queue, cloze parsing | #5 | Matt's Claude | `src/lib/scheduler.ts`, `src/lib/cloze.ts` + tests | **Done** (PR #12) |
 | Data layer: IndexedDB, schema, change log, `StudyStore` | #6 | Nathan's Claude | `src/db/` | **Done** (PR #9) |
-| Screens: decks, card editor, review | #7 | Nathan's Claude | `src/ui/`, `src/App.tsx` | Starting (Nov 18) |
+| Screens: decks, card editor, review | #7 | Nathan's Claude | `src/ui/`, `src/App.tsx` | **Done** (PR #14) |
 
 The contract all three code against: `src/types/study.ts`, plus the signatures in the
 `scheduler.ts` and `cloze.ts` stubs. Change it only in its own small PR, announced in the issues.
@@ -23,7 +23,7 @@ The contract all three code against: `src/types/study.ts`, plus the signatures i
 | # | Milestone | State |
 | --- | --- | --- |
 | 1 | Skeleton: installable offline PWA, server, tests, CI | **Done** (#2, #3). Live at https://honed.pacificfish.ca |
-| 2 | Study by hand: decks, hand-made cards, FSRS reviews, review log, change log | **In progress** (#5, #6, #7) |
+| 2 | Study by hand: decks, hand-made cards, FSRS reviews, review log, change log | **Done** (#5, #6, #7). Deploy with Update after #14 merges |
 | 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | Not started |
 | 4 | Time budget: pacing, daily ring, streak | Not started |
 | 5 | Slides to cards: PDF in the browser, AI drafts, approve screen | Not started |
@@ -73,6 +73,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** #7 screens (PR #14): decks (counts, create, rename, delete with an in-page
+  confirmation), a deck's notes (add, edit, delete; Basic or Cloze with live cloze checks and card
+  previews), review (Show answer / Space, Again-Hard-Good-Easy / 1-4 with interval labels, time to
+  answer recorded, "Done for now"), hash routes `#/`, `#/deck/<id>`, `#/review/<id>`. Card text is
+  never HTML. Browser tests click through all of it on desktop, Android and iPhone (28 checks);
+  four deliberate UI bugs each caught. **Milestone 2 is complete.** (Nathan's Claude)
+
 - **Nov 18:** #5 scheduler and cloze (PR #12): `src/lib/scheduler.ts` (ts-fsrs 6, retention 0.9,
   max 36500 days, deterministic fuzz; the daily queue with the study day, new-card limit,
   suspended cards and one card per note per day; button labels) and `src/lib/cloze.ts`
@@ -85,7 +92,8 @@ the "Test and publish" run on `main` to finish, then press Update.
   `src/db/store.ts` (`StudyStore`: decks, notes and their cards, suspend, study queue, answers,
   change log), 18 Vitest tests (each key rule proved to fail without it) and browser tests in all
   three engines (persistence across reload, offline). SQLite tried and dropped (see Decisions).
-  The store is at `globalThis.__honedStore` (a promise) until the screens (#7) use it.
+  (The temporary `globalThis.__honedStore` was removed in #14: the screens get the store through
+  React context.)
   (Nathan's Claude)
 - **Nov 18:** Repo moved to NandMinc (Matt). References updated; the server switches to
   `ghcr.io/nandminc/aw-study` after the first publish from the new home. (Nathan's Claude)
@@ -97,6 +105,16 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- **Keyboard shortcuts in React: register the listener once and read state through a ref
+  updated in `useLayoutEffect`.** A listener re-added in `useEffect` after each new card left a
+  gap where a key reached the old card's handler and was lost (5 of 6 WebKit runs failed). See
+  `src/ui/ReviewScreen.tsx`.
+- **A test run stopped half-way can leave WebKit processes behind** (`WebKitNetworkProcess`) that
+  make the next run hang. On Windows: `Get-Process WebKit* | Stop-Process` before running again.
+- **On Windows PowerShell 5.1, don't round-trip source files through `Get-Content`/`Set-Content`**:
+  it reads UTF-8 as Windows-1252 and adds a byte-order mark, turning “quotes” into "â€œ". Edit
+  files with your editor or Node instead.
 
 - ts-fsrs's review log `due` field is the card's previous review time, not its old due date.
   `review()` fills `ReviewEntry.dueBefore` from the state passed in instead. ts-fsrs 6 also marks

@@ -1,23 +1,24 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
-import App from './App';
+import App, { StorageProblem } from './App';
 import { openStudyStore } from './db/store';
+import { messageOf } from './ui/useLoad';
 import './app.css';
 
-// The on-device database. The screens (issue #7) will get it through React; until then, and for
-// the browser tests and DevTools, a promise of it is at globalThis.__honedStore.
-const store = openStudyStore();
-(globalThis as { __honedStore?: unknown }).__honedStore = store;
-store.catch((err: unknown) => console.error('Could not open the on-device database:', err));
+const element = document.getElementById('root');
+if (!element) throw new Error('index.html has no #root element');
+const root = createRoot(element);
 
-const root = document.getElementById('root');
-if (!root) throw new Error('index.html has no #root element');
-
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+// Open the on-device database first; every screen needs it.
+openStudyStore().then(
+  (store) =>
+    root.render(
+      <StrictMode>
+        <App store={store} />
+      </StrictMode>,
+    ),
+  (err: unknown) => root.render(<StorageProblem message={messageOf(err)} />),
 );
 
 // The service worker caches the app so it opens offline. In `npm run dev` this does nothing.

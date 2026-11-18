@@ -69,7 +69,10 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - `src/db/`: storage. `schema.ts` (IndexedDB stores and numbered migrations) and `store.ts` (the
   `StudyStore` the screens call; the only code that touches the database). Read the top of
   `store.ts` before changing it: inside an IndexedDB transaction, await only IndexedDB requests.
-- `src/ui/`: the screens.
+- `src/ui/`: the screens (React). `route.ts` (hash routes, no router library), `store-context.ts`
+  (the store reaches screens through React context), `DecksScreen`, `DeckScreen`, `NoteEditor`,
+  `ReviewScreen`, `CardText` (card text is always React text, never HTML), `ConfirmDialog` (never
+  `confirm()`), `settings.ts` (day start 4 a.m., 20 new cards a day until milestone 4).
 - `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design.
 - `server/`: the production server (Node's own modules only): serves `dist/`, `/healthz`, and every
   security header (`server/headers.mjs`).
