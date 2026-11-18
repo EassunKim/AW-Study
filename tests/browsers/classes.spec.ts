@@ -282,3 +282,27 @@ test('the time, minutes and date fields are one line tall, like the other fields
     expect(box.height, label).toBeLessThan(nameHeight * 1.5); // they were about 4x as tall (Nov 18)
   }
 });
+
+test('slides fill the window: a portrait page (a document saved as PDF) is shown large on a tall screen', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'a desktop window size');
+  await page.setViewportSize({ width: 1280, height: 1300 });
+  await openUnlocked(page);
+  await addClass(page, 'PHIL 201');
+  await page.getByLabel('Add slides (PDF)').setInputFiles(pdfFile('Notes.pdf', portraitPdf()));
+  await page.getByTestId('deck-row').getByRole('link', { name: 'Notes' }).click();
+  const slide = page.getByTestId('slide-page');
+  await expect(slide).toHaveAttribute('data-rendered', '1');
+  const box = (await slide.locator('canvas').boundingBox())!;
+  expect(box.height).toBeGreaterThan(800); // was about 480 in a fixed 44rem frame (Nov 18)
+  // The page itself never scrolls sideways
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+/** A one-page US Letter (portrait) PDF, like a Word document saved as PDF. */
+function portraitPdf(): Uint8Array {
+  return new TextEncoder().encode(
+    makePdf([{ title: 'Unit 4: Fallacies' }])
+      .reduce((s, b) => s + String.fromCharCode(b), '')
+      .replace('/MediaBox [0 0 720 540]', '/MediaBox [0 0 612 792]'),
+  );
+}
