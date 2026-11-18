@@ -20,6 +20,14 @@ concurrency: # a newer push cancels an older run of the same branch still going
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20 # a normal run takes about 2 minutes; a hang fails here instead of running for hours
+    # Playwright's own image: Chromium (desktop, Android) and WebKit (iPhone) and every system library
+    # they need are already inside, so nothing is downloaded from Ubuntu's package mirrors (installing
+    # them hung twice on Nov 18). Its version must equal @playwright/test's in package.json: when you
+    # upgrade Playwright, change the tag here and in the check below.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -27,17 +35,18 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # The browsers the tests use: Chromium for desktop and Android, WebKit (Safari's engine) for iPhone
-      - run: npx playwright install --with-deps chromium webkit
+      - name: Check the image matches the installed Playwright
+        run: test "$(node -p "require('@playwright/test/package.json').version")" = "1.65.1"
       - run: npm test
 
   image:
     needs: test # a broken push never becomes an image
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         if: github.event_name != 'pull_request'
         with:
           registry: ghcr.io
@@ -47,7 +56,7 @@ jobs:
       - id: name
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
       # On a pull request the image is only built, to prove the Dockerfile works; on main it's published
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64

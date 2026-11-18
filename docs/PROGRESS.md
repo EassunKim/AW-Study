@@ -75,6 +75,9 @@ the "Test and publish" run on `main` to finish, then press Update.
   suspended cards and one card per note per day; button labels) and `src/lib/cloze.ts`
   (`checkCloze`, `renderCloze`), with 71 Vitest tests. Each key rule was proved to fail without it
   (30 of 32; the other two are already enforced by ts-fsrs). Signatures unchanged. (Matt's Claude)
+- **Nov 18:** CI's test job runs in Playwright's own image (`mcr.microsoft.com/playwright`) after
+  `playwright install --with-deps` hung twice on Ubuntu's mirrors; jobs get time limits (20 and
+  15 min); Docker actions moved to their Node 24 majors (#10). (Nathan's Claude)
 - **Nov 18:** #6 data layer (PR #9): `src/db/schema.ts` (IndexedDB, migration step 1),
   `src/db/store.ts` (`StudyStore`: decks, notes and their cards, suspend, study queue, answers,
   change log), 18 Vitest tests (each key rule proved to fail without it) and browser tests in all
@@ -97,7 +100,12 @@ the "Test and publish" run on `main` to finish, then press Update.
   the classic `fsrs()` API we use as deprecated (it still works); only `scheduler.ts` would change.
 - `npm install` on a different Node version (Matt's PC has Node 22) can rewrite
   `package-lock.json`. Don't commit that unless the PR is about dependencies.
-
+- **Don't use `America/Vancouver` in tests.** BC moved to permanent UTC-7 in 2026, and only newer
+  time zone data knows it: Node 26 says UTC-7 in November, Node 22 says UTC-8, so a test that
+  passes on one PC fails on another. Use a zone whose rules haven't changed (`America/Los_Angeles`,
+  `America/New_York`, `Asia/Tokyo`, `UTC`).
+- **Upgrading Playwright?** Also change the image tag in `.github/workflows/publish.yml`
+  (`mcr.microsoft.com/playwright:v<version>-noble`) and the version in its check step, or CI fails.
 - **Playwright's WebKit has no OPFS** (the browser's private file system): anything built on it
   can't be tested for iPhones here. Real Safari has it; our tests can't show it.
 - **IndexedDB transactions commit as soon as nothing is pending.** Inside one, await only
