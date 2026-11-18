@@ -36,6 +36,7 @@ slides" and "M6: AI helper and quizzes":
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 | Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
 | Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | **Done** (contract #48, storage and planner #49, screens #50) |
+| Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **In progress**: contract and storage (PR #57), then the viewer tools |
 
 ## Milestones
 
@@ -47,7 +48,7 @@ slides" and "M6: AI helper and quizzes":
 | 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Done** (#24-#26); not yet tried on a real phone |
 | 5 | Planner and the daily checklist with Play | **Done** (#47); exams pulling sections forward come with 9 |
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
-| 7 | Viewer tools: highlights, notes, explain, ask | Not started |
+| 7 | Viewer tools: highlights, notes, explain, ask | **In progress** (#56) |
 | 8 | First run (tutorial) and after-class prompts | Not started |
 | 9 | Exams: pulling forward, practice tests with AI-graded short answers | Not started |
 
@@ -107,6 +108,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 18:** Notes and highlights, contract and storage (#56, PR #57): `src/types/annotation.ts` and
+  `src/db/annotations.ts`, schema step 7 (store `annotations`, by course and by deck). An annotation
+  belongs to a deck's page (not a section), so it shows wherever that slide is open. Positions are
+  fractions of the page; text highlights keep their words. Unlike attempts and sessions they can be
+  edited (colour, note) and deleted; deleting a deck or class deletes them. Only id, courseId and
+  deckId stay readable (the page is sealed too). 18 deliberate bugs caught. (Matt's Claude)
 
 - **Nov 18:** Updates never reload an unlocked app (PR #55): the service worker's autoUpdate reloaded the
   page as soon as a new version arrived, which locked it, so a passkey was asked for twice (and a quiz in
