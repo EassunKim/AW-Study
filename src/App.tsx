@@ -25,6 +25,8 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   const route = useRoute();
   const [status, setStatus] = useState<VaultStatus>(() => vault.status());
   const refresh = () => setStatus(vault.status());
+  // The slides use the whole window (app.css .wide); header and footer line up with them
+  const wide = status === 'unlocked' && route.name === 'slides';
   const lock = () => {
     vault.lock();
     refresh();
@@ -34,7 +36,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   return (
     <VaultContext value={vault}>
       <StoreContext value={store}>
-        <header className="top">
+        <header className={wide ? 'top wide' : 'top'}>
           <h1>
             <a href={href({ name: 'classes' })}>{APP_NAME}</a>
           </h1>
@@ -49,13 +51,13 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
             </nav>
           )}
         </header>
-        <main className="app">
+        <main className={wide ? 'app wide' : 'app'}>
           {status === 'new' && <SetupScreen onDone={refresh} />}
           {status === 'locked' && <UnlockScreen onUnlocked={refresh} />}
           {status === 'unlocked' && <BackupWatcher store={store} />}
           {status === 'unlocked' && <Screen route={route} onLock={lock} />}
         </main>
-        <Footer />
+        <Footer wide={wide} />
       </StoreContext>
     </VaultContext>
   );
@@ -87,7 +89,7 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
   );
 }
 
-function Footer() {
+function Footer({ wide }: { wide: boolean }) {
   const [now, setNow] = useState(() => new Date());
   const [offlineReady, setOfflineReady] = useState(false);
 
@@ -102,7 +104,7 @@ function Footer() {
   }, []);
 
   return (
-    <footer className="foot muted small">
+    <footer className={wide ? 'foot muted small wide' : 'foot muted small'}>
       <span>
         Study day <span data-testid="study-day">{studyDay(now, deviceTimeZone(), DAY_START_HOUR)}</span>
       </span>

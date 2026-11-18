@@ -423,8 +423,18 @@ label.file input {
 }
 
 
+/* The slides get the window, not the 40rem column: as wide as fits, and as tall as the screen less
+   the header, back link and title above (about 14rem), so a portrait page (a Word document saved as
+   PDF) is readable too. Never under 26rem. */
+.top.wide,
+.app.wide,
+.foot.wide {
+  max-width: 90rem;
+}
+
 .slides-frame {
-  height: min(75vh, 44rem);
+  height: max(26rem, calc(100vh - 14rem));
+  height: max(26rem, calc(100dvh - 14rem)); /* dvh: the visible height on phones, with the browser bars */
   margin: 0.5rem 0 1rem;
 }
 
