@@ -6,7 +6,8 @@ Spaced repetition for lecture content. Set a daily time budget, turn lecture sli
 (written by hand, or drafted by AI and approved by you), and review them at the right moments with
 [FSRS](https://github.com/open-spaced-repetition). Your slides and cards stay on your own device.
 
-Status: early. The skeleton (installable, works offline) is in place; studying arrives next.
+Status: early. You can make decks, write basic and cloze cards by hand, and review them with
+FSRS, on your phone or computer, offline. Slides-to-cards and the daily time budget come next.
 The plan is in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Run it

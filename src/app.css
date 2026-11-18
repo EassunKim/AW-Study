@@ -1,10 +1,20 @@
+/* Phone first: everything works one-handed on a narrow screen, tap targets are at least 44px
+   (Apple's minimum), and nothing moves under your thumb. Light and dark follow the device. */
+
 :root {
   --bg: #f8fafc;
   --surface: #ffffff;
   --text: #0f172a;
   --muted: #475569;
   --accent: #4f46e5;
+  --accent-text: #ffffff;
   --border: #e2e8f0;
+  --danger: #b91c1c;
+  --again: #b91c1c;
+  --hard: #b45309;
+  --good: #15803d;
+  --easy: #1d4ed8;
+  --radius: 0.75rem;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
@@ -17,7 +27,13 @@
     --text: #f1f5f9;
     --muted: #94a3b8;
     --accent: #818cf8;
+    --accent-text: #111827;
     --border: #334155;
+    --danger: #f87171;
+    --again: #f87171;
+    --hard: #fbbf24;
+    --good: #4ade80;
+    --easy: #60a5fa;
   }
 }
 
@@ -31,39 +47,370 @@ body {
   color: var(--text);
 }
 
-.app {
+a {
+  color: var(--accent);
+}
+
+/* --- Frame --- */
+
+.top,
+.app,
+.foot {
   max-width: 40rem;
   margin: 0 auto;
-  padding: max(2rem, env(safe-area-inset-top)) 1rem 2rem;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
 }
 
-h1 {
-  margin: 0 0 0.25rem;
-  color: var(--accent);
-  font-size: 2rem;
+.top {
+  padding-top: max(1rem, env(safe-area-inset-top));
 }
 
-.tagline,
-.note {
+.top h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.top h1 a {
+  text-decoration: none;
+}
+
+.app {
+  padding-bottom: 2rem;
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+h2 {
+  margin: 1rem 0 0.5rem;
+}
+
+h3 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1rem;
   color: var(--muted);
 }
 
-.facts {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.5rem 1rem;
-  margin: 1.5rem 0;
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.error {
+  color: var(--danger);
+}
+
+/* --- Controls --- */
+
+button,
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation; /* no double-tap zoom delay on phones */
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #ffffff;
+}
+
+.wide {
+  width: 100%;
+}
+
+input,
+textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: max(1rem, 16px); /* 16px or more stops iPhones zooming in on focus */
+}
+
+textarea {
+  resize: vertical;
+}
+
+label {
+  font-weight: 600;
+}
+
+kbd {
+  font-family: inherit;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  border: 1px solid currentColor;
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+}
+
+@media (hover: none) {
+  kbd {
+    display: none; /* no keyboard on a phone */
+  }
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row.end {
+  justify-content: flex-end;
+}
+
+.row input {
+  flex: 1 1 12rem;
+  width: auto;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.segmented {
+  display: flex;
+}
+
+.segmented button {
+  flex: 1;
+  border-radius: 0;
+}
+
+.segmented button:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.segmented button:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+/* --- Lists --- */
+
+.list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.deck-row,
+.note-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.deck-link {
+  flex: 1 1 12rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 44px;
+  justify-content: center;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.deck-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.counts {
+  display: inline-flex;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.counts .due {
+  color: var(--good);
+}
+
+.counts .new {
+  color: var(--easy);
+}
+
+.note-text {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+/* --- Cards --- */
+
+.card-text {
+  white-space: pre-wrap; /* keep the line breaks people type */
+  overflow-wrap: anywhere;
+}
+
+.cloze-blank {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.cloze-answer {
+  font-weight: 700;
+  color: var(--good);
+}
+
+.previews {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preview {
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.editor {
   padding: 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius);
 }
 
-.facts dt {
+.review .card {
+  min-height: 12rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1.25rem;
+}
+
+.review .card hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.answer-bar {
+  margin-top: 1rem;
+  min-height: 4.5rem; /* the same height before and after "Show answer" */
+  display: flex;
+  align-items: stretch;
+}
+
+.answer-bar > .wide {
+  min-height: 4.5rem;
+}
+
+.grades {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.grade {
+  flex-direction: column;
+  gap: 0;
+  padding: 0.25rem;
+  min-height: 4.5rem;
+}
+
+.grade-label {
+  font-weight: 700;
+}
+
+.grade-when {
+  font-size: 0.85rem;
   color: var(--muted);
+  min-height: 1.3em;
 }
 
-.facts dd {
-  margin: 0;
-  overflow-wrap: anywhere;
+.grade-1 .grade-label {
+  color: var(--again);
+}
+
+.grade-2 .grade-label {
+  color: var(--hard);
+}
+
+.grade-3 .grade-label {
+  color: var(--good);
+}
+
+.grade-4 .grade-label {
+  color: var(--easy);
+}
+
+/* --- Dialog --- */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.dialog {
+  width: min(28rem, 100%);
+  padding: 1.25rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.dialog h2 {
+  margin-top: 0;
 }
