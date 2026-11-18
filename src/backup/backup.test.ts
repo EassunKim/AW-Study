@@ -244,6 +244,7 @@ describe('the file format', () => {
     expect(code(variant((f) => (f.createdAt = 'yesterday')))).toBe('damaged');
     expect(code(variant((f) => ((f.stores as Record<string, unknown>).decks = [{ id: 'x', name: 'plain' }])))).toBe('damaged');
     expect(code(variant((f) => ((f.keycheck as { iv: unknown }).iv = { $bytes: '!!' })))).toBe('damaged');
+    expect(code(variant((f) => ((f.keycheck as { iv: unknown }).iv = { $bytes: 'AAAAA' })))).toBe('damaged'); // 5 characters can't be whole bytes
   });
 
   it('round-trips through text unchanged', async () => {

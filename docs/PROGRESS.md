@@ -113,7 +113,7 @@ the "Test and publish" run on `main` to finish, then press Update.
   (one transaction, all or nothing) and `latestChange`. Backups copy every store in
   `RECORD_STORES`, so #24's stores join automatically. 23 unit tests and browser tests on all
   three engines (download, restore on a new device, replace in Settings, wrong passphrase, a
-  non-backup file); 17 deliberate bugs each caught. Folder backups can't be driven by Playwright
+  non-backup file); 18 deliberate bugs each caught. Folder backups can't be driven by Playwright
   (no way to answer the folder picker): unit-tested with a fake folder. (Matt's Claude)
 
 - **Nov 18:** #17 screens (PR #21): first-run setup (passkey or passphrase, the recovery key shown once and typed back), the unlock screen (passkey, passphrase, recovery key, then a new passphrase), Settings (change passphrase, add/remove passkeys, new recovery key, Lock now), on the encrypted store from #16. Browser tests on all three engines, including an end-to-end scan of the real IndexedDB for plaintext; passkeys tested in Chromium with a virtual authenticator with PRF. 15 rules proved to fail without them. (Matt's Claude)
