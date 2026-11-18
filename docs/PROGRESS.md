@@ -30,7 +30,7 @@ slides" and "M6: AI helper and quizzes":
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
 | Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Contract on `main` (PR #29); storage next |
-| PDF slide viewer component | #25 | unclaimed | `src/viewer/`, `tests/fixtures/` | Ready (independent) |
+| PDF slide viewer component | #25 | Matt's Claude | `src/viewer/`, `tests/fixtures/`, `viewer-demo.html`, the PDF.js part of `vite.config.ts` | **Done** (PR #VIEWER) |
 | Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Waits for #24's contract and #25 |
 | AI helper on the server | #27 | unclaimed | `helper/`, its CI job | Ready (independent) |
 
@@ -105,6 +105,17 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 18:** #25 slide viewer (PR #VIEWER): `src/viewer/` with `<SlideViewer pdf page range
+  onPageChange>` (one slide fitted to the screen; keys, buttons, swipes, thumbnails; pinch, +/−
+  zoom; the section's range marked; a selectable text layer for milestone 7; thumbnails drawn only
+  near the screen) and `extractPageText(pdf)`. PDF.js 6 (`pdfjs-dist`, Apache-2.0), **legacy
+  build**; its worker and data files (fonts, decoders, colour profiles, character maps) come from
+  our own site (`/pdfjs/`, copied by `vite.config.ts`), so the CSP needed **no change**. Test page
+  `/viewer-demo.html` until #26 uses it. Unit tests on PDFs generated in the test
+  (`tests/fixtures/make-pdf.ts`); browser tests on all three engines (no errors, no CSP
+  violations, every request same-site, a 150-slide deck in under 5 s with under 40 thumbnails
+  drawn). 12 deliberate bugs each caught. (Matt's Claude)
+
 - **Nov 18:** Redesign written into `docs/DESIGN.md`, `CLAUDE.md` (product, schedule and AI rules)
   and this file; milestones 4-9 replace the old 4-7; issues #24-#27. (Nathan's Claude)
 
@@ -160,6 +171,15 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- **PDF.js: use the legacy build** (`pdfjs-dist/legacy/build/pdf.mjs`, and its worker). The
+  modern build of PDF.js 6 needs `Uint8Array.prototype.toHex` (Chrome 140, Safari 18.2, Node 25)
+  and `Promise.try`, so it fails in Node 24 and on older iPhones. In v6, `destroy()` is on the
+  loading task, not the document: use `openPdf()`'s `close()` (`src/viewer/pdf.ts`). PDF.js takes
+  ownership of the bytes it's given, so `openPdf` copies them.
+- **A mutation check that breaks the type check proves nothing in browser tests:** `npm run build`
+  fails, and the tests run against the old `dist/`. Check the build succeeded before trusting a
+  "missed" or "caught".
 
 - **Writing to the encrypted store: read, decrypt, compute, encrypt, then write** in a second
   transaction (never encrypt inside one). Wrap every write in `exclusive()` in
