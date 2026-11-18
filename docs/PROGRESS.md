@@ -21,17 +21,32 @@ parallel, and #18 follows #16. Claim a task with a comment on its issue.
 
 Milestone 2 (#5, #6, #7) is done: see the log.
 
+### Next: the redesign (Nov 18)
+
+**Matt and Nathan redesigned the app** around lectures, slides and AI quizzes (`docs/DESIGN.md`,
+rewritten). Milestone 3 continues unchanged. The new work, in GitHub milestones "M4: Classes and
+slides" and "M6: AI helper and quizzes":
+
+| Task | Issue | Who | Files it owns | Status |
+| --- | --- | --- | --- | --- |
+| Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Starting: contract first |
+| PDF slide viewer component | #25 | unclaimed | `src/viewer/`, `tests/fixtures/` | Ready (independent) |
+| Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Waits for #24's contract and #25 |
+| AI helper on the server | #27 | unclaimed | `helper/`, its CI job | Ready (independent) |
+
 ## Milestones
 
 | # | Milestone | State |
 | --- | --- | --- |
 | 1 | Skeleton: installable offline PWA, server, tests, CI | **Done** (#2, #3). Live at https://honed.pacificfish.ca |
-| 2 | Study by hand: decks, hand-made cards, FSRS reviews, review log, change log | **Done** (#5, #6, #7). Deploy with Update after #14 merges |
+| 2 | Study by hand (flashcards, FSRS) | **Done**, then **superseded** by the Nov 18 redesign; removed in #26 |
 | 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | **In progress** (#15-#18) |
-| 4 | Time budget: pacing, daily ring, streak | Not started |
-| 5 | Slides to cards: PDF in the browser, AI drafts, approve screen | Not started |
-| 6 | Polish the reward loop | Not started |
-| 7 | v2: encrypted sync | Not started |
+| 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Starting** (#24-#26) |
+| 5 | Planner and the daily checklist with Play | Not started |
+| 6 | AI helper and quizzes | **Helper starting** (#27); the app side later |
+| 7 | Viewer tools: highlights, notes, explain, ask | Not started |
+| 8 | First run (tutorial) and after-class prompts | Not started |
+| 9 | Exams: pulling forward, practice tests with AI-graded short answers | Not started |
 
 ## Live
 
@@ -40,6 +55,13 @@ GitHub** at apps.pacificfish.ca (Matt and Nathan both have the button). After me
 the "Test and publish" run on `main` to finish, then press Update.
 
 ## Decisions (newest first)
+
+- **Nov 18: Redesign** (Matt and Nathan). FSRS and flashcards were a reference, not the product.
+  Honed is built around **lectures**: classes, PDF slides studied in a built-in viewer, and AI
+  multiple-choice quizzes whose scores schedule each section (a low score adds study time later,
+  never an immediate re-study). Data stays on the device. AI is Claude Code in a locked-down helper
+  on Nathan's server, on Matt's and Nathan's own subscriptions. PDF only for now; flashcards out.
+  Everything in `docs/DESIGN.md`; the flashcard code goes in #26.
 
 - **Nov 18 (#15):** Encryption, as written in `docs/SECURITY.md`: one random AES-GCM data key
   encrypts every record's private part (fresh random IV, additional data
@@ -84,6 +106,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 ## Log (newest first)
 
 - **Nov 18:** #17 screens (PR #21): first-run setup (passkey or passphrase, the recovery key shown once and typed back), the unlock screen (passkey, passphrase, recovery key, then a new passphrase), Settings (change passphrase, add/remove passkeys, new recovery key, Lock now), on the encrypted store from #16. Browser tests on all three engines, including an end-to-end scan of the real IndexedDB for plaintext; passkeys tested in Chromium with a virtual authenticator with PRF. 15 rules proved to fail without them. (Matt's Claude)
+
+- **Nov 18:** Redesign written into `docs/DESIGN.md`, `CLAUDE.md` (product, schedule and AI rules)
+  and this file; milestones 4-9 replace the old 4-7; issues #24-#27. (Nathan's Claude)
 
 - **Nov 18:** #16 encrypted storage (PR #23): `StudyStore` gains the `Vault` methods agreed with
   #17 (`status`, `getKeyring`, `setUp` with progress, `unlock`, `lock`, three keyring
