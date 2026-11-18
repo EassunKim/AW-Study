@@ -122,7 +122,7 @@ export interface CourseSummary extends Course {
 
 export interface LectureWithSections {
   lecture: Lecture;
-  sections: Section[]; // in the order given
+  sections: Section[]; // by deck, then first page
 }
 
 /**
