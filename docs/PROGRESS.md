@@ -29,7 +29,7 @@ slides" and "M6: AI helper and quizzes":
 
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
-| Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Starting: contract first |
+| Contract and storage: classes, exams, decks, lectures, sections | #24 | Nathan's Claude | `src/types/lecture.ts`, `src/db/`, SECURITY.md's table | Contract on `main` (PR #29); storage next |
 | PDF slide viewer component | #25 | Matt's Claude (after #18) | `src/viewer/`, `tests/fixtures/` | Ready (independent) |
 | Class and lecture screens; remove the flashcard layer | #26 | unclaimed | `src/ui/` (not #17's screens), routes, old flashcard files | Waits for #24's contract and #25 |
 | AI helper on the server | #27 | unclaimed | `helper/`, its CI job | Ready (independent) |
