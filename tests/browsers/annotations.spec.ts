@@ -261,7 +261,7 @@ test('Explain this and Ask about this send only the words and nearby slides, and
   await page.route('**/ai/explain', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'Not signed in.' }) }));
   await highlight.getByRole('button', { name: 'Explain this' }).click();
   await expect(notes.getByRole('alert')).toContainText('Sign in again to use AI.');
-  await expect(notes.getByRole('link', { name: 'Sign in for AI' })).toHaveAttribute('href', '/ai/whoami');
+  await expect(notes.getByRole('link', { name: 'Sign in for AI' })).toHaveAttribute('href', /^\/ai\/signin\?then=%2F%23%2F/);
 
   expect((await problems()).filter((p) => !/status of 401/.test(p))).toEqual([]);
 });

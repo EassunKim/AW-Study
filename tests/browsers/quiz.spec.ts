@@ -128,7 +128,7 @@ test('when the AI can’t be used, it says why, and a lapsed sign-in offers to s
 
   await make.click();
   await expect(page.getByRole('alert')).toHaveText('Sign in again to use AI.');
-  await expect(page.getByRole('link', { name: 'Sign in for AI' })).toHaveAttribute('href', '/ai/whoami');
+  await expect(page.getByRole('link', { name: 'Sign in for AI' })).toHaveAttribute('href', /^\/ai\/signin\?then=%2F%23%2F/);
   await make.click();
   await expect(page.getByRole('alert')).toContainText('Today’s AI limit');
   await expect(page.getByRole('link', { name: 'Sign in for AI' })).toBeHidden();
@@ -269,7 +269,7 @@ test('turned off, nothing is sent; a lapsed sign-in pauses the background work u
   await form.getByRole('button', { name: 'Save lecture' }).click();
   const status = page.getByTestId('bank-jobs');
   await expect(status).toContainText('Sign in again to use AI.');
-  await expect(status.getByRole('link', { name: 'Sign in for AI' })).toHaveAttribute('href', '/ai/whoami');
+  await expect(status.getByRole('link', { name: 'Sign in for AI' })).toHaveAttribute('href', /^\/ai\/signin\?then=%2F%23%2F/);
   signedIn = true;
   await status.getByRole('button', { name: 'Try again' }).click();
   await expect(status).toContainText('Quiz questions ready: 10 for Cells, slides 1–2.');

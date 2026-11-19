@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { accessChecker } from '../../helper/access.mjs';
-import { createHelper, MAX_BODY, peopleFromEnv } from '../../helper/app.mjs';
+import { createHelper, MAX_BODY, peopleFromEnv, returnPath } from '../../helper/app.mjs';
 import { claudeArgs } from '../../helper/claude.mjs';
 import { buildPrompt } from '../../helper/jobs.mjs';
 
@@ -359,6 +359,37 @@ describe('who’s asking', () => {
     expect((await fetch(`${base}/ai/whoami`)).status).toBe(401);
     expect(calls()).toHaveLength(1);
     expect(JSON.stringify(logs)).not.toContain('example.com');
+  });
+
+  it('signin: a page saying you’re signed in, linking back into the app (an iPhone Home Screen app has no Back button)', async () => {
+    await start([reply({ text: 'x' })]);
+    const signin = (then, email = 'matt@example.com') =>
+      fetch(`${base}/ai/signin${then === undefined ? '' : `?then=${encodeURIComponent(then)}`}`, {
+        headers: email ? { 'cf-access-jwt-assertion': token({ email }) } : {},
+      });
+    const res = await signin('/#/class/abc');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/^text\/html/);
+    expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
+    const page = await res.text();
+    expect(page).toContain('signed in for AI as matt@example.com');
+    expect(page).toContain('<a href="/#/class/abc">Back to the app</a>');
+    expect(page).not.toMatch(/<script|<style|style=/);
+    expect(await (await signin(undefined)).text()).toContain('<a href="/">');
+    // Not allowed or not signed in: still a way back
+    const stranger = await signin('/', 'stranger@example.com');
+    expect(stranger.status).toBe(403);
+    expect(await stranger.text()).toContain('stranger@example.com can’t use the AI helper.');
+    const nobody = await signin('/', null);
+    expect(nobody.status).toBe(401);
+    expect(await nobody.text()).toContain('<a href="/">Back to the app</a>');
+    expect(calls()).toHaveLength(0); // no AI used
+  });
+
+  it('signin links only back into this site: anything else goes to /', () => {
+    for (const ok of ['/', '/#/class/abc', '/#/play?x=1', '/viewer-demo.html']) expect(returnPath(ok), ok).toBe(ok);
+    for (const bad of [null, '', 'https://evil.example/', '//evil.example/', '/\\evil.example', 'javascript:alert(1)', '/"><script>', '/ai/whoami', '/ai', ' /', 'x'.repeat(301)])
+      expect(returnPath(bad), String(bad)).toBe('/');
   });
 
   it('emails match whatever their case', async () => {

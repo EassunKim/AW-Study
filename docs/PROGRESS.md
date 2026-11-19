@@ -111,6 +111,17 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 19:** "Sign in for AI" goes to the helper's new `GET /ai/signin?then=<path>` (a plain page, strict CSP:
+  "You're signed in for AI", **Back to the app**, "close this tab if it opened in one"), not `/ai/whoami`.
+  On Nathan's iPhone Home Screen app the sign-in had left him on whoami's JSON with no way back. `then`
+  is the screen you were on (`signInUrl()`), and the helper only links to a path on this site, never
+  `/ai/` (`returnPath`, tested with hostile values). Needs **Update for both `site-honed` and `honed-ai`**.
+- **Nov 19:** Real iPhone (Nathan, Home Screen app): setup with a passkey and Face ID unlock work. A
+  passkey saved to Chrome stopped working (see Gotchas); one in Apple's Passwords works. The class form's
+  time and date boxes overflowed their columns (Safari draws them ~183 px wide): fixed in PR #63
+  (`appearance: none`, `min-width: 0` on the boxes and `label.inline`, rows lined up by their bottom);
+  confirmed on the iPhone, the time picker still opens.
+
 - **Nov 19:** Deployed main 8ee4c61 (the viewer tools, #56) and checked it live (#60): `/healthz` 200,
   the security headers and CSP intact, no Cloudflare script injected, `/assets/` immutable. The whole
   browser suite run against https://honed.pacificfish.ca (desktop, Android, iPhone): 110 passed, 5
@@ -318,6 +329,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- **On an iPhone, a passkey saved to Chrome (Google Password Manager) can't be trusted for unlocking.**
+  Nathan's (Nov 19) unlocked once, then every try through "More from Chrome…" ended in "cancelled or
+  timed out" (`NotAllowedError`). A new one saved to Apple's Passwords works. Exact cause unknown (PRF
+  through a third-party provider is the guess). Set up passkeys on iPhones in Apple's Passwords.
+- **An iPhone Home Screen app opens a `target="_blank"` link to our own site inside itself, with no Back
+  button.** Anything a link opens (like Access sign-in) must offer a way back into the app.
 
 - **Anything that resizes the slide redraws its text layer, which drops the user's selection.** Don't
   change the viewer's size while words may be selected (the notes panel waits for the press to end).
