@@ -1,8 +1,9 @@
-// A slide deck in the viewer (#25), optionally opened at a section's slides with the range marked.
+// A slide deck in the viewer (#25), optionally opened at a section's slides with the range marked,
+// with its notes and highlights (#56).
 // Loaded on demand (with PDF.js), so the first screen doesn't wait for it.
 import { useState } from 'react';
-import { SlideViewer } from '../viewer/SlideViewer';
 import { slidesLabel } from './classes';
+import { DeckSlides } from './DeckSlides';
 import { href } from './route';
 import { useStore } from './store-context';
 import { useLoad } from './useLoad';
@@ -40,7 +41,7 @@ export default function SlidesScreen({ courseId, deckId, first, last }: { course
         {range && <span className="muted small"> · {slidesLabel(range.first, range.last)}</span>}
       </h2>
       <div className="slides-frame">
-        <SlideViewer pdf={pdf} page={page} range={range} onPageChange={setPage} />
+        <DeckSlides deckId={deck.id} pdf={pdf} page={page} range={range} onPageChange={setPage} />
       </div>
     </section>
   );

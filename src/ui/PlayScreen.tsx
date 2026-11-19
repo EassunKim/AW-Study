@@ -8,7 +8,7 @@ import type { StudyStore } from '../db/store';
 import { pickQuiz, type QuizItem } from '../quiz/pick';
 import type { PlanItem } from '../plan/planner';
 import type { Question, QuizAttempt } from '../types/quiz';
-import { SlideViewer } from '../viewer/SlideViewer';
+import { DeckSlides } from './DeckSlides';
 import { describeItem, loadPlanning, type ItemPlace } from './planning';
 import { Quiz, Start, type Setting } from './QuizScreen';
 import { href } from './route';
@@ -137,7 +137,7 @@ function StudyTime({ item, place, store, onEnd }: { item: PlanItem; place: ItemP
       {error && <p className="error">{error}</p>}
       <div className="session-frame">
         {pdf ? (
-          <SlideViewer pdf={pdf} page={page} range={{ first: place.section.firstPage, last: place.section.lastPage }} onPageChange={setPage} />
+          <DeckSlides deckId={place.deck.id} pdf={pdf} page={page} range={{ first: place.section.firstPage, last: place.section.lastPage }} onPageChange={setPage} />
         ) : (
           <p className="muted">Opening the slides…</p>
         )}

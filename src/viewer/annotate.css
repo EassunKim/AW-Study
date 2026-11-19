@@ -1,0 +1,212 @@
+/* Notes and highlights (AnnotatedViewer.tsx). The viewer and its panel share the parent's height. */
+
+.annotated {
+  display: flex;
+  gap: 0.75rem;
+  height: 100%;
+  min-height: 20rem;
+}
+
+.av-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+
+.ann-panel {
+  flex: 0 0 20rem;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border-left: 1px solid var(--border);
+}
+
+/* Phones and narrow windows: the panel goes under the slides. The slides keep the same height with
+   the panel open or closed (a redraw would drop a selection being made), and the screen's frame (a
+   fixed height for the viewer alone) grows to fit both. */
+@media (max-width: 899px) {
+  .annotated {
+    flex-direction: column;
+    height: auto;
+  }
+  .av-main {
+    flex: 0 0 auto;
+    height: max(20rem, calc(100vh - 16rem));
+    height: max(20rem, calc(100dvh - 16rem));
+  }
+  .ann-panel {
+    flex: 0 0 auto;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+  :has(> .annotated) {
+    height: auto;
+  }
+}
+
+/* Colours: highlights are see-through, so the slide shows through */
+.c-yellow {
+  --ann: rgb(255 214 0);
+}
+.c-green {
+  --ann: rgb(60 200 90);
+}
+.c-blue {
+  --ann: rgb(70 150 255);
+}
+.c-pink {
+  --ann: rgb(255 100 180);
+}
+
+/* On the slide: above the text layer, letting presses through unless a tool is on */
+.ann-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ann-layer.tool-area,
+.ann-layer.tool-pin {
+  pointer-events: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.ann-mark {
+  position: absolute;
+  background: var(--ann);
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  border-radius: 2px;
+}
+
+.ann-mark.area {
+  opacity: 0.25;
+  outline: 2px solid var(--ann);
+}
+
+.ann-mark.active {
+  opacity: 0.55;
+  outline: 2px solid var(--accent);
+}
+
+.ann-mark.pending {
+  background: rgb(0 0 255 / 0.12);
+  opacity: 1;
+  outline: 2px dashed var(--accent);
+}
+
+.ann-pin {
+  position: absolute;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: -0.75rem 0 0 -0.75rem;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: var(--ann, var(--accent));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.ann-pin.active {
+  outline: 3px solid var(--accent);
+}
+
+.ann-pin.pending {
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* The panel */
+.ann-tools,
+.ann-row,
+.ann-colours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ann-tools button[aria-pressed='true'] {
+  outline: 2px solid var(--accent);
+}
+
+.ann-heading {
+  margin: 1rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.ann-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 0.5rem;
+}
+
+.ann-card .ann-heading {
+  margin: 0;
+}
+
+.ann-quote {
+  margin: 0;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.ann-note,
+.ann-answer {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ann-swatch {
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+  background: var(--ann);
+}
+
+.ann-swatch[aria-pressed='true'] {
+  border-color: var(--text);
+  outline: 2px solid var(--accent);
+}
+
+.ann-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ann-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+  border-left: 4px solid var(--ann);
+  border-radius: 0.25rem;
+  background: rgb(127 127 127 / 0.08);
+}
+
+.ann-item.active {
+  outline: 2px solid var(--accent);
+}
+
+.ann-actions button {
+  font-size: 0.875rem;
+}

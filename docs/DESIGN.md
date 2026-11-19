@@ -171,6 +171,7 @@ Slides are shown exactly as the PDF draws them, with your notes and highlights o
 - **Explain this:** select text or an area, and get a fuller explanation in a side panel, based on that slide and its neighbours.
 - **Ask about this:** the same, with your own question.
 - Either answer can be **kept as a note** on the slide.
+- Built in #56 (`src/viewer/AnnotatedViewer.tsx`): a **Notes** panel beside the slides (under them on phones) with **Box**, **Pin a note** and **Ask about this slide**; selecting words offers the colours, Explain and Ask. Explain sends the selection (or the words inside a box) with the slide and its neighbours, nothing else. Ask's question is kept with its answer. The quiz's slide shows no notes for now.
 
 **PowerPoint later.** Browsers can't draw .pptx files faithfully. Options when it's time: (1) convert to PDF on Nathan's server with LibreOffice, which keeps fonts and layout better than most exports but isn't perfect; (2) a JavaScript .pptx renderer in the browser (keeps files on the device; weaker fidelity); (3) keep asking for a PDF export. Test with real problem decks before choosing.
 
