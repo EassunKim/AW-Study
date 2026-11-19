@@ -8,9 +8,18 @@
 import { AiError, type AiBackend, type AskRequest, type ExplainRequest, type GradeRequest, type MakeQuestionsRequest } from './backend';
 import { checkGrade, checkQuestions, checkText } from './check';
 
-/** Opens in a window to sign in to Cloudflare Access; it shows "ready" once you're in. */
-export function signInUrl(base = '/ai/'): string {
-  return `${base}whoami`;
+/**
+ * Opens in a window to sign in to Cloudflare Access. The helper's /ai/signin page then says you're in
+ * and links back to `then` (by default the screen you're on): an iPhone Home Screen app opens it in
+ * its own window, with no Back button (Nov 19: it was left on /ai/whoami's JSON).
+ */
+export function signInUrl(base = '/ai/', then = here()): string {
+  return `${base}signin?then=${encodeURIComponent(then)}`;
+}
+
+function here(): string {
+  const at = globalThis.location;
+  return at ? `${at.pathname}${at.search}${at.hash}` : '/';
 }
 
 export class HttpAiBackend implements AiBackend {

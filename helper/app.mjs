@@ -1,5 +1,7 @@
 // The helper's HTTP API (served at /ai/ behind Cloudflare Access):
 //   POST /ai/questions, /ai/grade, /ai/explain, /ai/ask: JSON in, JSON out (helper/jobs.mjs)
+//   GET  /ai/signin?then=<path>: where "Sign in for AI" goes; a page linking back into the app
+//   GET  /ai/whoami: for setting up (JSON: who you are, whether you're ready, today's count)
 //   GET  /healthz: for the container's health check (no sign-in, says nothing)
 //
 // For each request: check it's JSON from our own site, check the Access token and find the person,
@@ -78,6 +80,23 @@ export function createHelper(options) {
         if (err instanceof AccessError) return send(401, { error: err.message });
         return send(503, { error: 'Couldn’t check the sign-in. Try again.' });
       }
+    }
+    // Where "Sign in for AI" goes: Access signs you in first, then this page links back into the app.
+    // An iPhone Home Screen app opens the sign-in in its own window with no Back button (Nov 19: it
+    // was left on whoami's JSON), so the page must offer the way back; in a browser tab, you close it.
+    if (url.pathname === '/ai/signin' && req.method === 'GET') {
+      let status = 200;
+      let message;
+      try {
+        const email = await checkAccess(req.headers);
+        person = people.get(email) ?? null;
+        if (person) message = `You’re signed in for AI as ${email}.`;
+        else [status, message] = [403, `${email} can’t use the AI helper.`];
+      } catch (err) {
+        if (err instanceof AccessError) [status, message] = [401, 'You’re not signed in. Open this page again to sign in.'];
+        else [status, message] = [503, 'Couldn’t check the sign-in. Try again.'];
+      }
+      return sendPage(res, status, message, returnPath(url.searchParams.get('then')));
     }
     if (job === null || !Object.hasOwn(JOBS, job)) return send(404, { error: 'Not found.' });
     if (req.method !== 'POST') return send(405, { error: 'Use POST.' });
@@ -167,6 +186,47 @@ export function createHelper(options) {
 class TooLarge extends Error {}
 
 /** The body as text; rejects with TooLarge past `max` bytes (after draining a little, so the client hears why). */
+/**
+ * Where /ai/signin's link goes: a path on this same site (the app's own, e.g. "/#/class/x"), never
+ * another site ("//evil.example", "https://…", "/\\evil"), and never back into /ai/. Anything else is "/".
+ */
+export function returnPath(then) {
+  if (typeof then !== 'string' || then.length > 300) return '/';
+  if (!/^\/(?![/\\])[A-Za-z0-9\-._~/?#=&%+:@!$'()*,;]*$/.test(then)) return '/';
+  if (then.startsWith('/ai/') || then === '/ai') return '/';
+  return then;
+}
+
+const escapeHtml = (text) =>
+  text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+/** A plain page with no script or style of its own, so its CSP can forbid everything. */
+function sendPage(res, status, message, back) {
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>AI sign-in</title>
+</head>
+<body>
+<p>${escapeHtml(message)}</p>
+<p><a href="${escapeHtml(back)}">Back to the app</a></p>
+<p>If this opened in a new tab, you can close it.</p>
+</body>
+</html>
+`;
+  res.writeHead(status, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    'Referrer-Policy': 'no-referrer',
+  });
+  res.end(html);
+}
+
 function readBody(req, max) {
   return new Promise((resolve, reject) => {
     let size = 0;

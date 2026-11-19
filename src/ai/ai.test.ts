@@ -67,7 +67,7 @@ describe('HttpAiBackend: requests', () => {
   it('only talks to a path on this same site', () => {
     expect(() => new HttpAiBackend('https://elsewhere.example/ai/')).toThrow(/same site/);
     expect(() => new HttpAiBackend('//elsewhere.example/ai/')).toThrow(/same site/);
-    expect(signInUrl()).toBe('/ai/whoami');
+    expect(signInUrl('/ai/', '/#/class/abc')).toBe('/ai/signin?then=%2F%23%2Fclass%2Fabc');
   });
 });
 
