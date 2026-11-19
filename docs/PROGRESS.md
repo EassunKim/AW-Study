@@ -36,7 +36,7 @@ slides" and "M6: AI helper and quizzes":
 | AiBackend in the app (client for `/ai/`, and a fake) | #34 | Matt's Claude | `src/ai/` | **Done** (PR #35) |
 | Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
 | Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | **Done** (contract #48, storage and planner #49, screens #50) |
-| Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **In progress**: contract and storage (PR #57), viewer tools (PR #58) |
+| Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **Done** (contract and storage PR #57, viewer tools PR #58). Try on an iPhone after deploy |
 
 ## Milestones
 
@@ -48,7 +48,7 @@ slides" and "M6: AI helper and quizzes":
 | 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Done** (#24-#26); not yet tried on a real phone |
 | 5 | Planner and the daily checklist with Play | **Done** (#47); exams pulling sections forward come with 9 |
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
-| 7 | Viewer tools: highlights, notes, explain, ask | **In progress** (#56) |
+| 7 | Viewer tools: highlights, notes, explain, ask | **Done** (#56); not yet tried on a real phone |
 | 8 | First run (tutorial) and after-class prompts | Not started |
 | 9 | Exams: pulling forward, practice tests with AI-graded short answers | Not started |
 
