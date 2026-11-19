@@ -308,3 +308,44 @@ function portraitPdf(): Uint8Array {
       .replace('/MediaBox [0 0 720 540]', '/MediaBox [0 0 612 792]'),
   );
 }
+
+// A real iPhone (Nov 19): Safari drew the time and date boxes about 183 px wide whatever their column,
+// so "Starts at" ran under "Minutes" and the term's "Ends" past the form's edge. Neither Chromium nor
+// Windows WebKit draws them that way (even given Safari's width, they widen the column or wrap, as
+// they should), so the geometry below can't catch that bug here; it guards the layout in general.
+// The fix's rules are checked directly, and the real proof is an iPhone.
+test('the new class form keeps every box inside it, side by side boxes lined up and not overlapping', async ({ page }) => {
+  await openUnlocked(page);
+  await page.getByRole('button', { name: 'Add a class' }).click();
+  const form = page.getByRole('form', { name: 'New class' });
+
+  // The fix: date and time boxes without Safari's own look, allowed to shrink, in labels that can too
+  for (const label of ['Starts at', 'Starts', 'Ends']) {
+    const input = form.getByLabel(label, { exact: true });
+    const style = await input.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { appearance: s.appearance, minWidth: s.minWidth, labelMinWidth: getComputedStyle(el.closest('label')!).minWidth };
+    });
+    expect(style, label).toEqual({ appearance: 'none', minWidth: '0px', labelMinWidth: '0px' });
+  }
+
+  const formBox = (await form.boundingBox())!;
+  const inputs = form.locator('input');
+  const boxes = [];
+  for (let i = 0; i < (await inputs.count()); i++) {
+    const input = inputs.nth(i);
+    const box = (await input.boundingBox())!;
+    const name = await input.evaluate((el) => el.closest('label')?.firstChild?.textContent?.trim() || el.type);
+    expect(box.x, `${name}: left edge`).toBeGreaterThanOrEqual(formBox.x);
+    expect(box.x + box.width, `${name}: right edge`).toBeLessThanOrEqual(formBox.x + formBox.width + 0.5);
+    boxes.push({ name, ...box });
+  }
+  for (const a of boxes)
+    for (const b of boxes) {
+      if (a === b) continue;
+      const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      expect(overlapX > 0.5 && overlapY > 0.5, `${a.name} overlaps ${b.name}`).toBe(false);
+      if (overlapY > 0.5) expect(Math.abs(a.y + a.height - (b.y + b.height)), `${a.name} and ${b.name} line up`).toBeLessThan(1);
+    }
+});

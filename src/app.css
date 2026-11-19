@@ -162,6 +162,21 @@ textarea {
   font-size: max(1rem, 16px); /* 16px or more stops iPhones zooming in on focus */
 }
 
+/* iPhone Safari draws date and time boxes about 183 px wide whatever their column (Nov 19: "Starts
+   at" ran under "Minutes", the term's "Ends" past the form's edge) and a little taller. Without its
+   own look they take the width and height given; the value stays on the left like other boxes. */
+input[type='date'],
+input[type='time'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  display: block;
+}
+
+input::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 textarea {
   resize: vertical;
 }
@@ -360,6 +375,21 @@ label.inline {
   flex-direction: column;
   gap: 0.25rem;
   flex: 1 1 9rem;
+  min-width: 0; /* may be narrower than its box's own size, so the box fits the column */
+}
+
+/* Groups of fields in a form: one stack's margin between them, not two plus a paragraph's */
+.editor > fieldset.stack + fieldset.stack {
+  margin-top: 0;
+}
+
+.editor > fieldset.stack > p:last-child {
+  margin-bottom: 0;
+}
+
+/* Labels side by side line up by their boxes, even when one box is taller */
+.row:has(> label.inline) {
+  align-items: flex-end;
 }
 
 label.check {
