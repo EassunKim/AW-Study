@@ -4,13 +4,15 @@ The shared status board for everyone working on Honed: Matt, Nathan and each one
 **Read it at the start of every session. Update it in every PR** (your task's row, and a line in the
 log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("Working together").
 
-## Now (updated Nov 18, 2026)
+## Now (updated Nov 19, 2026)
 
-Milestone 3, **Lock it down**: encryption, the recovery key, persistent storage, backup and
-restore. Four tasks, each a GitHub issue labelled `agent-task` in the GitHub milestone
-"M3: Lock it down". **#15 goes first**: it writes `docs/SECURITY.md` and the shared contract
-(`src/types/crypto.ts` + stubs, merged early like the M2 kickoff). Then #16 and #17 can run in
-parallel, and #18 follows #16. Claim a task with a comment on its issue.
+Milestones 3 to 7 are **done and live** (deployed Nov 19, main 8ee4c61). Next: trying it all on a
+real phone (Nathan, Nov 19), then milestone 8 (first run and after-class prompts). Open question
+for Matt and Nathan before 8 starts: are after-class prompts when you next open the app enough for
+now, or do we want real push notifications (DESIGN, "Open questions")?
+
+Milestone 3, **Lock it down** (done): encryption, the recovery key, persistent storage, backup and
+restore, in the GitHub milestone "M3: Lock it down".
 
 | Task | Issue | Who | Files it owns | Status |
 | --- | --- | --- | --- | --- |
@@ -44,7 +46,7 @@ slides" and "M6: AI helper and quizzes":
 | --- | --- | --- |
 | 1 | Skeleton: installable offline PWA, server, tests, CI | **Done** (#2, #3). Live at https://honed.pacificfish.ca |
 | 2 | Study by hand (flashcards, FSRS) | **Done**, then **superseded** by the Nov 18 redesign; **removed** (PR #37) |
-| 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | **In progress** (#15-#18) |
+| 3 | Lock it down: encryption, recovery key, persistent storage, backup and restore | **Done** (#15-#18); passkeys not yet tried on a real iPhone |
 | 4 | Classes and slides: classes, exams, PDFs, the viewer, lectures and sections | **Done** (#24-#26); not yet tried on a real phone |
 | 5 | Planner and the daily checklist with Play | **Done** (#47); exams pulling sections forward come with 9 |
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
@@ -108,6 +110,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 19:** Deployed main 8ee4c61 (the viewer tools, #56) and checked it live (#60): `/healthz` 200,
+  the security headers and CSP intact, no Cloudflare script injected, `/assets/` immutable. The whole
+  browser suite run against https://honed.pacificfish.ca (desktop, Android, iPhone): 110 passed, 5
+  skipped; only `app.spec.ts`'s "/ai/ is left to the network" failed, as it must there (it expects the
+  test server's 404, and live `/ai/whoami` answers Cloudflare Access's 302 to sign-in). Milestone 3
+  marked done. Real phones still to try.
 
 - **Nov 18:** Viewer tools (#56, PR #58): `src/viewer/AnnotatedViewer.tsx` over `SlideViewer` (which gained
   an `overlay` and `barExtra`) and `src/ui/DeckSlides.tsx` (store + AI), on the Slides and Play screens.
