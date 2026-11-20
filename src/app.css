@@ -35,7 +35,7 @@
     --text: #f2f5f1;
     --muted: #b3b9b0;
     --accent: #9fe870;
-    --nav-current: #f2f5f1;
+    --nav-current: #272727; /* dark grey on the green pill in both themes (Nathan, Nov 19) */
     --border: #4b4f49;
     --danger: #ff8a80;
     --right: #9fe870;
@@ -51,7 +51,7 @@
   --text: #f2f5f1;
   --muted: #b3b9b0;
   --accent: #9fe870;
-  --nav-current: #f2f5f1;
+  --nav-current: #272727;
   --border: #4b4f49;
   --danger: #ff8a80;
   --right: #9fe870;
@@ -573,11 +573,7 @@ label.file input {
   height: min(60vh, 32rem);
 }
 
-/* --- Today and Play (#47) --- */
-
-.today {
-  margin-bottom: 1.5rem;
-}
+/* --- Play (#47) --- */
 
 .play {
   font-size: 1.2rem;
@@ -592,11 +588,6 @@ button.link {
   color: var(--accent);
   text-decoration: underline;
   font-size: inherit;
-}
-
-.later summary {
-  cursor: pointer;
-  padding: 0.5rem 0;
 }
 
 .play-bar {
@@ -751,4 +742,222 @@ button.link {
 /* Room under the last thing on the page, so the bar never covers it */
 .foot.above-nav {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+
+/* Read out by screen readers, not shown */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- The Tasks page (TasksScreen.tsx, #77; docs/design): the bar, Start, a row per class --- */
+
+.tasks h2 {
+  font-size: 1.75rem;
+}
+
+.tasks-progress {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 1.1rem;
+  border: 2px solid var(--accent);
+  border-radius: var(--pill);
+  background: transparent;
+  overflow: hidden;
+}
+
+.tasks-progress::-webkit-progress-bar {
+  background: transparent;
+}
+
+.tasks-progress::-webkit-progress-value {
+  background: var(--fill);
+  border-radius: var(--pill);
+}
+
+.tasks-progress::-moz-progress-bar {
+  background: var(--fill);
+  border-radius: var(--pill);
+}
+
+.button.start {
+  display: flex;
+  width: fit-content;
+  min-width: 7rem;
+  margin: 1rem auto 0.75rem;
+}
+
+.tasks-done-note {
+  text-align: center;
+  color: var(--accent);
+  margin: 1rem 0 0.75rem;
+}
+
+.task-classes,
+.task-lectures {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-head {
+  display: flex;
+  align-items: stretch;
+}
+
+.drag-handle {
+  flex: none;
+  width: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--text);
+  touch-action: none; /* holding the handle drags the row; the rest of the page scrolls as usual */
+  cursor: grab;
+}
+
+.drag-handle svg {
+  width: 0.7rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
+.task-toggle {
+  flex: 1;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0.5rem 0.25rem 0.5rem 0;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1.05rem;
+  text-align: left;
+}
+
+.task-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.task-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  display: inline-block;
+  width: 1.2rem;
+  margin-left: 0.3rem;
+  color: var(--muted);
+}
+
+.task-toggle[aria-expanded='true'] .chevron {
+  transform: rotate(90deg);
+}
+
+.task-status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tick {
+  width: 1.4rem;
+  height: 1.4rem;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.task-lecture {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-left: 2.75rem; /* under the class's name */
+  padding-right: 0.25rem;
+}
+
+.task-lecture a,
+.task-lecture > span,
+.task-lecture > .tick {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text);
+}
+
+.tasks-empty {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+/* The penguin (Penguin.tsx): theme colours, so it suits light and dark */
+.penguin {
+  width: min(12rem, 60%);
+  height: auto;
+}
+
+.penguin-dark {
+  fill: #1d1f1c;
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.penguin-light {
+  fill: #f2f5f1;
+}
+
+.penguin-line {
+  fill: none;
+  stroke: #1d1f1c;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.penguin-line.thin {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.penguin-cheek {
+  fill: #f4a6a0;
+}
+
+.penguin-beak {
+  fill: #f2b544;
+}
+
+.penguin-shadow {
+  fill: var(--border);
+}
+
+.penguin-tassel {
+  stroke: var(--fill);
+  stroke-width: 2.5;
+}
+
+.penguin-accent {
+  fill: var(--fill);
+}
+
+.penguin-page {
+  fill: #ffffff;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.penguin-cover {
+  stroke: var(--accent);
+  stroke-width: 2;
 }

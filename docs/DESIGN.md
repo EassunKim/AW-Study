@@ -86,7 +86,7 @@ The **section** is what gets scheduled and quizzed: a range of slides covered in
 
 ## Planning the day
 
-The planner turns your sections, their quiz history, upcoming exams and **your daily study minutes** (a setting, e.g. 60) into today's checklist. It never plans more than your daily minutes, except in the days before an exam, and then it says so.
+The planner turns your sections, their quiz history, upcoming exams and **your daily study minutes** (a setting, e.g. 60) into today's checklist (the minutes are set in Settings; the Tasks page shows no times). It never plans more than your daily minutes, except in the days before an exam, and then it says so.
 
 **A new section (its first week)**
 

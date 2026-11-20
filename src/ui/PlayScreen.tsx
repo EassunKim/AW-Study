@@ -27,7 +27,9 @@ export default function PlayScreen() {
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Getting today ready…</p>;
-  const items = data.plan.today.filter((i) => data.place(i.sectionId));
+  // The Tasks page's list, in its order, without what's done (#77)
+  const tasks = data.tasks.classes.flatMap((c) => c.items).filter((t) => !t.done);
+  const items = tasks.map((t) => t.item);
 
   if (index >= items.length) {
     return (
@@ -62,14 +64,37 @@ export default function PlayScreen() {
         </a>
       </div>
       <h2 className="play-title">{describeItem(item, place).title}</h2>
-      <PlayItem key={`${index}-${item.kind}-${item.sectionId}`} item={item} place={place} store={store} onDone={next} last={index === items.length - 1} />
+      <PlayItem
+        key={`${index}-${item.kind}-${item.sectionId}`}
+        item={item}
+        read={tasks[index]!.studiedMinutes > 0}
+        place={place}
+        store={store}
+        onDone={next}
+        last={index === items.length - 1}
+      />
     </section>
   );
 }
 
 /** One item: the session (study, extra) and/or the quiz (study, quiz). */
-function PlayItem({ item, place, store, onDone, last }: { item: PlanItem; place: ItemPlace; store: StudyStore; onDone: () => void; last: boolean }) {
-  const [phase, setPhase] = useState<'study' | 'quiz'>(item.kind === 'quiz' ? 'quiz' : 'study');
+function PlayItem({
+  item,
+  read,
+  place,
+  store,
+  onDone,
+  last,
+}: {
+  item: PlanItem;
+  /** Its slides were already read today (a session saved, no quiz yet): straight to the quiz. */
+  read: boolean;
+  place: ItemPlace;
+  store: StudyStore;
+  onDone: () => void;
+  last: boolean;
+}) {
+  const [phase, setPhase] = useState<'study' | 'quiz'>(item.kind === 'quiz' || (item.kind === 'study' && read) ? 'quiz' : 'study');
   if (phase === 'study') {
     return <StudyTime item={item} place={place} store={store} onEnd={() => (item.kind === 'extra' ? onDone() : setPhase('quiz'))} />;
   }
