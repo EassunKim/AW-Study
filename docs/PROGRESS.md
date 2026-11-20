@@ -127,6 +127,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#87, part 2):** The AI helper's new `written` job writes short-answer questions for exam practice (each
+  with 1-6 points a full answer makes, and its slide), checked by the helper and again on the device
+  (`checkWritten`); `AiBackend.makeWrittenQuestions` (HTTP and fake). Grading uses the existing `grade` job.
+  **The helper changed: after merging, press Update for `honed-ai` too.**
 - **Nov 20 (#86):** Exams pull their sections forward. From 10 days before an exam (`RULES.examPullDays`), each
   section it covers (its listed lectures, or all of its class's up to the date) is quizzed at least twice
   (`examQuizzes`) before the day: the first quiz at once, the second halfway to the exam, never on the day. Those

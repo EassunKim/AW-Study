@@ -188,6 +188,7 @@ The AI runs as **Claude Code on Nathan's home server**, inside a locked-down hel
 | Job | When | Input | Output |
 | --- | --- | --- | --- |
 | Make questions | When a section is added (and when its bank runs low) | The section's slide text | Multiple-choice questions, each with its slide number |
+| Write short-answer questions | Exam practice (#87), when it starts | The slide text of the sections the exam covers | Questions, each with the points a full answer makes and its slide number |
 | Grade a short answer | Tests and exam practice | Question, expected points, your answer, the slide text | A mark and one line of feedback |
 | Explain this | In the viewer | The selection and the slide (plus neighbours) | A short explanation |
 | Ask about this | In the viewer | The same, plus your question | An answer |
@@ -209,7 +210,7 @@ Multiple-choice quizzes need **no AI at the moment you take them**: the bank was
 - **Limits per person** (requests per day, size of each request, a time limit), so a bug can't use up anyone's Claude allowance.
 - The sign-in tokens are created by Matt and Nathan (`claude setup-token`) and put on the server by them, never by a Claude.
 
-**In the app**, every AI job goes through one `AiBackend` interface (`makeQuestions`, `gradeAnswer`, `explain`, `ask`). Tests use a fake, so they never spend usage or send data. Switching later to an API key or a local model means one new backend, not new screens.
+**In the app**, every AI job goes through one `AiBackend` interface (`makeQuestions`, `makeWrittenQuestions`, `gradeAnswer`, `explain`, `ask`, and `status` for Settings). Tests use a fake, so they never spend usage or send data. Switching later to an API key or a local model means one new backend, not new screens.
 
 **Privacy note:** slide text travels device → Nathan's server → Anthropic for these jobs. The server passes it through without storing it. Data at rest stays only on your devices.
 

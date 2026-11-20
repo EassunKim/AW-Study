@@ -1,10 +1,11 @@
 // A stand-in AiBackend for tests and for building screens: answers instantly from the slide text,
 // sends nothing anywhere, costs nothing. It records every request, and can be told to fail.
-import { AiError, type AiBackend, type AiErrorCode, type AiStatus, type AskRequest, type ExplainRequest, type GradeRequest, type McQuestion, type MakeQuestionsRequest } from './backend';
+import { AiError, type AiBackend, type AiErrorCode, type AiStatus, type AskRequest, type ExplainRequest, type GradeRequest, type McQuestion, type MakeQuestionsRequest, type WrittenQuestion, type WrittenRequest } from './backend';
 
 export type FakeCall =
   | { job: 'status' }
   | { job: 'makeQuestions'; request: MakeQuestionsRequest }
+  | { job: 'makeWrittenQuestions'; request: WrittenRequest }
   | { job: 'gradeAnswer'; request: GradeRequest }
   | { job: 'explain'; request: ExplainRequest }
   | { job: 'ask'; request: AskRequest };
@@ -33,6 +34,17 @@ export class FakeAiBackend implements AiBackend {
         page: page.page,
         explanation: `Slide ${page.page} says “${fact}”.`,
       } satisfies McQuestion;
+    });
+  }
+
+  async makeWrittenQuestions(request: WrittenRequest): Promise<WrittenQuestion[]> {
+    this.record({ job: 'makeWrittenQuestions', request });
+    const pages = request.pages.filter((p) => p.text.trim() !== '');
+    if (pages.length === 0) throw new AiError('unavailable', 'Nothing to ask about.');
+    return Array.from({ length: request.count }, (_, i) => {
+      const page = pages[i % pages.length]!;
+      const fact = firstWords(page.text);
+      return { question: `Explain what slide ${page.page} says (${i + 1}).`, points: [fact.toLowerCase()], page: page.page };
     });
   }
 
