@@ -124,3 +124,64 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=helper
+
+  # The sync server (sync/, #95): its own image, ghcr.io/nandminc/aw-study-sync. Its tests run in the
+  # test job above (tests/sync/, with a fake Google). Here: build it, start it locked down the way the
+  # server runs it (read-only, as the TrueNAS apps user, /data its only writable folder), check it
+  # answers and refuses what it must, and on main publish it.
+  sync-image:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}-sync" >> "$GITHUB_OUTPUT"
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: sync
+          platforms: linux/amd64
+          load: true
+          tags: aw-study-sync:test
+          cache-from: type=gha,scope=sync
+          cache-to: type=gha,scope=sync,mode=max
+      - name: Starts read-only as 568, writes only /data, answers, and refuses what it must
+        run: |
+          mkdir -p data && sudo chown 568:568 data
+          docker run -d --name sync --read-only --cap-drop ALL --security-opt no-new-privileges --user 568:568 \
+            -v "$PWD/data:/data" \
+            -e GOOGLE_CLIENT_ID=test.apps.googleusercontent.com -e GOOGLE_CLIENT_SECRET=not-a-real-secret \
+            -e ALLOWED_EMAILS=someone@example.com -e APP_ORIGIN=https://honed.example \
+            -p 3002:3002 aw-study-sync:test
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:3002/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:3002/healthz
+          test "$(curl -s http://127.0.0.1:3002/api/me)" = '{"signedIn":false}'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3002/api/devices)" = 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H 'origin: https://honed.example' -H 'content-type: application/json' -d '{}' http://127.0.0.1:3002/api/account)" = 401
+          # Sign-in goes to Google with our client and PKCE
+          curl -s -o /dev/null -D - http://127.0.0.1:3002/api/auth/google | grep -i '^location: https://accounts.google.com/o/oauth2/v2/auth?client_id=test.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fhoned.example%2Fapi%2Fauth%2Fcallback'
+          test -s data/sync.db
+          docker logs sync
+          docker rm -f sync
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v7
+        with:
+          context: sync
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.name.outputs.image }}:main
+            ${{ steps.name.outputs.image }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=sync

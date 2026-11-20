@@ -52,6 +52,7 @@ slides" and "M6: AI helper and quizzes":
 | Milestone 9b: exam practice with AI-graded short answers | #87 | Matt's Claude | to be proposed in #87 (contract first) | Next |
 | Viewer: fit width for portrait pages (documents saved as PDF) | #46 | Nathan's Claude | `src/viewer/SlideViewer.tsx`, `viewer.css`, new `fit.ts` + `fit.test.ts`, the page size in `test-pdf.ts`, `tests/browsers/viewer.spec.ts` | **Done** (this PR). Try on a real phone after deploy |
 | Accounts and sync (v2), testing phase on the home server: **design first** | #93 | Nathan's Claude | `docs/SECURITY.md` ("Accounts and sync"), the accounts lines in `docs/DESIGN.md` | Design PR open for Matt and Matt's Claude to read; then sign-in and accounts, syncing the small records and PDFs on demand, each its own issue |
+| Sync step 1: the `honed-sync` server's Google sign-in and accounts, Settings' Account box | #95 | Nathan's Claude | `sync/`, `tests/sync/`, the `sync-image` CI job, `/api/` in `vite.config.ts` and `app.spec.ts`, `src/sync/`, one line of `SettingsScreen.tsx`, `tests/browsers/account.spec.ts` | **Done** (this PR). Live once Nathan sets up the server side (Google client, dataset, app, tunnel route) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -128,6 +129,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 20 (#95):** Sync step 1, the sync server's sign-in and accounts (`sync/`, image `ghcr.io/nandminc/aw-study-sync`): Google
+  OpenID Connect with PKCE, state bound to a cookie (a sign-in finishes only in the browser that started it), our own ID token
+  checks, an email allow list (rechecked on every request), hashed sessions (30 days idle, 180 at most), the devices list,
+  signing out one or all, deleting the account after a fresh sign-in. 25 server tests against a fake Google; each of 19 rules
+  broken on purpose was caught. Settings has an Account (testing) box that asks the server only when you press a button. The
+  service worker leaves `/api/` to the network (Google returns to `/api/auth/callback`). Nothing syncs yet.
 
 - **Nov 20 (#93):** Accounts and sync designed (`docs/SECURITY.md`, "Accounts and sync"), not built. Nathan's
   decisions: Google sign-in with our own code (OpenID Connect, no hosted service); a new server app `honed-sync` at

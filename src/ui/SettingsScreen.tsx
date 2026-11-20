@@ -5,6 +5,7 @@
 // Compare models are src/ui/AiSettings.tsx (#79).
 import { useState, type FormEvent } from 'react';
 import { BackupSettings } from '../backup/BackupSettings';
+import { AccountSettings } from '../sync/AccountSettings';
 import { AiSettings } from './AiSettings';
 import { APP_NAME } from '../brand';
 import { DAILY_MINUTES_MAX, DAILY_MINUTES_MIN } from '../db/plan';
@@ -133,6 +134,8 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
       )}
 
       <AiSettings />
+
+      <AccountSettings />
 
       <BackupSettings store={store} onRestored={() => void reload()} />
 
