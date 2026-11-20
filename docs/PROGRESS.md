@@ -51,6 +51,7 @@ slides" and "M6: AI helper and quizzes":
 | Milestone 9a: exams pull their sections forward (planner) | #86 | Matt's Claude | the exam rules in `src/plan/planner.ts` (+ `RULES.examPullDays`, `examQuizzes`), `PlanInput.exams`, `Plan.examsOver` (through `tasks.ts`), loading exams in `planning.ts`, the note on `TasksScreen.tsx` | **Done** (PR #88) |
 | Milestone 9b: exam practice with AI-graded short answers | #87 | Matt's Claude | to be proposed in #87 (contract first) | Next |
 | Viewer: fit width for portrait pages (documents saved as PDF) | #46 | Nathan's Claude | `src/viewer/SlideViewer.tsx`, `viewer.css`, new `fit.ts` + `fit.test.ts`, the page size in `test-pdf.ts`, `tests/browsers/viewer.spec.ts` | **Done** (this PR). Try on a real phone after deploy |
+| Accounts and sync (v2), testing phase on the home server: **design first** | #93 | Nathan's Claude | `docs/SECURITY.md` ("Accounts and sync"), the accounts lines in `docs/DESIGN.md` | Design PR open for Matt and Matt's Claude to read; then sign-in and accounts, syncing the small records and PDFs on demand, each its own issue |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -127,6 +128,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 20 (#93):** Accounts and sync designed (`docs/SECURITY.md`, "Accounts and sync"), not built. Nathan's
+  decisions: Google sign-in with our own code (OpenID Connect, no hosted service); a new server app `honed-sync` at
+  `/api/` on his home server with its own dataset, `site-honed` staying a file server; testers only (an email allow
+  list); sync opt-in. Signing in never unlocks: the server holds ciphertext and wrapped keys. A trap found while
+  designing: a sealed record's additional data covers only its store and id, not the readable fields beside it, so
+  synced changes are sealed again with everything inside, and devices never act on the server's readable hints.
 
 - **Nov 20 (#46):** Portrait pages fit the width and scroll down (DESIGN, "The slide viewer"), with a Whole page /
   Page width switch. Measured on the real Slides screen with a US Letter document: the stage is 361 × 196 on the
