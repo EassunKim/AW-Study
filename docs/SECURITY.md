@@ -8,7 +8,9 @@ blocks from the browser's WebCrypto, with standard parameters. No home-made cryp
 
 | Threat | Protected? | How |
 | --- | --- | --- |
-| Our server, or anyone who takes it over, reading your classes and slides | **Yes**, at rest | The server stores none of them. The one exception is AI requests (below): a section's slide text passes through the AI helper on its way to Anthropic, and nothing is kept. In v2 the server only stores ciphertext it has no key for. |
+| Our server, or anyone who takes it over, reading your classes and slides | **Yes**, at rest | The server stores none of them. The one exception is AI requests (below): a section's slide text passes through the AI helper on its way to Anthropic, and nothing is kept. With sync (v2, "Accounts and sync") it stores only ciphertext it has no key for. |
+| Google, or someone who takes over the Google account, opening the data (v2) | **Yes** | Signing in only says which account it is; it never unlocks ("Accounts and sync"). They could see the account exists and, through our server, download ciphertext. |
+| The sync server withholding or rolling back changes (v2) | **No** (it can't read, forge or alter them) | Every device keeps its own full copy, so sync stops; nothing is lost from a device. |
 | A backup file (`.honed`) found in someone's cloud drive | **Yes** | Backups hold only ciphertext and wrapped keys (#18). |
 | Another person using the same computer account, or copying the browser's files | **Yes**, while Honed is locked | Records are encrypted at rest; the key is only ever in memory while unlocked. |
 | A lost phone or laptop | By the device | The device's own lock and disk encryption. Honed adds the points above. |
@@ -172,6 +174,131 @@ It can sit in OneDrive, iCloud Drive or Google Drive.
 - **Persistent storage:** `navigator.storage.persist()` is asked right after setup and after a
   restore; Settings shows the answer.
 
+## Accounts and sync (v2, #93)
+
+**Design only: nothing here is built yet.** The testing phase runs on Nathan's home server, for Matt,
+Nathan and a few testers. Every piece is kept easy to move to Cloudflare (Workers, R2, D1) if Honed goes
+public. Sync is **opt-in**: a device that never signs in keeps working exactly as today.
+
+### The rule: signing in never unlocks
+
+Google sign-in tells our server **which account** a device belongs to. It never opens the data. The data
+key is still opened only by a passkey, passphrase or recovery key, on the device, as in "Keys". So the
+server, Google, or anyone who takes either over gets ciphertext and wrapped keys, nothing they can open.
+The model is 1Password's, Bitwarden's and Proton's: one sign-in for the account, a separate secret for
+the vault.
+
+### What the sync server holds, and what it can see
+
+| Held | Readable by the server | Sealed (it has no key) |
+| --- | --- | --- |
+| Account | Google account id (`sub`), email, when it was made, last sign-in | — |
+| Sessions | a SHA-256 hash of each session token, its device label, its times | — |
+| The keyring and key check | the methods (passphrase, passkey, recovery key) and their parameters (salts, iterations, credential ids), a version number | the wrapped data keys (useless without the user's secret) |
+| Changes | a server sequence number, the change id, size, upload time, and the hints below | everything about the record |
+| Files (slide PDFs, their page text) | the deck id, size, upload time | the whole file |
+
+**Hints:** each change also carries `entity`, `entityId`, `op` and `at` in the clear, as the local change
+log does today, so the server could later keep only each record's latest change. They show *how many*
+classes, lectures and quizzes there are and *when* things changed: the same as a backup file shows (the
+"What stays readable" table). **Devices never trust the hints:** every field a device acts on is inside
+the ciphertext, and a change whose hints disagree with its sealed copy is refused.
+
+Not protected: the server can **withhold** changes, serve old ones or delete everything (it can't read,
+forge or alter them). Devices keep their own full copy, so the worst case is sync stopping, never data
+lost from a device. Ciphertext also sits in the server's snapshots and its backup copy (14 days, then
+gone) after a deletion.
+
+### Signing in (Google, OpenID Connect)
+
+- The sync server (`honed-sync`, on our own site at `/api/`, so `connect-src 'self'` doesn't change) does
+  the **authorization code flow with PKCE**, asking only for `openid email`, which needs no review by
+  Google. Our own code with Node's own modules, as decided in #93: no hosted sign-in service.
+- It checks Google's ID token itself: the signature (Google's published keys, cached), the issuer, the
+  audience (our client id), the expiry, and a `nonce` and `state` it made for that sign-in, so a token
+  meant for another site, an old one or a forged one is refused. `email_verified` must be true.
+- The account is keyed by Google's `sub`, never the email (an email can change hands).
+- **Testing phase:** only emails on the server's allow list (`ALLOWED_EMAILS`, like the admin site's
+  `ADMIN_EMAILS`) can make an account. Everyone else gets "Honed sync is invite-only for now".
+- The Google client secret lives in a file on the server, made by Nathan; no Claude ever reads it, and
+  it's never in the repo or the image.
+
+### Sessions
+
+- A session is 32 random bytes in a cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/api/`. The
+  page's code can't read it. The server stores only its SHA-256 hash, so a stolen database holds no
+  usable sessions.
+- It lasts **30 days** from its last use, and **180 days** at most. Settings lists the account's
+  devices; any one can be signed out there, or all of them.
+- Every request that changes something must be a `POST`, `PUT` or `DELETE` with JSON and an `Origin` of
+  our own site, or it's refused (no cross-site request can act as the user).
+- **Deleting the account** needs a Google sign-in from the last 5 minutes, then removes the account,
+  its sessions, keyring, changes and files at once.
+
+### The keyring on the server
+
+- The account's keyring and key check are what this device already has in `meta`: wrapped copies of
+  one data key. The **first device** to turn sync on uploads them.
+- **The key check never changes:** the data key is made once and only rewrapped (see "Keys"), so the
+  key check stays the same for the account's life. The server refuses a keyring upload with a
+  different key check, and so does every device. A stolen session can therefore never swap in a key
+  someone else holds; the most it could do is break unlocking, which the device would refuse.
+- A keyring change (a new passphrase, a passkey added or removed, a new recovery key) uploads the new
+  keyring with the version it replaced (compare and swap, so two devices can't overwrite each other's
+  change). Other devices take the new one the next time they sync, and use it the next time they
+  unlock.
+- A passkey made on one device unlocks on another only where the passkey itself syncs (iCloud
+  Keychain, Google Password Manager) and the browser supports PRF. A passphrase or the recovery key
+  always works.
+
+### Changes
+
+- Sync carries the change log (`changes`, "How the store applies it"). For upload a change is
+  **sealed again** with additional data `honed:v1:sync:<change id>`, with *everything* inside: the
+  entity, its id, the operation, the time, the device and the record. The local sealed rows can't be
+  sent as they are, because their additional data covers only the store and the id, not the readable
+  fields beside it.
+- Changes are only ever added. The server numbers them in arrival order; a device asks for "everything
+  after number N" and remembers the last number it applied. The same change id twice is stored once.
+- **The first device** uploads the **current state** (one `put` per record), not its whole history. A
+  device that already syncs uploads its new changes as it makes them, and waits and retries when
+  offline.
+- Applying a change from another device writes the record through the store as usual (sealed with this
+  device's readable fields worked out again, never taken from the hints), but doesn't log it as a new
+  change of this device.
+- **Conflicts:** quiz attempts and study sessions are only ever added, so they never clash. For
+  everything else the later `at` wins, and the device id breaks ties. Each device's clock is kept
+  moving forward past every change it has seen (each new `at` is later than the latest it applied), so
+  an edit made after seeing another device's edit always wins over it, even with a clock that's
+  slightly off. A delete is a change like any other, so a deleted record doesn't come back from another
+  device.
+- **Sync runs only while unlocked:** applying changes needs the data key.
+
+### Files (slide PDFs)
+
+- A deck's PDF and its page text are uploaded once, sealed exactly as they're stored locally
+  (`deckFiles`, `deckPages`: their additional data covers the whole content), and downloaded only when a
+  device opens that deck. Until then the device shows the deck with "Download the slides".
+- Limits in the testing phase: 100 MB a file (Cloudflare's upload limit and Honed's PDF limit) and
+  5 GB an account.
+
+### Joining a device
+
+1. Sign in with Google. The server sends the account's keyring and key check; the device still can't
+   read anything.
+2. Unlock with the account's passphrase, recovery key, or a passkey that's synced to this device.
+3. The device downloads every change and applies it.
+
+A device that **already has its own data** under a different key is asked to choose: replace this
+device's data with the account's (the restore warning, since this device's data goes), or don't sync
+this device. Merging two separately made sets of data (decrypting one and re-adding it under the
+account's key) is possible, but left for later.
+
+### Turning sync off
+
+Settings > Sync: **sign out on this device** (the data stays here, sync stops), or **delete the account
+from the server** (every device keeps its own copy).
+
 ## Recovery key format
 
 - 16 random bytes (128 bits), plus a 4-byte check (the first 4 bytes of the secret's SHA-256):
@@ -199,3 +326,4 @@ as PRF).
 | `src/db/` (#16) | Uses them to encrypt records and keep the keyring |
 | `src/ui/` (#17) | Setup, unlock, recovery, Settings |
 | `src/backup/` (#18) | The `.honed` file format, making and restoring backups (see "Backups") |
+| `sync/` (v2, #93, not built yet) | The sync server, `honed-sync`: sign-in, sessions, the keyring, changes, files (see "Accounts and sync") |

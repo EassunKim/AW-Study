@@ -16,7 +16,7 @@ Code: [github.com/NandMinc/AW-Study](https://github.com/NandMinc/AW-Study).
 
 | Topic | Decision (Nov 18) |
 | --- | --- |
-| Where data lives | In the app, on each device, encrypted. No accounts for now; revisit later. |
+| Where data lives | In the app, on each device, encrypted. **Accounts and sync (v2) are designed** (Nov 20, #93: `docs/SECURITY.md`, "Accounts and sync"), opt-in, first for testers on Nathan's home server; not built yet. |
 | AI | Matt's and Nathan's Claude subscriptions, through Claude Code running in a locked-down helper on Nathan's home server (each person's own token). Not for other users. |
 | Quizzes | Multiple choice for normal studying (graded instantly, no AI). Short answers, graded by AI, for tests and exam practice. |
 | Slide formats | PDF only for the prototype. Faithful PowerPoint viewing matters later, because exporting some decks to PDF mangles them. |
@@ -223,7 +223,8 @@ Everything stays on the device, encrypted with a key only you can unlock, exactl
 - **Slide PDFs** are stored encrypted too, as their own records; the viewer decrypts a deck when you open it.
 - **What stays readable on disk** (for the database's indexes): ids, which class/lecture/deck/section a record belongs to, and dates (lecture dates, next quiz dates, exam dates, attempt times). Names, slide text, the PDFs, notes, highlights, questions, answers and scores are encrypted. `docs/SECURITY.md` gets an updated table before the new stores are built.
 - **Space:** slide decks are a few MB each; a term's worth fits easily, but the app shows how much it uses and asks the browser to keep it permanently (`navigator.storage.persist()`).
-- **No accounts:** each device has its own data. Moving to a new device is a backup and restore (#18). Sync between devices is a later decision.
+- **No accounts yet:** each device has its own data. Moving to a new device is a backup and restore (#18).
+- **Accounts and sync (v2, designed Nov 20, #93; not built):** opt-in, with Google sign-in. Signing in only says which account it is; the data key is still opened only by a passkey, passphrase or recovery key, so the sync server stores ciphertext it can't open. Each device keeps its full local copy (offline, fast, safe from the server going away); the server is a relay. Testing phase: our own sign-in code (OpenID Connect, no hosted service) in a new server app, `honed-sync`, at `/api/` on Nathan's home server, open only to an allow list of emails. The details, including what the server can see, are in `docs/SECURITY.md` ("Accounts and sync"). The order: the server's sign-in and accounts, then syncing the small records, then PDFs on demand. With sync on, the footer's "Your classes and slides stay on this device" becomes "Your classes and slides are encrypted on your device. Only you can read them, even though they sync through our server."
 - **What leaves the device:** only the AI jobs' inputs (slide text and your selections or answers), through the helper to Anthropic, never stored on the way.
 
 ## Architecture
@@ -308,5 +309,4 @@ Tick a question once Matt and Nathan agree, and write the answer under it.
 - **Practice tests:** upload past tests so the AI's questions match the real ones, or generate full practice exams.
 - **Leaderboards** (needs accounts and a server).
 - **Faithful PowerPoint viewing** (see The slide viewer), and other resources: notes, textbook chapters.
-- **Accounts and sync** between devices, with email or Google sign-in, keeping content end-to-end encrypted.
 - **Flashcards** as a side feature.
