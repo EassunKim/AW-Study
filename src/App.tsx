@@ -78,7 +78,7 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
     <>
       {route.name === 'tasks' && <TasksScreen />}
       {route.name === 'classes' && <ClassesScreen />}
-      {route.name === 'class' && <ClassScreen key={route.courseId} courseId={route.courseId} />}
+      {route.name === 'class' && <ClassScreen key={href(route)} courseId={route.courseId} part={route.part} cover={route.cover} />}
       {route.name === 'slides' && (
         <Suspense fallback={<p className="muted">Opening the slides…</p>}>
           <SlidesScreen key={href(route)} courseId={route.courseId} deckId={route.deckId} first={route.first} last={route.last} />

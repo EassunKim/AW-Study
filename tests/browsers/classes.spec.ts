@@ -4,7 +4,7 @@
 // Policy violations throughout. PDFs are made in the test.
 import { expect, test, type Page } from '@playwright/test';
 import { makePdf, numberedSlides } from '../../src/viewer/test-pdf';
-import { addClass, classRow, pdfFile, toClasses, watchProblems } from './class-helpers';
+import { addClass, classRow, openClass, pdfFile, toClasses, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked } from './lock-helpers';
 
 const lectureRow = (page: Page) => page.getByTestId('lecture-row');
@@ -64,8 +64,7 @@ test('add a class, record a lecture with new slides, view them, and find it all 
   await page.getByRole('link', { name: '← CHEM 101' }).click();
   await expect(lectureRow(page)).toContainText('Week 4, slides 2–4');
   await page.getByRole('link', { name: '← Classes' }).click();
-  await expect(classRow(page, 'CHEM 101')).toContainText('1 lecture · 1 slide deck');
-  await expect(page.getByRole('list', { name: 'Latest lectures' })).toContainText('Week 4, slides 2–4');
+  await expect(classRow(page, 'CHEM 101')).toBeVisible();
 
   expect(await problems()).toEqual([]);
 });
@@ -102,17 +101,19 @@ test('the next lecture carries on where the last stopped, and can use two decks'
   expect(await problems()).toEqual([]);
 });
 
-test('a class with lectures every day prompts for the latest one and fills in its date and length', async ({ page }) => {
+test('a class with lectures every day: a date button for each lecture to fill in opens it with its date and length', async ({ page }) => {
   const problems = await watchProblems(page);
   await openUnlocked(page);
   // Every day at midnight: the latest lecture is always today's
   await addClass(page, 'Daily', { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], start: '00:00', minutes: 45 });
   await expect(page.getByTestId('cover-prompt')).toBeVisible();
   await page.getByRole('link', { name: '← Classes' }).click();
-  await expect(page.getByRole('list', { name: 'Lectures to fill in' })).toContainText('Daily');
-  await classRow(page, 'Daily').getByRole('link').click();
+  // On the Classes page: a button for today's lecture and each of the week before the class was added
+  const toFill = classRow(page, 'Daily').getByRole('list', { name: 'Lectures to fill in for Daily' }).getByRole('link');
+  await expect(toFill).toHaveCount(8);
+  await expect(toFill.first()).toHaveText(/^[A-Z][a-z]{2} \d{1,2}$/); // "Nov 15"
+  await toFill.last().click();
 
-  await page.getByRole('button', { name: 'What was covered?' }).click();
   const today = await page.evaluate(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -121,6 +122,10 @@ test('a class with lectures every day prompts for the latest one and fills in it
   await expect(lectureForm(page).getByLabel('Minutes')).toHaveValue('45');
   await slides(page, 1).getByLabel('Upload the slides (PDF)').setInputFiles(pdfFile('Daily.pdf', numberedSlides(2)));
   await record(page, { first: 1, last: 2 });
+  // Saved: back on the Classes page, where today's button has gone
+  await expect(page.getByRole('heading', { level: 2, name: 'Classes', exact: true })).toBeVisible();
+  await expect(toFill).toHaveCount(7);
+  await openClass(page, 'Daily');
   await expect(lectureRow(page)).toHaveCount(1);
   await expect(page.getByTestId('cover-prompt')).toBeHidden();
   expect(await problems()).toEqual([]);
@@ -354,4 +359,72 @@ test('the new class form keeps every box inside it, side by side boxes lined up 
       expect(overlapX > 0.5 && overlapY > 0.5, `${a.name} overlaps ${b.name}`).toBe(false);
       if (overlapY > 0.5) expect(Math.abs(a.y + a.height - (b.y + b.height)), `${a.name} and ${b.name} line up`).toBeLessThan(1);
     }
+});
+
+test('the Classes page: each class’s menu opens that part of its page, and deletes it after asking', async ({ page }) => {
+  const problems = await watchProblems(page);
+  await openUnlocked(page);
+  await addClass(page, 'COMP 2000', { days: ['Mon', 'Wed', 'Fri'], start: '10:30', minutes: 50 });
+  await page.getByRole('link', { name: '← Classes' }).click();
+  const menuButton = page.getByRole('button', { name: 'Menu for COMP 2000' });
+  const menu = page.getByRole('list', { name: 'COMP 2000 menu' });
+  const choose = async (item: string) => {
+    await menuButton.click();
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    await menu.getByRole('link', { name: item }).click();
+  };
+  const back = async () => {
+    await page.getByRole('link', { name: '← Classes' }).click();
+    await expect(page.getByRole('heading', { level: 2, name: 'Classes', exact: true })).toBeVisible();
+  };
+
+  // Escape and a tap elsewhere close it
+  await menuButton.click();
+  await expect(menu.getByRole('listitem')).toHaveText(['What lectures covered', 'Class details', 'Exams', 'Files', 'Delete class']);
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(menuButton).toBeFocused();
+  await menuButton.click();
+  await page.getByRole('heading', { level: 2, name: 'Classes', exact: true }).click();
+  await expect(menu).toBeHidden();
+
+  // Each part of the class's page
+  await choose('Exams');
+  await expect(page).toHaveURL(/#\/class\/[^/]+\/exams$/);
+  await expect(page.getByRole('heading', { level: 3, name: 'Exams' })).toBeFocused();
+  await back();
+  await choose('Files');
+  await expect(page.getByRole('heading', { level: 3, name: 'Slide decks' })).toBeFocused();
+  await back();
+  await choose('What lectures covered');
+  await expect(page.getByRole('heading', { level: 3, name: '0 lectures' })).toBeFocused();
+  await back();
+  await choose('Class details');
+  await expect(page.getByRole('form', { name: 'Edit COMP 2000' })).toBeVisible();
+  await back();
+
+  // A date button opens "What was covered?" for its date; Cancel comes back here
+  const toFill = classRow(page, 'COMP 2000').getByRole('list', { name: 'Lectures to fill in for COMP 2000' }).getByRole('link');
+  const count = await toFill.count();
+  expect(count).toBeGreaterThan(0); // MWF: the week before today has some
+  const href = (await toFill.first().getAttribute('href'))!;
+  await toFill.first().click();
+  await expect(page.getByRole('form', { name: 'What was covered?' }).getByLabel('Lecture date')).toHaveValue(href.slice(-10));
+  await expect(page.getByRole('form', { name: 'What was covered?' }).getByLabel('Minutes')).toHaveValue('50');
+  await page.getByRole('form', { name: 'What was covered?' }).getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('heading', { level: 2, name: 'Classes', exact: true })).toBeVisible();
+  await expect(toFill).toHaveCount(count);
+
+  // Delete asks first
+  await menuButton.click();
+  await menu.getByRole('button', { name: 'Delete class' }).click();
+  await expect(page.getByRole('heading', { name: 'Delete “COMP 2000”?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(classRow(page, 'COMP 2000')).toBeVisible();
+  await menuButton.click();
+  await menu.getByRole('button', { name: 'Delete class' }).click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(classRow(page, 'COMP 2000')).toHaveCount(0);
+  await expect(page.getByText('No classes yet')).toBeVisible();
+  expect(await problems()).toEqual([]);
 });
