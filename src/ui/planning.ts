@@ -1,9 +1,10 @@
 // Loads what the planner needs (src/plan/planner.ts) and the names the screens show with it, for the
-// Today panel and Play. Everything is read fresh each time: nothing the planner works out is stored.
+// Tasks page and Play (both use `tasks`, src/plan/tasks.ts: by class, in the saved order). Everything is read fresh each time: nothing the planner works out is stored.
 import type { StudyStore } from '../db/store';
 import { deviceTimeZone, studyDay } from '../lib/studyDay';
 import { planDay, type Plan, type PlanItem } from '../plan/planner';
-import type { Course, Section, SlideDeck } from '../types/lecture';
+import { progress, tasksForDay, type TasksDay } from '../plan/tasks';
+import type { Course, Lecture, Section, SlideDeck } from '../types/lecture';
 import { slidesLabel } from './classes';
 import { DAY_START_HOUR } from './settings';
 
@@ -11,11 +12,16 @@ export interface ItemPlace {
   course: Course;
   section: Section;
   deck: SlideDeck;
+  lecture: Lecture;
 }
 
 export interface Planning {
   today: string;
   plan: Plan;
+  /** Today by class, as the Tasks page shows it and Play runs it (only items with a place). */
+  tasks: TasksDay;
+  /** StudySettings.classOrder as saved (the Tasks page keeps classes not shown today in their place). */
+  classOrder: string[];
   place: (sectionId: string) => ItemPlace | undefined;
   /** Courses with at least one lecture: whether there's anything to plan at all. */
   hasLectures: boolean;
@@ -36,17 +42,28 @@ export async function loadPlanning(store: StudyStore, now = new Date()): Promise
   const decks = new Map(perCourse.flatMap((p) => p.decks).map((d) => [d.id, d]));
   const courseById = new Map<string, Course>(courses.map((c) => [c.id, c]));
   const sectionById = new Map(sections.map((s) => [s.id, s]));
-  const plan = planDay({ today, dailyMinutes: settings.dailyMinutes, lectures, sections, sessions, attempts, timeZone, dayStartHour: DAY_START_HOUR });
+  const lectureById = new Map(lectures.map((l) => [l.id, l]));
+  const input = { today, dailyMinutes: settings.dailyMinutes, lectures, sections, sessions, attempts, timeZone, dayStartHour: DAY_START_HOUR };
+  const plan = planDay(input);
+  const nextExam = Object.fromEntries(courses.map((c) => [c.id, c.nextExam?.date ?? null]));
+  const place = (sectionId: string): ItemPlace | undefined => {
+    const section = sectionById.get(sectionId);
+    const course = section && courseById.get(section.courseId);
+    const deck = section && decks.get(section.deckId);
+    const lecture = section && lectureById.get(section.lectureId);
+    return section && course && deck && lecture ? { course, section, deck, lecture } : undefined;
+  };
+  const day = tasksForDay({ ...input, classOrder: settings.classOrder, nextExam });
+  const classes = day.classes
+    .map((c) => ({ ...c, items: c.items.filter((t) => place(t.item.sectionId)) }))
+    .filter((c) => c.items.length > 0);
   return {
     today,
     plan,
+    tasks: { ...day, classes, progress: progress(classes.flatMap((c) => c.items)) },
+    classOrder: settings.classOrder,
     hasLectures: lectures.length > 0,
-    place(sectionId) {
-      const section = sectionById.get(sectionId);
-      const course = section && courseById.get(section.courseId);
-      const deck = section && decks.get(section.deckId);
-      return section && course && deck ? { course, section, deck } : undefined;
-    },
+    place,
   };
 }
 

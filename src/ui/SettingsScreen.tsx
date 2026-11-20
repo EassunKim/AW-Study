@@ -7,6 +7,7 @@ import { useState, type FormEvent } from 'react';
 import { BackupSettings } from '../backup/BackupSettings';
 import { AiSettings } from './AiSettings';
 import { APP_NAME } from '../brand';
+import { DAILY_MINUTES_MAX, DAILY_MINUTES_MIN } from '../db/plan';
 import { newRecoveryKey, wrapWithPasskey, wrapWithPassphrase, wrapWithRecoveryKey } from '../lib/crypto';
 import { createPasskey } from '../lib/passkey';
 import type { Keyring } from '../types/crypto';
@@ -69,6 +70,8 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
       <h2 id="settings-title">Settings</h2>
 
       <ThemeSetting />
+
+      <StudyTimeSetting />
 
       <h3>How you unlock</h3>
       <ul className="list" aria-label="Ways to unlock">
@@ -327,6 +330,44 @@ function ThemeSetting() {
         ))}
       </div>
       <p className="muted small">Phone follows your phone’s light or dark setting. This is kept on this device only.</p>
+    </>
+  );
+}
+
+/** The daily study minutes the planner fills (moved here from the Tasks page, which shows no times, #77). */
+function StudyTimeSetting() {
+  const store = useStore();
+  const { data, error } = useLoad(() => store.getStudySettings(), [store]);
+  const [value, setValue] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; problem: boolean } | null>(null);
+  if (error) return <p className="error">{error}</p>;
+  if (!data) return null;
+  const shown = value ?? String(data.dailyMinutes);
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      const saved = await store.saveStudySettings({ dailyMinutes: Number(shown) });
+      setMessage({ text: `Saved: ${saved.dailyMinutes} minutes a day.`, problem: false });
+    } catch (err) {
+      setMessage({ text: messageOf(err), problem: true });
+    }
+  };
+  return (
+    <>
+      <h3 id="study-time-title">Study time</h3>
+      <form className="row" noValidate onSubmit={save} aria-labelledby="study-time-title">
+        <label className="inline">
+          Minutes a day
+          <input type="number" inputMode="numeric" min={DAILY_MINUTES_MIN} max={DAILY_MINUTES_MAX} value={shown} onChange={(e) => setValue(e.target.value)} />
+        </label>
+        <button type="submit">Save</button>
+      </form>
+      {message && (
+        <p className={message.problem ? 'error' : 'muted small'} role={message.problem ? 'alert' : 'status'}>
+          {message.text}
+        </p>
+      )}
+      <p className="muted small">How much the planner puts on each day’s Tasks.</p>
     </>
   );
 }
