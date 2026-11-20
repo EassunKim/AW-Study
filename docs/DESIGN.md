@@ -48,6 +48,7 @@ Three moments: setting up once, telling Honed what each lecture covered, and the
 - The app has three main pages behind a nav bar at the bottom: **Tasks** (the home page), **Classes** and **Settings** (Nov 19; the look is `docs/design/`). Full-screen screens (a class, the slides, a quiz, Play) hide the bar and have a back link.
 - The home page is **a short checklist** of today's work, such as *Study CHEM 101, slides 21–30 (25 min)* or *Quiz: Week 3 (10 questions)*, with how much of today's time it uses.
 - A big **Play** button runs through the whole checklist in order. Each item is a **study session**: the slides in the viewer for most of the time, then a multiple-choice quiz when the time is up or when you press *I'm ready*. The score decides when that section comes back.
+- **The Tasks page (Nov 19, #72; the look is in `docs/design/`):** the checklist grouped by class, in the order the user drags the classes into (saved), each class with a one-word status: *Exam soon* (an exam within 7 days), else *New* (material seen for the first time), else *Review*, and a checkmark when done. The list is worked out from the history **before today**, so it stays put while you work and finished items stay on it, ticked. A lecture is done when its quiz is done; slide time alone ticks nothing. No times are shown. The progress bar weighs each item by its study minutes plus its quiz time: a done item counts in full, and slide time counts for up to 80% of an unfinished item's study part, so the bar creeps while you read and fills with the quizzes. The logic is `src/plan/tasks.ts`; the numbers are in `rules.ts`.
 - You can stop at any point; what's left stays on the list.
 
 ```mermaid
@@ -86,7 +87,7 @@ The **section** is what gets scheduled and quizzed: a range of slides covered in
 
 ## Planning the day
 
-The planner turns your sections, their quiz history, upcoming exams and **your daily study minutes** (a setting, e.g. 60) into today's checklist. It never plans more than your daily minutes, except in the days before an exam, and then it says so.
+The planner turns your sections, their quiz history, upcoming exams and **your daily study minutes** (a setting, e.g. 60) into today's checklist (the minutes are set in Settings; the Tasks page shows no times). It never plans more than your daily minutes, except in the days before an exam, and then it says so.
 
 **A new section (its first week)**
 

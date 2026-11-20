@@ -81,7 +81,7 @@ sessions and settings:
 | questions (#40) | id, courseId, sectionId | the slide number, question, options, answer, explanation, dates |
 | quizAttempts (#40) | id, courseId, sectionId | when, every answer, the score |
 | studySessions (#47) | id, courseId, sectionId | which session (first week or extra), when, minutes spent |
-| settings (#47) | id (`study`) | the daily study minutes |
+| settings (#47) | id (`study`) | the daily study minutes, the Tasks page's class order (#72) |
 | annotations (#56) | id, courseId, deckId | the page, the kind, where it is on the page, the words highlighted, the colour, the note, dates |
 | changes (log) | seq, entity, entityId, op, at | the record data (PDF bytes are not in the log) |
 | meta | device id, schema step, the keyring (already wrapped) | nothing else is secret |

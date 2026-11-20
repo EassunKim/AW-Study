@@ -41,7 +41,9 @@ slides" and "M6: AI helper and quizzes":
 | Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | **Done** (contract #48, storage and planner #49, screens #50) |
 | Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **Done** (contract and storage PR #57, viewer tools PR #58). Try on an iPhone after deploy |
 | First-week quizzes: 10 questions, scaled by the section's slides (restyle step 6) | #70 | Nathan's Claude | `src/plan/rules.ts`, `src/plan/planner.ts`, `src/quiz/pick.ts`, one line of `src/ui/PlayScreen.tsx` | **Done** (PR #71) |
+| Tasks page logic: grouped by class, saved order, statuses, progress (restyle step 2, no screen) | #72 | Nathan's Claude | `src/types/plan.ts` (`StudySettings`), the settings part of `src/db/plan.ts`, new `src/plan/tasks.ts` | Contract and storage (PR #73) and the logic (`src/plan/tasks.ts`, PR #74) **done**; the screen next (#68 is in) |
 | Restyle step 1: colours (dark and light), Phone / Light / Dark setting, the Lexend font, the nav bar, the Tasks, Classes and Settings pages | #68 | Matt's Claude | `src/app.css` (colours, buttons, nav bar), `src/ui/theme.ts`, `src/ui/NavBar.tsx`, `src/ui/TasksScreen.tsx`, the routes, the frame in `src/App.tsx`, the theme part of Settings, `tests/browsers/look.spec.ts` | **Done** (PR #69). Steps 2 to 5 are free |
+| Restyle step 2: the Tasks page screen (rows by class, drag, ticks, penguin) | #77 | Nathan's Claude | `src/ui/TasksScreen.tsx`, `src/ui/Penguin.tsx`, `src/ui/planning.ts`, which items Play runs in `src/ui/PlayScreen.tsx`, the daily minutes in Settings, the Tasks styles | **Done** (PR #78) |
 | Restyle step 3: the Classes page (a heading and menu per class, date buttons for lectures to fill in, a round +) | #75 | Matt's Claude | `src/ui/ClassesScreen.tsx`, `src/ui/ClassMenu.tsx`, `unfilledLectures` and `shortDate` in `src/ui/classes.ts`, the class routes' part and date, opening at them in `ClassScreen.tsx`, the Classes styles in `src/app.css` | **Done** (PR #76) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
@@ -127,6 +129,19 @@ the "Test and publish" run on `main` to finish, then press Update.
   the term's start if later, to now, never past the term's end), opening "What was covered?" for that
   date (`#/class/<id>/cover/<date>`) and coming back to Classes when saved or cancelled. The latest
   lectures list and each class's details left this page; they're on the class's page.
+- **Nov 19 (#77):** The Tasks page as drawn: progress bar, Start, a row per class (`::` to drag, saved; arrow keys
+  too), tap to open its lectures (name = slides, Quiz = quiz, a tick when done), the penguin when there's nothing.
+  Play runs the same list in the same order, skipping what's done (slides read but no quiz yet: straight to the
+  quiz). `Today.tsx` is gone; the daily minutes moved to Settings ("Study time"). The selected nav icon is dark
+  grey in dark mode too. Gotcha: drag handlers bound before a re-render saw the old order in WebKit; the order
+  lives in a ref.
+- **Nov 19 (#72):** `src/plan/tasks.ts`: the Tasks page's day, grouped by class in the saved order, fixed at the start of
+  the day (worked out from the history before today, so done items stay, ticked), done = its quiz done, statuses
+  (Exam soon within 7 days, New, Review, done) and the progress bar (slide time creeps up to 80% of the study part).
+  The screen is #77.
+- **Nov 19 (#72):** `StudySettings.classOrder` (contract change): the Tasks page's class order, saved with the daily
+  minutes and encrypted like them. `saveStudySettings` now takes only what changes (`{ dailyMinutes }` keeps the order);
+  settings saved before read with an empty order.
 - **Nov 19 (#68):** Restyle step 1. The colours from `docs/design/` are CSS variables in `src/app.css`, dark
   and light (`--accent` for green text and outlines, darker in light mode; `--fill`/`--on-fill` for green
   behind things). Settings has **Colours: Phone / Light / Dark** (`src/ui/theme.ts`: localStorage

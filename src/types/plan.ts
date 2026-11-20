@@ -28,9 +28,15 @@ export type StudySessionInput = Pick<StudySession, 'sectionId' | 'kind' | 'step'
 
 export interface StudySettings {
   dailyMinutes: number; // the time the planner fills each day, 10-600; 60 to start with
+  /**
+   * Course ids in the order the user dragged them into on the Tasks page (#72; docs/design/README.md).
+   * Classes not in it come after, in the planner's order; ids of deleted classes are ignored. At most
+   * 200, no repeats. Settings saved before #72 read as [].
+   */
+  classOrder: string[];
 }
 
-export const DEFAULT_STUDY_SETTINGS: StudySettings = { dailyMinutes: 60 };
+export const DEFAULT_STUDY_SETTINGS: StudySettings = { dailyMinutes: 60, classOrder: [] };
 
 /**
  * The store methods for planning. Part of StudyStore (src/db/store.ts), with its rules: 'locked'
@@ -44,5 +50,6 @@ export interface PlanStore {
   listStudySessions(sectionId?: string): Promise<StudySession[]>;
   /** The settings, or DEFAULT_STUDY_SETTINGS before they're first saved. */
   getStudySettings(): Promise<StudySettings>;
-  saveStudySettings(settings: StudySettings): Promise<StudySettings>;
+  /** Saves the settings given, keeping the others as they were (e.g. { dailyMinutes } leaves the order). */
+  saveStudySettings(settings: Partial<StudySettings>): Promise<StudySettings>;
 }

@@ -110,7 +110,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   while unlocked, where a banner offers Reload and Lock applies it).
   `bank-jobs.tsx` (making question banks in the background after "What was covered?"; held by App).
   `CompareModels` (the same slides to Haiku, Sonnet and Opus, side by side; the helper allows only those
-  three by name). Planner (#47): `Today` (the checklist on the Tasks page, Play, the daily minutes), `PlayScreen`
+  three by name). Planner (#47): `TasksScreen` (#77: today by class from `src/plan/tasks.ts`, the saved order by
+  dragging, the progress bar, Start; `Penguin` when there's nothing; the daily minutes are in Settings), `PlayScreen`
   (`#/play`: each item's session with its timer, the quiz offered at 80%, then the quiz), `planning.ts`
   (loads what the planner needs and the names to show).
 - `src/plan/`: the planner (#47), pure, with tests: `planner.ts` works out today's checklist from the
