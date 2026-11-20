@@ -40,7 +40,7 @@ slides" and "M6: AI helper and quizzes":
 | Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | **Done** (contract #48, storage and planner #49, screens #50) |
 | Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **Done** (contract and storage PR #57, viewer tools PR #58). Try on an iPhone after deploy |
 | First-week quizzes: 10 questions, scaled by the section's slides (restyle step 6) | #70 | Nathan's Claude | `src/plan/rules.ts`, `src/plan/planner.ts`, `src/quiz/pick.ts`, one line of `src/ui/PlayScreen.tsx` | **Done** (PR #71) |
-| Tasks page logic: grouped by class, saved order, statuses, progress (restyle step 2, no screen) | #72 | Nathan's Claude | `src/types/plan.ts` (`StudySettings`), the settings part of `src/db/plan.ts`, new `src/plan/tasks.ts` | Contract and storage **done** (PR #73); the logic next |
+| Tasks page logic: grouped by class, saved order, statuses, progress (restyle step 2, no screen) | #72 | Nathan's Claude | `src/types/plan.ts` (`StudySettings`), the settings part of `src/db/plan.ts`, new `src/plan/tasks.ts` | Contract and storage (PR #73) and the logic (`src/plan/tasks.ts`, PR #74) **done**; the screen waits for #68 |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -118,6 +118,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 19 (#72):** `src/plan/tasks.ts`: the Tasks page's day, grouped by class in the saved order, fixed at the start of
+  the day (worked out from the history before today, so done items stay, ticked), done = its quiz done, statuses
+  (Exam soon within 7 days, New, Review, done) and the progress bar (slide time creeps up to 80% of the study part).
+  No screen yet: it goes on `Today.tsx` after #68.
 - **Nov 19 (#72):** `StudySettings.classOrder` (contract change): the Tasks page's class order, saved with the daily
   minutes and encrypted like them. `saveStudySettings` now takes only what changes (`{ dailyMinutes }` keeps the order);
   settings saved before read with an empty order.

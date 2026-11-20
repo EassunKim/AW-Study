@@ -12,6 +12,11 @@ export const RULES = {
   firstGapDays: 7,
   /** A quiz counts as this many seconds a question when fitting the day. */
   secondsPerQuestion: 40,
+  /** The Tasks page says "Exam soon" for a class with an exam this many days away or fewer (#72). */
+  examSoonDays: 7,
+  /** On the Tasks page's progress bar, slide time counts for up to this much of an item's study part;
+   * the rest comes when its quiz is done (#72). */
+  slidesCountUpTo: 0.8,
   /** Below this, a section counts as weak: it comes first, and gets extra study. */
   weakScore: 0.7,
   /** DESIGN's score table, highest band first: what a quiz's score sets for the next one. (The 90% band's
