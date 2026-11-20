@@ -7,6 +7,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from './fixtures';
 import {
+  chooseRemember,
   confirmRecoveryKey,
   PASSPHRASE,
   readRecoveryKey,
@@ -60,6 +61,7 @@ test('set up with a passphrase, then unlock after a reload', async ({ page }) =>
   await page.getByLabel(/type group \d of your recovery key/).fill('ZZZZ');
   await expect(save).toBeDisabled();
   await confirmRecoveryKey(page, recoveryKey);
+  await chooseRemember(page, false); // so the reload below asks (remembering: remember.spec.ts)
   await save.click();
   await expect(page.getByRole('heading', { level: 2, name: 'Tasks', exact: true })).toBeVisible(); // the home page
   await addClassAndReturn(page, 'Biology');
@@ -133,6 +135,7 @@ test('recover with the recovery key and choose a new passphrase', async ({ page 
   await page.reload();
 
   await page.getByRole('button', { name: 'Use your recovery key' }).click();
+  await chooseRemember(page, false);
   const field = page.getByLabel('Recovery key');
   // A typo is caught as you type, before trying it
   const typo = recoveryKey.slice(0, -1) + (recoveryKey.endsWith('0') ? '1' : '0');
@@ -233,12 +236,14 @@ test.describe('passkeys (Chromium, virtual authenticator)', () => {
     await page.getByRole('button', { name: 'Create passkey' }).click();
     const recoveryKey = await readRecoveryKey(page);
     await confirmRecoveryKey(page, recoveryKey);
+    await chooseRemember(page, false);
     await page.getByRole('button', { name: /I’ve saved it/ }).click();
     await addClassAndReturn(page, 'Physics');
 
     // A reload locks; the passkey opens it (no passphrase was ever set)
     await page.reload();
     await expect(unlockHeading(page)).toBeVisible();
+    await chooseRemember(page, false);
     await page.getByRole('button', { name: 'Unlock with a passkey' }).click();
     await expect(page.getByTestId('class-row').filter({ hasText: 'Physics' })).toBeVisible();
 

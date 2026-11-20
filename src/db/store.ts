@@ -16,8 +16,8 @@
 //
 // The clock and ids come in as `deps` (the real ones by default), so tests can fix them. The
 // classes, lectures and slides themselves are in lectures.ts.
-import { decryptBytes, decryptRecord, encryptBytes, encryptRecord, recordAad } from '../lib/crypto';
-import type { EncryptedRecord, Keyring, KeyringEntry, UnlockMethod } from '../types/crypto';
+import { decryptBytes, decryptRecord, encryptBytes, encryptRecord, recallKey, recordAad } from '../lib/crypto';
+import type { EncryptedRecord, Keyring, KeyringEntry, RememberedKey, UnlockMethod } from '../types/crypto';
 import type { LectureStore, Section } from '../types/lecture';
 import type { AnnotationStore } from '../types/annotation';
 import type { PlanStore } from '../types/plan';
@@ -42,6 +42,16 @@ export interface StudyStore extends LectureStore, QuizStore, PlanStore, Annotati
   /** Checks the key against the one saved at setup ('wrong-key' if not), finishes an interrupted setUp. */
   unlock(dataKey: CryptoKey): Promise<void>;
   lock(): void;
+  /**
+   * This device's remembered unlock (#99, docs/SECURITY.md "Remembering a device"), readable while
+   * locked so the app can open without asking. Null when this device doesn't remember. Never in
+   * backups or the keyring.
+   */
+  getRemembered(): Promise<RememberedKey | null>;
+  /** Remembers the unlock on this device (unlocked only: it's checked against the open key). */
+  remember(remembered: RememberedKey): Promise<void>;
+  /** Forgets this device's remembered unlock: the next open asks again. Works locked or unlocked. */
+  forget(): Promise<void>;
   addKeyringEntry(entry: KeyringEntry): Promise<void>;
   removeKeyringEntry(id: string): Promise<void>;
   /** Removes every entry of `method` and adds `entry`, in one go (change passphrase, new recovery key). */
@@ -304,6 +314,27 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
       key = null;
     },
 
+    async getRemembered() {
+      return ((await db.get('meta', 'remembered'))?.value as RememberedKey | undefined) ?? null;
+    },
+
+    remember: (remembered) =>
+      exclusive(async () => {
+        if (status() !== 'unlocked') throw new StoreError('locked', 'Unlock first.');
+        // Only ever a key that opens this device's data: it must unwrap and pass the key check
+        const keycheck = (await db.get('meta', 'keycheck'))?.value as EncryptedRecord;
+        try {
+          await decryptRecord(await recallKey(remembered), KEYCHECK_AAD, keycheck);
+        } catch {
+          throw new StoreError('wrong-key', 'That remembered unlock doesn’t open this device’s data.');
+        }
+        await db.put('meta', { key: 'remembered', value: remembered });
+      }),
+
+    async forget() {
+      await db.delete('meta', 'remembered');
+    },
+
     addKeyringEntry: (entry) => keyringChange((entries) => [...entries, entry]),
 
     removeKeyringEntry: (id) =>
@@ -367,6 +398,7 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
         await meta.put({ key: 'keyring', value: snapshot.keyring });
         await meta.put({ key: 'keycheck', value: snapshot.keycheck });
         await meta.delete('migration');
+        await meta.delete('remembered'); // it was for the old data key (#99)
         await tx.done;
         hasKeyring = true;
         key = dataKey;

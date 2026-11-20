@@ -4,12 +4,14 @@
 import {
   newDataKey,
   newRecoveryKey,
+  recallKey,
+  rememberKey,
   unlock,
   wrapWithPasskey,
   wrapWithPassphrase,
   wrapWithRecoveryKey,
 } from '../lib/crypto';
-import { CryptoError, type Keyring, type KeyringEntry, type UnlockSecret } from '../types/crypto';
+import { CryptoError, type Keyring, type KeyringEntry, type RememberedKey, type UnlockSecret } from '../types/crypto';
 
 /** What setup produces before anything is saved: the keyring, the data key, and the key to show. */
 export interface NewKeys {
@@ -60,6 +62,17 @@ export function unlockWith(keyring: Keyring, secret: UnlockSecret): Promise<Cryp
  */
 export function unlockForChange(keyring: Keyring, secret: UnlockSecret): Promise<CryptoKey> {
   return unlock(keyring, secret, { extractable: true });
+}
+
+/**
+ * Unlocks with `secret`; when `remember` (#99), also makes this device's remembered unlock from the same
+ * secret. The key for the session is never extractable either way: when remembering, it's the one
+ * unwrapped back from the device key, and the extractable copy is dropped here.
+ */
+export async function openKey(keyring: Keyring, secret: UnlockSecret, remember: boolean): Promise<{ key: CryptoKey; remembered: RememberedKey | null }> {
+  if (!remember) return { key: await unlockWith(keyring, secret), remembered: null };
+  const remembered = await rememberKey(await unlockForChange(keyring, secret));
+  return { key: await recallKey(remembered), remembered };
 }
 
 /** The keyring's passkeys, for the unlock screen's button and the Settings list. */

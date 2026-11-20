@@ -128,3 +128,23 @@ describe('unlockMessage', () => {
     expect(unlockMessage(new Error('disk full'), 'passphrase')).toBe('disk full');
   });
 });
+
+describe('openKey (#99)', () => {
+  it('never gives an extractable key for the session, remembering or not', async () => {
+    const { newDataKey, testKeyring, TEST_PASSPHRASE } = await import('../db/test-helpers');
+    const { openKey } = await import('./keys');
+    const { recallKey } = await import('../lib/crypto');
+    const dataKey = await newDataKey();
+    const keyring = await testKeyring(dataKey);
+    const secret = { method: 'passphrase', passphrase: TEST_PASSPHRASE } as const;
+
+    const plain = await openKey(keyring, secret, false);
+    expect(plain.remembered).toBeNull();
+    expect(plain.key.extractable).toBe(false);
+
+    const kept = await openKey(keyring, secret, true);
+    expect(kept.key.extractable).toBe(false);
+    expect(kept.remembered!.deviceKey.extractable).toBe(false);
+    expect((await recallKey(kept.remembered!)).extractable).toBe(false);
+  });
+});

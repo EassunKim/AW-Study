@@ -35,7 +35,10 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   useEffect(() => setActivity(status === 'unlocked' ? 'unlocked' : status === 'new' ? 'unlocking' : 'locked'), [status]);
   // The slides use the whole window (app.css .wide); header and footer line up with them
   const wide = status === 'unlocked' && (route.name === 'slides' || route.name === 'play');
-  const lock = () => {
+  // Lock also forgets this device's remembered unlock (#99), so the next open asks again. Forgotten
+  // first: the unlock screen tries a remembered unlock as soon as it appears.
+  const lock = async () => {
+    await vault.forget().catch(() => {});
     vault.lock();
     refresh();
     go({ name: 'tasks' });
@@ -52,7 +55,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
             <a href={href({ name: 'tasks' })}>{APP_NAME}</a>
           </h1>
           {status === 'unlocked' && (
-            <button type="button" onClick={lock}>
+            <button type="button" onClick={() => void lock()}>
               Lock
             </button>
           )}
@@ -105,7 +108,7 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
   );
 }
 
-/** "A new version is ready": reloading would lock the app, so it's your choice when (or it happens on Lock). */
+/** "A new version is ready": reloading closes what you're doing (and locks, unless this device remembers the unlock, #99), so it's your choice when (or it happens on Lock). */
 function UpdateBanner() {
   const [ready, setReady] = useState(isUpdateReady);
   useEffect(() => {
@@ -116,7 +119,7 @@ function UpdateBanner() {
   if (!ready) return null;
   return (
     <p className="update-banner" role="status" data-testid="update-banner">
-      A new version of {APP_NAME} is ready. Reloading locks it, so finish what you’re doing first.{' '}
+      A new version of {APP_NAME} is ready. Finish what you’re doing first: reloading starts {APP_NAME} again.{' '}
       <button type="button" onClick={() => window.location.reload()}>
         Reload
       </button>
