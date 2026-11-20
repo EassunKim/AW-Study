@@ -1,7 +1,7 @@
 // Settings on one page (#79, restyle step 4): the AI sign-in check and Compare models, through the real
 // screens on desktop, an Android phone and an iPhone. The test answers /ai/ itself: nothing is spent
 // or sent.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { numberedSlides } from '../../src/viewer/test-pdf';
 import { addClass, navBar, pdfFile, watchProblems } from './class-helpers';
 import { openUnlocked } from './lock-helpers';

@@ -1,6 +1,6 @@
 // Shared steps for browser tests that work with classes, lectures and slides (#26), through the
 // real screens. PDFs are made in the test (src/viewer/test-pdf.ts): no real slides are committed.
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page } from './fixtures';
 
 /** Console errors, page errors and Content-Security-Policy violations, collected from the start. */
 export async function watchProblems(page: Page): Promise<() => Promise<string[]>> {

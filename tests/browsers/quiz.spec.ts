@@ -2,7 +2,7 @@
 // an Android phone and an iPhone (WebKit). The test answers /ai/ itself, the way the helper does, so
 // nothing is spent or sent. Service workers are off here: Playwright's routing doesn't see requests a
 // service worker makes.
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from './fixtures';
 import { numberedSlides } from '../../src/viewer/test-pdf';
 import { addClass, pdfFile, toClasses, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked, unlockWithPassphrase } from './lock-helpers';

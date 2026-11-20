@@ -1,7 +1,7 @@
 // Setting up and unlocking through the real screens (#17), for every browser test. Each test
 // starts with an empty database (a fresh browser context), so the first visit shows setup and a
 // reload shows the unlock screen.
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page } from './fixtures';
 
 export const PASSPHRASE = 'paper lantern river cobalt';
 

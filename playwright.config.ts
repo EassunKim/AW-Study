@@ -17,8 +17,9 @@ export default defineConfig({
     { name: 'android', use: { ...devices['Pixel 7'] } },
     // WebKit on Windows and Linux runs every step about 3x slower than Chromium (measured Nov 20, #81:
     // setup 1.1 s vs 0.2 s, a class and lecture 2.0 s vs 0.5 s, unlock 0.9 s vs 0.1 s), so its longest
-    // tests take 10-12 s, and on a busy machine (two browsers per CPU thread) 25-30 s, past the default
-    // 30 s, failing wherever the clock ran out. Nothing hangs: its budgets are scaled to its speed.
+    // tests take 10-12 s, and on a busy machine (two browsers per CPU thread) up to 50 s, past the default
+    // 30 s, failing wherever the clock ran out. So its budgets are scaled to its speed. (WebKit's other
+    // trouble under load, pages that stop drawing frames, is fixed in tests/browsers/fixtures.ts.)
     { name: 'iphone', use: { ...devices['iPhone 15'] }, timeout: 90_000, expect: { timeout: 15_000 } },
   ],
   webServer: {

@@ -136,7 +136,9 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   `tests/helper/` with a fake `claude`; never a real token in tests or CI.
 - `server/`: the production server (Node's own modules only): serves `dist/`, `/healthz`, and every
   security header (`server/headers.mjs`).
-- `tests/server.test.mjs`: the server. `tests/browsers/`: Playwright against the built app.
+- `tests/server.test.mjs`: the server. `tests/browsers/`: Playwright against the built app. Browser tests
+  import `test` and `expect` from `tests/browsers/fixtures.ts`, not '@playwright/test' (it keeps WebKit pages
+  drawing under load, #81).
 - `.github/workflows/publish.yml`: tests every PR and push; on `main` publishes
   `ghcr.io/nandminc/aw-study:main`, which the home server deploys when someone presses Update.
 

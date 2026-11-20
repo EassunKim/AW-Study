@@ -2,7 +2,7 @@
 // and an iPhone (WebKit): highlight words, box part of a slide, pin a note, and find them in the same
 // place after a reload and when zoomed. Explain this and Ask about this go through the real AI client;
 // the test answers /ai/ itself, so nothing is spent or sent.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { numberedSlides } from '../../src/viewer/test-pdf';
 import { addClass, pdfFile, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked } from './lock-helpers';
