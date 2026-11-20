@@ -3,8 +3,8 @@
 // Each question's options are shown in a fresh order, so the right one isn't always in one place.
 import type { OptionIndex, Question, QuizAttempt } from '../types/quiz';
 
-/** Questions per quiz until the planner (milestone 5) sets it from the section's scores. */
-export const QUIZ_SIZE = 5;
+/** Questions in a quiz started by hand from a class (in Play, the planner sets the size). Nov 19: 10, was 5. */
+export const QUIZ_SIZE = 10;
 
 export interface QuizItem {
   question: Question;

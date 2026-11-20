@@ -152,6 +152,11 @@ describe('pickQuiz', () => {
     expect(pickQuiz(bank.slice(0, 2), [], 5, noShuffle)).toHaveLength(2); // a small bank: all of it
   });
 
+  it('a quiz started by hand asks 10 questions (Nov 19; was 5)', () => {
+    const big = Array.from({ length: 14 }, (_, i) => question(`q${i}`));
+    expect(pickQuiz(big, [])).toHaveLength(10);
+  });
+
   it('shows each question’s options in a fresh order that still maps to the stored ones', () => {
     let seed = 7;
     const random = () => ((seed = (seed * 16_807) % 2_147_483_647) / 2_147_483_647);
