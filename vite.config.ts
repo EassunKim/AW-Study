@@ -99,7 +99,8 @@ export default defineConfig({
         // Never for the AI helper (helper/, behind Cloudflare Access), nor for Cloudflare's own pages on
         // this site (/cdn-cgi/: after the Google sign-in, Access sets its cookie at
         // /cdn-cgi/access/authorized). They must reach the network, or there's no sign-in cookie.
-        navigateFallbackDenylist: [/^\/healthz/, /^\/ai(\/|$)/, /^\/cdn-cgi\//],
+        // Nor for the sync server (sync/, #95): Google sends the browser back to /api/auth/callback.
+        navigateFallbackDenylist: [/^\/healthz/, /^\/ai(\/|$)/, /^\/api(\/|$)/, /^\/cdn-cgi\//],
       },
     }),
   ],

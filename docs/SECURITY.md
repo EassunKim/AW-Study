@@ -326,4 +326,5 @@ as PRF).
 | `src/db/` (#16) | Uses them to encrypt records and keep the keyring |
 | `src/ui/` (#17) | Setup, unlock, recovery, Settings |
 | `src/backup/` (#18) | The `.honed` file format, making and restoring backups (see "Backups") |
-| `sync/` (v2, #93, not built yet) | The sync server, `honed-sync`: sign-in, sessions, the keyring, changes, files (see "Accounts and sync") |
+| `sync/` (v2) | The sync server, `honed-sync` (see "Accounts and sync"): Google sign-in, accounts and sessions built (#95: `google.mjs`, `app.mjs`, `db.mjs`, tests in `tests/sync/`); the keyring, changes and files not yet |
+| `src/sync/` (#95) | The app's side: Settings' Account box (sign in, check, sign out); asks the server only when you press a button |

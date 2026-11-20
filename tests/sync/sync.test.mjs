@@ -1,0 +1,519 @@
+// The sync server (sync/, #95): Google sign-in, accounts and sessions, over real HTTP, with a fake
+// Google made here (its token endpoint checks the client secret, the redirect address and PKCE, and
+// signs ID tokens with a key made here). Nothing reaches Google.
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { createServer } from 'node:http';
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createSync, deviceName, RECENT_SIGN_IN_MS, safePath, SESSION_COOKIE, SESSION_IDLE_MS, SESSION_MAX_MS, SIGN_IN_WAIT_MS, SIGNIN_COOKIE } from '../../sync/app.mjs';
+import { openDb, SCHEMA_STEP } from '../../sync/db.mjs';
+import { googleClient, SignInError } from '../../sync/google.mjs';
+
+const ORIGIN = 'http://honed.test';
+const CLIENT_ID = 'client-123.apps.googleusercontent.com';
+const SECRET = 'GOCSPX-test-secret';
+const REDIRECT = `${ORIGIN}/api/auth/callback`;
+const ENDPOINTS = {
+  issuers: ['https://accounts.google.com', 'accounts.google.com'],
+  authorize: 'https://google.test/auth',
+  token: 'https://google.test/token',
+  keys: 'https://google.test/certs',
+};
+const CHROME = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1';
+
+const googleKey = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const otherKey = generateKeyPairSync('rsa', { modulusLength: 2048 });
+
+function idToken(claims, { key = googleKey.privateKey, kid = 'g1', alg = 'RS256' } = {}) {
+  const head = Buffer.from(JSON.stringify({ alg, kid, typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  const signature = sign('RSA-SHA256', Buffer.from(`${head}.${body}`), key).toString('base64url');
+  return `${head}.${body}.${signature}`;
+}
+
+/** A fake Google: remembers each approved sign-in by its code, and answers the token endpoint like Google. */
+function fakeGoogle(clock) {
+  const codes = new Map();
+  const google = {
+    keyFetches: 0,
+    /** Plays the user approving the sign-in on Google's page: gives the code Google would send back. */
+    approve(authorizeUrl, person, tweak = {}) {
+      const url = new URL(authorizeUrl);
+      const code = `code-${codes.size + 1}`;
+      codes.set(code, { params: url.searchParams, person, tweak });
+      return code;
+    },
+    async fetch(address, init = {}) {
+      if (address === ENDPOINTS.keys) {
+        google.keyFetches++;
+        return Response.json({ keys: [{ ...googleKey.publicKey.export({ format: 'jwk' }), kid: 'g1', alg: 'RS256', use: 'sig' }] });
+      }
+      if (address === ENDPOINTS.token && init.method === 'POST') {
+        const form = new URLSearchParams(init.body);
+        const grant = codes.get(form.get('code'));
+        codes.delete(form.get('code')); // a code works once
+        const challenge = grant && createHash('sha256').update(form.get('code_verifier') ?? '').digest('base64url');
+        if (
+          !grant ||
+          form.get('client_id') !== CLIENT_ID ||
+          form.get('client_secret') !== SECRET ||
+          form.get('redirect_uri') !== REDIRECT ||
+          form.get('grant_type') !== 'authorization_code' ||
+          grant.params.get('code_challenge_method') !== 'S256' ||
+          challenge !== grant.params.get('code_challenge')
+        ) {
+          return Response.json({ error: 'invalid_grant' }, { status: 400 });
+        }
+        const seconds = Math.floor(clock.getTime() / 1000);
+        const claims = {
+          iss: 'https://accounts.google.com',
+          aud: CLIENT_ID,
+          sub: grant.person.sub,
+          email: grant.person.email,
+          email_verified: true,
+          nonce: grant.params.get('nonce'),
+          iat: seconds,
+          exp: seconds + 3600,
+          ...grant.tweak.claims,
+        };
+        return Response.json({ id_token: idToken(claims, grant.tweak.sign), access_token: 'unused', token_type: 'Bearer' });
+      }
+      return new Response('not found', { status: 404 });
+    },
+  };
+  return google;
+}
+
+const MATT = { sub: '1001', email: 'matt@example.com' };
+const NATHAN = { sub: '1002', email: 'Nathan@Example.com' }; // Google may send capitals
+const STRANGER = { sub: '9999', email: 'stranger@example.com' };
+
+let dir;
+let db;
+let server;
+let base;
+let clock;
+let google;
+let logs;
+let allowed;
+
+async function start() {
+  logs = [];
+  const handle = createSync({
+    db,
+    google: googleClient({ clientId: CLIENT_ID, clientSecret: SECRET, redirectUri: REDIRECT, endpoints: ENDPOINTS, fetch: google.fetch, now: () => clock.getTime() }),
+    allowedEmails: allowed,
+    appOrigin: ORIGIN,
+    log: (line) => logs.push(line),
+    now: () => new Date(clock),
+  });
+  server = createServer((req, res) => void handle(req, res));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  base = `http://127.0.0.1:${server.address().port}`;
+}
+
+beforeEach(async () => {
+  dir = mkdtempSync(join(tmpdir(), 'honed-sync-'));
+  db = openDb(dir);
+  clock = new Date('2026-11-20T18:00:00Z');
+  google = fakeGoogle(clock);
+  allowed = ['matt@example.com', 'nathan@example.com'];
+  await start();
+});
+
+afterEach(async () => {
+  await new Promise((resolve) => server.close(resolve));
+  db.close();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+/** A browser: keeps cookies like one (by name), sends them back, never follows redirects by itself. */
+function browser(agent = CHROME) {
+  const jar = new Map();
+  const b = {
+    jar,
+    setCookies: [],
+    async go(path, init = {}) {
+      const res = await fetch(base + path, {
+        redirect: 'manual',
+        ...init,
+        headers: { 'User-Agent': agent, Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(init.headers ?? {}) },
+      });
+      for (const line of res.headers.getSetCookie()) {
+        b.setCookies.push(line);
+        const [pair, ...attrs] = line.split(';');
+        const [name, value] = [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)];
+        if (attrs.some((a) => a.trim().toLowerCase() === 'max-age=0')) jar.delete(name);
+        else jar.set(name, value);
+      }
+      return res;
+    },
+    /** POST/DELETE as the app does: JSON, from our own site. */
+    send(method, path, body = {}) {
+      return b.go(path, { method, headers: { Origin: ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    },
+    async me() {
+      return (await b.go('/api/me')).json();
+    },
+  };
+  return b;
+}
+
+/** The whole Google round trip; gives the callback's response. */
+async function signIn(b, person, { then, tweak, fresh } = {}) {
+  const query = new URLSearchParams({ ...(then !== undefined ? { then } : {}), ...(fresh ? { fresh: '1' } : {}) });
+  const start = await b.go(`/api/auth/google?${query}`);
+  expect(start.status).toBe(303);
+  const authorize = start.headers.get('location');
+  const state = new URL(authorize).searchParams.get('state');
+  const code = google.approve(authorize, person, tweak);
+  return b.go(`/api/auth/callback?${new URLSearchParams({ code, state })}`);
+}
+
+describe('signing in with Google', () => {
+  it('sends the browser to Google with our client, openid email, state, nonce and PKCE', async () => {
+    const b = browser();
+    const res = await b.go('/api/auth/google?then=%2F%23%2Fsettings');
+    expect(res.status).toBe(303);
+    const url = new URL(res.headers.get('location'));
+    expect(url.origin + url.pathname).toBe(ENDPOINTS.authorize);
+    const p = url.searchParams;
+    expect(Object.fromEntries(p)).toMatchObject({ client_id: CLIENT_ID, redirect_uri: REDIRECT, response_type: 'code', scope: 'openid email', code_challenge_method: 'S256' });
+    expect(p.get('state')).toMatch(/^[\w-]{43}$/);
+    expect(p.get('nonce')).toMatch(/^[\w-]{43}$/);
+    expect(p.get('nonce')).not.toBe(p.get('state'));
+    expect(p.get('code_challenge')).toMatch(/^[\w-]{43}$/);
+    expect(p.has('prompt')).toBe(false);
+    // The state is also in a cookie for /api/auth/ only, so the sign-in can only finish in this browser
+    expect(b.jar.get(SIGNIN_COOKIE)).toBe(p.get('state'));
+    expect(b.setCookies[0]).toMatch(/Path=\/api\/auth\/; HttpOnly; SameSite=Lax; Max-Age=600/);
+  });
+
+  it('signs in: makes the account, sets the session cookie, goes back where it started', async () => {
+    const b = browser();
+    const res = await signIn(b, NATHAN, { then: '/#/settings' });
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/#/settings');
+    const cookie = b.setCookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`));
+    expect(cookie).toMatch(/; Path=\/api\/; HttpOnly; SameSite=Lax; Max-Age=15552000/);
+    expect(b.jar.has(SIGNIN_COOKIE)).toBe(false); // cleared
+    expect(await b.me()).toEqual({ signedIn: true, email: 'nathan@example.com', device: expect.any(String) });
+
+    // Keyed by Google's sub; the session is stored as a hash, never the token
+    const accounts = db.prepare('SELECT * FROM accounts').all();
+    expect(accounts).toEqual([expect.objectContaining({ google_sub: '1002', email: 'nathan@example.com' })]);
+    const token = b.jar.get(SESSION_COOKIE);
+    expect(token).toMatch(/^[\w-]{43}$/);
+    const sessions = db.prepare('SELECT * FROM sessions').all();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].hash).toBe(createHash('sha256').update(token).digest('base64url'));
+    expect(JSON.stringify(sessions)).not.toContain(token);
+    expect(sessions[0].device).toBe('Chrome on Windows');
+  });
+
+  it('a second sign-in finds the same account by Google id, even if the email changed', async () => {
+    await new Promise((resolve) => server.close(resolve));
+    allowed.push('nathan.new@example.com');
+    await start();
+    await signIn(browser(), NATHAN);
+    await signIn(browser(IPHONE), { ...NATHAN, email: 'nathan.new@example.com' });
+    expect(db.prepare('SELECT google_sub, email FROM accounts').all()).toEqual([{ google_sub: '1002', email: 'nathan.new@example.com' }]);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n).toBe(2);
+  });
+
+  it('refuses anyone not on the allow list, and makes no account', async () => {
+    const b = browser();
+    const res = await signIn(b, STRANGER);
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain('invite-only');
+    expect(b.jar.has(SESSION_COOKIE)).toBe(false);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM accounts').get().n).toBe(0);
+  });
+
+  it('an empty allow list lets nobody in', async () => {
+    await new Promise((resolve) => server.close(resolve));
+    allowed = [];
+    await start();
+    expect((await signIn(browser(), NATHAN)).status).toBe(403);
+  });
+
+  it('a sign-in can only finish in the browser that started it, once, within 10 minutes', async () => {
+    // Someone sends you their own callback link: your browser has no matching state cookie
+    const attacker = browser();
+    const start = await attacker.go('/api/auth/google');
+    const authorize = start.headers.get('location');
+    const code = google.approve(authorize, STRANGER);
+    const victim = browser();
+    const link = `/api/auth/callback?${new URLSearchParams({ code, state: new URL(authorize).searchParams.get('state') })}`;
+    const res = await victim.go(link);
+    expect(res.status).toBe(400);
+    expect(victim.jar.has(SESSION_COOKIE)).toBe(false);
+    // The same callback twice: the state is used up
+    const b = browser();
+    const first = await b.go('/api/auth/google');
+    const state = new URL(first.headers.get('location')).searchParams.get('state');
+    const code2 = google.approve(first.headers.get('location'), MATT);
+    const cookie = b.jar.get(SIGNIN_COOKIE);
+    expect((await b.go(`/api/auth/callback?${new URLSearchParams({ code: code2, state })}`)).status).toBe(303);
+    b.jar.set(SIGNIN_COOKIE, cookie);
+    expect((await b.go(`/api/auth/callback?${new URLSearchParams({ code: code2, state })}`)).status).toBe(400);
+    // Too slow
+    const c = browser();
+    const slow = await c.go('/api/auth/google');
+    const code3 = google.approve(slow.headers.get('location'), MATT);
+    clock.setTime(clock.getTime() + SIGN_IN_WAIT_MS + 1000);
+    const late = await c.go(`/api/auth/callback?${new URLSearchParams({ code: code3, state: new URL(slow.headers.get('location')).searchParams.get('state') })}`);
+    expect(late.status).toBe(400);
+    expect(c.jar.has(SESSION_COOKIE)).toBe(false);
+  });
+
+  it('a cancelled sign-in says so', async () => {
+    const b = browser();
+    const start = await b.go('/api/auth/google');
+    const state = new URL(start.headers.get('location')).searchParams.get('state');
+    const res = await b.go(`/api/auth/callback?error=access_denied&state=${state}`);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('cancelled');
+    expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
+  });
+
+  it('refuses tokens that are forged, for another app, expired, for another sign-in, unverified or not from Google', async () => {
+    const cases = [
+      [{ sign: { key: otherKey.privateKey } }, 'signature'],
+      [{ claims: { aud: 'someone-else.apps.googleusercontent.com' } }, 'another app'],
+      [{ claims: { exp: Math.floor(clock.getTime() / 1000) - 3600 } }, 'expired'],
+      [{ claims: { nonce: 'not-this-one' } }, 'this sign-in'],
+      [{ claims: { email_verified: false } }, 'verified'],
+      [{ claims: { iss: 'https://evil.example' } }, 'other than Google'],
+      [{ sign: { kid: 'unknown' } }, 'unknown key'],
+    ];
+    for (const [tweak, words] of cases) {
+      const b = browser();
+      const res = await signIn(b, NATHAN, { tweak });
+      expect(res.status, words).toBe(400);
+      expect(await res.text(), words).toContain(words);
+      expect(b.jar.has(SESSION_COOKIE), words).toBe(false);
+    }
+    expect(db.prepare('SELECT COUNT(*) AS n FROM accounts').get().n).toBe(0);
+  });
+
+  it('refuses an unsigned token (alg none) and garbage', async () => {
+    const client = googleClient({ clientId: CLIENT_ID, clientSecret: SECRET, redirectUri: REDIRECT, endpoints: ENDPOINTS, fetch: google.fetch, now: () => clock.getTime() });
+    const claims = { iss: 'https://accounts.google.com', aud: CLIENT_ID, sub: '1', email: 'a@b.c', email_verified: true, nonce: 'n', exp: clock.getTime() / 1000 + 60 };
+    const head = Buffer.from(JSON.stringify({ alg: 'none', kid: 'g1' })).toString('base64url');
+    const none = `${head}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.`;
+    await expect(client.verifyIdToken(none, 'n')).rejects.toThrow(SignInError);
+    await expect(client.verifyIdToken('not.a.token', 'n')).rejects.toThrow(SignInError);
+    await expect(client.verifyIdToken('nope', 'n')).rejects.toThrow(SignInError);
+    // And accepts the real thing (so the cases above fail for their own reasons)
+    await expect(client.verifyIdToken(idToken(claims), 'n')).resolves.toEqual({ sub: '1', email: 'a@b.c', authTime: null });
+  });
+
+  it('a code Google refuses (wrong PKCE verifier, used twice) is no sign-in', async () => {
+    const client = googleClient({ clientId: CLIENT_ID, clientSecret: SECRET, redirectUri: REDIRECT, endpoints: ENDPOINTS, fetch: google.fetch });
+    const url = client.signInUrl({ state: 's', nonce: 'n', verifier: 'right-verifier' });
+    const code = google.approve(url, NATHAN);
+    await expect(client.exchange(code, 'wrong-verifier')).rejects.toThrow(SignInError);
+    const code2 = google.approve(url, NATHAN);
+    await expect(client.exchange(code2, 'right-verifier')).resolves.toEqual(expect.any(String));
+    await expect(client.exchange(code2, 'right-verifier')).rejects.toThrow(SignInError);
+  });
+
+  it('only ever goes back to a path on our own site', async () => {
+    for (const evil of ['//evil.example/', 'https://evil.example/', '/\\evil.example', 'javascript:alert(1)', '/ok\nSet-Cookie: x=1', 'x'.repeat(400)]) {
+      expect(safePath(evil), evil).toBe('/#/settings');
+    }
+    expect(safePath('/#/class/abc')).toBe('/#/class/abc');
+    expect(safePath(null)).toBe('/#/settings');
+    const res = await signIn(browser(), MATT, { then: '//evil.example/' });
+    expect(res.headers.get('location')).toBe('/#/settings');
+  });
+
+  it('fresh=1 asks Google to choose the account again', async () => {
+    const res = await browser().go('/api/auth/google?fresh=1');
+    expect(new URL(res.headers.get('location')).searchParams.get('prompt')).toBe('select_account');
+  });
+
+  it('reloads Google’s keys at most once a minute for unknown key ids', async () => {
+    await signIn(browser(), MATT);
+    expect(google.keyFetches).toBe(1);
+    await signIn(browser(), MATT, { tweak: { sign: { kid: 'new' } } });
+    await signIn(browser(), MATT, { tweak: { sign: { kid: 'new' } } });
+    expect(google.keyFetches).toBe(1);
+    clock.setTime(clock.getTime() + 61_000);
+    await signIn(browser(), MATT, { tweak: { sign: { kid: 'new' } } });
+    expect(google.keyFetches).toBe(2);
+  });
+});
+
+describe('sessions', () => {
+  it('signs out, and the cookie is cleared', async () => {
+    const b = browser();
+    await signIn(b, MATT);
+    const res = await b.send('POST', '/api/auth/signout');
+    expect(res.status).toBe(200);
+    expect(b.jar.has(SESSION_COOKIE)).toBe(false);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n).toBe(0);
+    expect(await b.me()).toEqual({ signedIn: false });
+  });
+
+  it('ends after 30 days unused, and after 180 days however much it’s used', async () => {
+    const idle = browser();
+    await signIn(idle, MATT);
+    const busy = browser();
+    await signIn(busy, NATHAN);
+    clock.setTime(clock.getTime() + SESSION_IDLE_MS - 3_600_000);
+    expect((await idle.me()).signedIn).toBe(true); // used: counts again from now
+    clock.setTime(clock.getTime() + SESSION_IDLE_MS + 1000);
+    expect((await idle.me()).signedIn).toBe(false);
+    // Used every 20 days until 180 days have passed since signing in
+    const s = browser();
+    clock.setTime(clock.getTime() + 1000);
+    await signIn(s, NATHAN);
+    const born = clock.getTime();
+    while (clock.getTime() + 20 * 86_400_000 < born + SESSION_MAX_MS) {
+      clock.setTime(clock.getTime() + 20 * 86_400_000);
+      expect((await s.me()).signedIn).toBe(true);
+    }
+    clock.setTime(born + SESSION_MAX_MS + 1000);
+    expect((await s.me()).signedIn).toBe(false);
+  });
+
+  it('someone taken off the allow list is signed out', async () => {
+    const b = browser();
+    await signIn(b, MATT);
+    await new Promise((resolve) => server.close(resolve));
+    allowed = ['nathan@example.com'];
+    await start();
+    expect(await b.me()).toEqual({ signedIn: false });
+  });
+
+  it('lists the account’s devices; signs one out, never another account’s; or all of them', async () => {
+    const pc = browser();
+    await signIn(pc, NATHAN);
+    const phone = browser(IPHONE);
+    await signIn(phone, NATHAN);
+    const matt = browser();
+    await signIn(matt, MATT);
+
+    const { devices } = await (await pc.go('/api/devices')).json();
+    expect(devices.map((d) => [d.device, d.current])).toEqual(
+      expect.arrayContaining([
+        ['Chrome on Windows', true],
+        ['Safari on iPhone', false],
+      ]),
+    );
+    expect(devices).toHaveLength(2);
+    const phoneId = devices.find((d) => !d.current).id;
+
+    // Matt can't sign out Nathan's phone
+    expect((await matt.send('POST', '/api/devices/signout', { id: phoneId })).status).toBe(200);
+    expect((await phone.me()).signedIn).toBe(true);
+    // Nathan can
+    expect((await pc.send('POST', '/api/devices/signout', { id: phoneId })).status).toBe(200);
+    expect((await phone.me()).signedIn).toBe(false);
+    expect((await pc.me()).signedIn).toBe(true);
+
+    // All of them
+    await signIn(phone, NATHAN);
+    await pc.send('POST', '/api/devices/signout', { all: true });
+    expect((await pc.me()).signedIn).toBe(false);
+    expect((await phone.me()).signedIn).toBe(false);
+    expect((await matt.me()).signedIn).toBe(true);
+    expect(pc.jar.has(SESSION_COOKIE)).toBe(false);
+  });
+
+  it('signing in again on a device replaces its session', async () => {
+    const b = browser();
+    await signIn(b, MATT);
+    await signIn(b, MATT);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n).toBe(1);
+  });
+
+  it('refuses changes from other sites, or not as JSON, and private reads when signed out', async () => {
+    const b = browser();
+    await signIn(b, MATT);
+    const noOrigin = await b.go('/api/auth/signout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    expect(noOrigin.status).toBe(403);
+    const evil = await b.go('/api/devices/signout', { method: 'POST', headers: { Origin: 'https://evil.example', 'Content-Type': 'application/json' }, body: '{"all":true}' });
+    expect(evil.status).toBe(403);
+    const form = await b.go('/api/devices/signout', { method: 'POST', headers: { Origin: ORIGIN, 'Content-Type': 'text/plain' }, body: '{"all":true}' });
+    expect(form.status).toBe(415);
+    expect((await b.me()).signedIn).toBe(true); // none of them did anything
+    const bad = await b.go('/api/devices/signout', { method: 'POST', headers: { Origin: ORIGIN, 'Content-Type': 'application/json' }, body: '{nope' });
+    expect(bad.status).toBe(400);
+    expect((await browser().go('/api/devices')).status).toBe(401);
+    expect((await browser().send('DELETE', '/api/account')).status).toBe(401);
+  });
+
+  it('never lets an answer be cached', async () => {
+    const res = await browser().go('/api/me');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+});
+
+describe('deleting the account', () => {
+  it('needs a Google sign-in in the last 5 minutes, then removes the account and every session', async () => {
+    const pc = browser();
+    await signIn(pc, NATHAN);
+    const phone = browser(IPHONE);
+    await signIn(phone, NATHAN);
+    await signIn(browser(), MATT);
+
+    clock.setTime(clock.getTime() + RECENT_SIGN_IN_MS + 1000);
+    const stale = await pc.send('DELETE', '/api/account');
+    expect(stale.status).toBe(403);
+    expect(await stale.json()).toMatchObject({ needsSignIn: true });
+
+    await signIn(pc, NATHAN, { fresh: true });
+    const res = await pc.send('DELETE', '/api/account');
+    expect(res.status).toBe(200);
+    expect(pc.jar.has(SESSION_COOKIE)).toBe(false);
+    expect((await phone.me()).signedIn).toBe(false);
+    expect(db.prepare('SELECT email FROM accounts').all()).toEqual([{ email: 'matt@example.com' }]);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n).toBe(1); // Matt's
+  });
+});
+
+describe('logs and storage', () => {
+  it('logs routes, statuses and times only: never emails, tokens or codes', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    await b.me();
+    const text = JSON.stringify(logs);
+    expect(logs.length).toBeGreaterThan(2);
+    for (const secret of ['nathan', 'code-1', b.jar.get(SESSION_COOKIE)]) expect(text).not.toContain(secret);
+    expect(logs[0]).toEqual({ at: expect.any(String), route: 'GET /api/auth/google', status: 303, ms: expect.any(Number) });
+  });
+
+  it('numbers its schema steps and refuses a database from a newer version', () => {
+    expect(db.prepare('PRAGMA user_version').get().user_version).toBe(SCHEMA_STEP);
+    const newer = mkdtempSync(join(tmpdir(), 'honed-sync-newer-'));
+    const d = new DatabaseSync(join(newer, 'sync.db'));
+    d.exec(`PRAGMA user_version = ${SCHEMA_STEP + 1}`);
+    d.close();
+    expect(() => openDb(newer)).toThrow(/newer version/);
+    rmSync(newer, { recursive: true, force: true });
+  });
+
+  it('answers its health check', async () => {
+    const res = await fetch(`${base}/healthz`);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+});
+
+describe('device names', () => {
+  it('tells common browsers apart', () => {
+    expect(deviceName(CHROME)).toBe('Chrome on Windows');
+    expect(deviceName(IPHONE)).toBe('Safari on iPhone');
+    expect(deviceName('Mozilla/5.0 (Linux; Android 16; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36')).toBe('Chrome on Android');
+    expect(deviceName('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15')).toBe('Safari on Mac');
+    expect(deviceName('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36 Edg/140.0')).toBe('Edge on Windows');
+    expect(deviceName('')).toBe('A browser');
+  });
+});

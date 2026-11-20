@@ -134,6 +134,10 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   server (its own modules only) that checks the Cloudflare Access token, picks the person's own
   Claude Code token and runs `claude -p` with no tools (`helper/claude.mjs`). Tests in
   `tests/helper/` with a fake `claude`; never a real token in tests or CI.
+- `sync/` (#95): the sync server, its own image `ghcr.io/nandminc/aw-study-sync` (Node's own modules, `node:sqlite`), at `/api/`:
+  Google sign-in (`google.mjs`), accounts and sessions (`app.mjs`, `db.mjs`, numbered schema steps). Tests in `tests/sync/`
+  with a fake Google; never real Google credentials in tests or CI. The app's side is `src/sync/` (Settings' Account box).
+  Design: `docs/SECURITY.md`, "Accounts and sync". The service worker must leave `/api/` to the network.
 - `server/`: the production server (Node's own modules only): serves `dist/`, `/healthz`, and every
   security header (`server/headers.mjs`).
 - `tests/server.test.mjs`: the server. `tests/browsers/`: Playwright against the built app. Browser tests
