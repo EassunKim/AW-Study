@@ -1,7 +1,7 @@
 // Checking the AI's answers on the device before anything uses them (CLAUDE.md: four options, one
 // right answer among them, a slide number). The helper checks too; this is the app not trusting
 // anything it didn't make itself.
-import { AiError, type Grade, type McQuestion } from './backend';
+import { AiError, type Grade, type McQuestion, type WrittenQuestion } from './backend';
 
 const unusable = (why: string) => new AiError('unavailable', `The AI’s answer wasn’t usable (${why}).`);
 
@@ -38,6 +38,30 @@ export function checkQuestions(reply: unknown, pages: readonly number[], count: 
       page: q.page as number,
       explanation: text(q.explanation, 600) ?? '',
     });
+    if (good.length === count) break;
+  }
+  if (good.length === 0) throw unusable('no usable questions');
+  return good;
+}
+
+/** Short-answer questions that pass every check, in order (#87): a question, 1-6 points, a slide that was sent. */
+export function checkWritten(reply: unknown, pages: readonly number[], count: number): WrittenQuestion[] {
+  const list = (reply as { questions?: unknown } | null)?.questions;
+  if (!Array.isArray(list)) throw unusable('no list of questions');
+  const allowed = new Set(pages);
+  const seen = new Set<string>();
+  const good: WrittenQuestion[] = [];
+  for (const item of list) {
+    const q = item as Partial<Record<keyof WrittenQuestion, unknown>> | null;
+    if (!q || typeof q !== 'object') continue;
+    const question = text(q.question, 600);
+    if (!question || seen.has(question.toLowerCase())) continue;
+    if (!Array.isArray(q.points) || q.points.length < 1 || q.points.length > 6) continue;
+    const points = q.points.map((p) => text(p, 300));
+    if (points.some((p) => p === null)) continue;
+    if (typeof q.page !== 'number' || !allowed.has(q.page)) continue;
+    seen.add(question.toLowerCase());
+    good.push({ question, points: points as string[], page: q.page });
     if (good.length === count) break;
   }
   if (good.length === 0) throw unusable('no usable questions');

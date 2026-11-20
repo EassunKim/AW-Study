@@ -125,6 +125,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#87, part 2):** The AI helper's new `written` job writes short-answer questions for exam practice (each
+  with 1-6 points a full answer makes, and its slide), checked by the helper and again on the device
+  (`checkWritten`); `AiBackend.makeWrittenQuestions` (HTTP and fake). Grading uses the existing `grade` job.
+  **The helper changed: after merging, press Update for `honed-ai` too.**
 - **Nov 20 (#82):** Restyle step 5, the last. Every other screen was checked on an iPhone-sized screen, dark
   and light: setup, the recovery key, unlock, a class's page, What was covered?, an exam, the viewer, a quiz
   (asked and answered) and Play. Fixed: cards and forms are outlines on the page's background, not filled

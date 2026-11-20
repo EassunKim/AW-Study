@@ -35,6 +35,8 @@ export const LIMITS = {
   selection: 2_000,
   answer: 4_000,
   points: 10,
+  written: 10, // short-answer questions per request (exam practice, #87)
+  writtenPoints: 6, // points a short answer's full version makes
 };
 
 const SYSTEM = [
@@ -172,6 +174,42 @@ export const JOBS = {
         if (!Number.isInteger(q.page) || !valid.has(q.page)) bad(`Question ${i + 1} names a slide that wasn’t given.`);
         const explanation = typeof q.explanation === 'string' ? q.explanation.trim().slice(0, 600) : '';
         return { question, options, answer: q.answer, page: q.page, explanation };
+      });
+      return { questions };
+    },
+  },
+
+  /** Short-answer questions for exam practice (#87), each with the points a full answer makes. */
+  written: {
+    validate(body) {
+      object(body);
+      return {
+        pages: pages(body.pages, 'pages', LIMITS.pages),
+        count: int(body.count, 'count', 1, LIMITS.written),
+      };
+    },
+    prompt(input) {
+      return buildPrompt(
+        [
+          `Write ${input.count} short-answer exam questions on the slides in DATA.pages (each has a slide number "page" and its "text"). Each should take a student 2 to 4 sentences to answer.`,
+          `For each, list 2 to ${LIMITS.writtenPoints} points a full answer makes, short and checkable; a marker gives one mark per point.`,
+          'Each question comes from one slide: give that slide\'s number as "page". Choose the slides with the most important ideas. Never ask about slides that only organise the lecture: title, agenda or contents, section dividers, "thank you", "questions?", references or credits.',
+          'Reply with: {"questions": [{"question": string, "points": [strings], "page": slide number}]}',
+        ].join('\n'),
+        input,
+      );
+    },
+    check(text, input) {
+      const reply = replyObject(text);
+      if (!Array.isArray(reply.questions) || reply.questions.length === 0) bad('No questions.');
+      const valid = new Set(input.pages.map((p) => p.page));
+      const questions = reply.questions.slice(0, input.count).map((q, i) => {
+        if (typeof q !== 'object' || q === null) bad(`Question ${i + 1} isn’t an object.`);
+        const question = replyText(q.question, `Question ${i + 1}`, 600);
+        if (!Array.isArray(q.points) || q.points.length < 1 || q.points.length > LIMITS.writtenPoints) bad(`Question ${i + 1} needs 1 to ${LIMITS.writtenPoints} points.`);
+        const points = q.points.map((p, j) => replyText(p, `Question ${i + 1} point ${j + 1}`, 300));
+        if (!Number.isInteger(q.page) || !valid.has(q.page)) bad(`Question ${i + 1} names a slide that wasn’t given.`);
+        return { question, points, page: q.page };
       });
       return { questions };
     },
