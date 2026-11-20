@@ -12,7 +12,8 @@ blocks from the browser's WebCrypto, with standard parameters. No home-made cryp
 | Google, or someone who takes over the Google account, opening the data (v2) | **Yes** | Signing in only says which account it is; it never unlocks ("Accounts and sync"). They could see the account exists and, through our server, download ciphertext. |
 | The sync server withholding or rolling back changes (v2) | **No** (it can't read, forge or alter them) | Every device keeps its own full copy, so sync stops; nothing is lost from a device. |
 | A backup file (`.honed`) found in someone's cloud drive | **Yes** | Backups hold only ciphertext and wrapped keys (#18). |
-| Another person using the same computer account, or copying the browser's files | **Yes**, while Honed is locked | Records are encrypted at rest; the key is only ever in memory while unlocked. |
+| Another person using the same computer account, or copying the browser's files | **Yes**, while Honed is locked **and the device doesn't remember the unlock** | Records are encrypted at rest; the key is only ever in memory while unlocked. A device that remembers the unlock (#97, "Remembering a device") opens without asking, so there the device's own lock is the protection. |
+| Our server reading the data of someone who turned on Google unlock (#97) | **No**, for that person only | They chose to let their Google account unlock Honed, so the server holds a key that opens it ("Google unlock"). Everyone else is unaffected. |
 | A lost phone or laptop | By the device | The device's own lock and disk encryption. Honed adds the points above. |
 | Malicious code running inside the page while it's unlocked | **No** (encryption can't) | Prevented instead by the strict Content-Security-Policy, no outside scripts, few dependencies. |
 | Forgetting the passphrase **and** losing the recovery key | **No: the data is gone** | Nobody else can unlock them; that is the point. The setup screen says so plainly. |
@@ -293,6 +294,57 @@ A device that **already has its own data** under a different key is asked to cho
 device's data with the account's (the restore warning, since this device's data goes), or don't sync
 this device. Merging two separately made sets of data (decrypting one and re-adding it under the
 account's key) is possible, but left for later.
+
+### Remembering a device (#97, design only)
+
+So Honed opens straight in instead of asking for a passkey every time (Nathan, Nov 20: "sign in the first
+time, save that log in after that").
+
+- **What it is:** after a device is unlocked once (passkey, passphrase or recovery key), it keeps the data
+  key for next time, wrapped by a **device key**: a random 256-bit AES-GCM key made on the device with
+  `extractable: false` and stored as a `CryptoKey` in this device's IndexedDB (`meta`, key `remembered`:
+  the device key plus the data key wrapped by it, with its IV). Opening Honed unwraps it and unlocks with no
+  prompt. Making it needs the data key in wrappable form once, so it happens right at unlock, while the
+  unlock secret has just been given (as "Changing how you unlock" says).
+- **Never leaves the device:** not in the keyring, not synced, not in backups (backups copy only the
+  record stores and the keyring), never sent anywhere. The server can't read any more than before.
+- **On by default**, with "Don't remember on this device" at unlock for a shared or school computer
+  (see the public-computer mode in the plans).
+- **Forgetting:** **Lock** forgets it (the next open asks again), and so does Settings > This device >
+  "Forget the unlock on this device". When sync exists, a device that learns its session was signed out
+  from another device (the devices list) forgets it too, the next time it's online.
+- **What it costs:** while a device remembers, Honed's encryption no longer protects against someone using
+  that device's unlocked computer account, or copying its browser files: browsers keep a
+  non-extractable key's bytes in their own files, so it stops page code reading them, not a copy of the
+  profile. That's how every app that stays signed in works; the device's own lock and disk encryption are
+  the protection. A device that doesn't remember keeps today's protection.
+
+### Google unlock (opt-in, #97, design only; built with sync)
+
+For people who'd rather never type a passphrase or use a passkey: their Google account can unlock Honed
+on a new device. **Off unless the person turns it on, and for them "signing in never unlocks" no longer
+holds.**
+
+- **How:** turning it on (in Settings, on an unlocked device, after confirming with the current
+  passphrase, passkey or recovery key like any change to how you unlock) makes a random 256-bit **Google
+  unlock key**, gives it to the sync server, which stores it with the account, and adds a keyring entry,
+  method `google`, wrapping the data key with it (AES-KW, as the other methods).
+- **A new device:** sign in with Google; the device gets the keyring (sync); it asks the server for the
+  Google unlock key, which the server gives only to a session whose Google sign-in was in the last 5
+  minutes; the device unwraps the data key and (by default) remembers it as above.
+- **What it costs:** our server holds both the key and (with sync) the encrypted data, so the server, or
+  anyone who takes it over, could read that person's classes, slides and scores, and so could anyone who
+  takes over their Google account. It's the standard iCloud or Google Drive model, chosen per person.
+  Settings says this plainly before turning it on, and the person's promise reads "Your data is
+  encrypted, and your Google account can unlock it" instead of "Only you can read it".
+- **Visible:** the server records each time the Google unlock key is given out (when and to which signed-in
+  device, never the key), and Settings shows it ("Unlocked with Google on Safari on iPhone, Nov 21").
+- **Turning it off** removes the `google` keyring entry and the server deletes its key. The data key
+  itself doesn't change, so whatever the server could read before stays readable to anyone who copied
+  that key while it was on; changing the data key (re-encrypting everything) would be the fix, and isn't
+  planned yet. Settings says so.
+- **The keyring rule becomes:** at least one way to unlock (passphrase, passkey, or Google unlock) and
+  always a recovery key, so losing the Google account never means losing the data.
 
 ### Turning sync off
 
