@@ -4,8 +4,10 @@
 export const RULES = {
   /** A new section's three first-week sessions, in days after the lecture. */
   firstWeekDays: [1, 3, 7],
-  /** Questions in each first-week session's quiz. */
-  firstWeekQuizSize: 5,
+  /** Questions in each first-week session's quiz (and the first quiz after, which has no score to size it):
+   * this many a slide of the section, rounded, between min and max. 20 slides make the default 10 (Nathan,
+   * Nov 19: "10 by default, more or fewer with how much was covered"). */
+  firstWeekQuiz: { perSlide: 0.5, min: 5, max: 15 },
   /** Days from the last first-week session to the first quiz after it. */
   firstGapDays: 7,
   /** A quiz counts as this many seconds a question when fitting the day. */

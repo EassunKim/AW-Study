@@ -39,6 +39,7 @@ slides" and "M6: AI helper and quizzes":
 | Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
 | Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | **Done** (contract #48, storage and planner #49, screens #50) |
 | Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **Done** (contract and storage PR #57, viewer tools PR #58). Try on an iPhone after deploy |
+| First-week quizzes: 10 questions, scaled by the section's slides (restyle step 6) | #70 | Nathan's Claude | `src/plan/rules.ts`, `src/plan/planner.ts`, `src/quiz/pick.ts`, one line of `src/ui/PlayScreen.tsx` | **Done** (PR #71) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -116,6 +117,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 19 (#70):** First-week quizzes are sized by the section: half a question a slide, 5 to 15 (20 slides make the
+  default 10; `RULES.firstWeekQuiz`). The first quiz after the first week uses the same size; the score table takes over
+  after it. A quiz started by hand from a class asks 10 (`QUIZ_SIZE`, was 5).
 - **Nov 19:** The first UI design is in `docs/design/` (`screens.png` + README with Nathan's answers to the
   open questions). No code yet: building it is planned in the README, one PR per step.
 - **Nov 19:** "Sign in for AI" goes to the helper's new `GET /ai/signin?then=<path>` (a plain page, strict CSP:
