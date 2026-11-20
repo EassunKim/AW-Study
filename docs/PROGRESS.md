@@ -50,6 +50,7 @@ slides" and "M6: AI helper and quizzes":
 | Restyle step 5: the other screens to match (setup, unlock, a class's page, What was covered?, the viewer, quizzes, Play) | #82 | Matt's Claude | the step 5 block at the end of `src/app.css`, `className="back"` on the back links | **Done** (PR #83). The restyle is finished |
 | Milestone 9a: exams pull their sections forward (planner) | #86 | Matt's Claude | the exam rules in `src/plan/planner.ts` (+ `RULES.examPullDays`, `examQuizzes`), `PlanInput.exams`, `Plan.examsOver` (through `tasks.ts`), loading exams in `planning.ts`, the note on `TasksScreen.tsx` | **Done** (PR #88) |
 | Milestone 9b: exam practice with AI-graded short answers | #87 | Matt's Claude | to be proposed in #87 (contract first) | Next |
+| Viewer: fit width for portrait pages (documents saved as PDF) | #46 | Nathan's Claude | `src/viewer/SlideViewer.tsx`, `viewer.css`, new `fit.ts` + `fit.test.ts`, the page size in `test-pdf.ts`, `tests/browsers/viewer.spec.ts` | **Done** (this PR). Try on a real phone after deploy |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -126,6 +127,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 20 (#46):** Portrait pages fit the width and scroll down (DESIGN, "The slide viewer"), with a Whole page /
+  Page width switch. Measured on the real Slides screen with a US Letter document: the stage is 361 × 196 on the
+  iPhone 15, 380 × 376 on the Pixel 7 and 886 × 341 on desktop, so a whole page was 151, 290 and 263 px wide; fit
+  width makes it 361, 380 and 816 (real size). Thumbnails now fit 96 × 72, which gave the Pixel's stage 52 px more
+  height. The iPhone's stage sits at the viewer's 12rem minimum (the Slides screen around it is taller than the
+  screen), which may be worth a look on its own. Checked live after deploy #90 the same day: 152 passed; only
+  `app.spec.ts:69` failed, as always live (Access answers `/ai/`).
 
 - **Nov 20 (#81):** iPhone (WebKit) tests that timed out under load. Measured with all three projects at
   48 workers on a 24-thread PC, `--repeat-each=4`. Three separate causes:

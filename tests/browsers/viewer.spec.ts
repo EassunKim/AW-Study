@@ -3,7 +3,7 @@
 // errors and no Content-Security-Policy violations: PDF.js's worker, fonts and decoders must all
 // come from our own site.
 import { expect, test, type Page } from './fixtures';
-import { numberedSlides } from '../../src/viewer/test-pdf';
+import { LETTER, numberedSlides } from '../../src/viewer/test-pdf';
 
 /** Console errors, page errors and CSP violations, collected from the start. */
 async function watchProblems(page: Page): Promise<() => Promise<string[]>> {
@@ -121,6 +121,89 @@ test('opens at a given slide', async ({ page }) => {
   await expect(position(page)).toHaveText('Slide 4 of 6');
   await expect(slide(page)).toHaveAttribute('data-rendered', '4');
   await expect(slide(page).locator('.textLayer')).toContainText('Slide 4');
+  expect(await problems()).toEqual([]);
+});
+
+test('landscape slides show whole', async ({ page }, testInfo) => {
+  await openPdf(page, '/viewer-demo.html', numberedSlides(2));
+  await expect(slide(page)).toHaveAttribute('data-rendered', '1');
+  await expect(page.getByTestId('slide-stage')).toHaveAttribute('data-fit', 'page');
+  // On a phone they fill the width already, so there's nothing to switch to
+  if (testInfo.project.name !== 'desktop') await expect(page.getByTestId('fit-switch')).toHaveCount(0);
+});
+
+test('a portrait page fits the width and scrolls; keys scroll, then move; Whole page switches (#46)', async ({ page }) => {
+  const problems = await watchProblems(page);
+  // The demo page's frame is 80% of the screen, taller than the real Slides screen's stage: on a tall
+  // phone a whole page would fill the width already. A shorter screen gives the real screen's shape.
+  const screen = page.viewportSize()!;
+  if (screen.width < 600) await page.setViewportSize({ width: screen.width, height: 560 });
+  await openPdf(page, '/viewer-demo.html', numberedSlides(3, LETTER));
+  const stage = page.getByTestId('slide-stage');
+  const stageSize = () => stage.evaluate((el) => ({ width: el.clientWidth, height: el.clientHeight, top: el.scrollTop, scroll: el.scrollHeight }));
+  const scrollTop = () => stage.evaluate((el) => el.scrollTop);
+  await expect(slide(page)).toHaveAttribute('data-rendered', '1');
+  await expect(stage).toHaveAttribute('data-fit', 'width');
+  await expect(page.getByTestId('fit-switch')).toHaveText('Whole page');
+
+  // As wide as the stage, or real size (612 points = 816 px) on a wide screen; taller than the stage
+  const s = await stageSize();
+  const wide = (await slide(page).boundingBox())!;
+  expect(Math.abs(wide.width - Math.min(s.width, 816))).toBeLessThanOrEqual(2);
+  expect(wide.height).toBeGreaterThan(s.height);
+  expect(s.scroll).toBeGreaterThan(s.height);
+  expect(await stage.evaluate((el) => getComputedStyle(el).touchAction)).toBe('pan-y'); // a finger scrolls it
+  expect(await slideHasInk(page)).toBe(true);
+  // Thumbnails of portrait pages are no taller than a slide's
+  await expect(page.locator('.sv-thumb').first()).toHaveAttribute('data-rendered', 'true');
+  const thumb = (await page.locator('.sv-thumb').first().boundingBox())!;
+  expect(Math.round(thumb.height)).toBe(72);
+  expect(Math.abs(thumb.width - (72 * LETTER.width) / LETTER.height)).toBeLessThan(1.5); // 55.6, give or take a pixel's rounding
+
+  // Down scrolls the page; at its bottom it moves on, and the next page starts at its top
+  await page.getByRole('region', { name: 'Slides' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(scrollTop).toBeGreaterThan(0);
+  await expect(position(page)).toHaveText('Slide 1 of 3');
+  await stage.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await page.keyboard.press('PageDown');
+  await expect(position(page)).toHaveText('Slide 2 of 3');
+  await expect(slide(page)).toHaveAttribute('data-rendered', '2');
+  await expect.poll(scrollTop).toBe(0);
+  // Up at the top goes back a page; left and right move as always
+  await page.keyboard.press('ArrowUp');
+  await expect(position(page)).toHaveText('Slide 1 of 3');
+  await page.keyboard.press('ArrowRight');
+  await expect(position(page)).toHaveText('Slide 2 of 3');
+
+  // A swipe still moves to the next page
+  const box = (await stage.boundingBox())!;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width * 0.8, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, y, { steps: 5 });
+  await page.mouse.move(box.x + box.width * 0.2, y, { steps: 5 });
+  await page.mouse.up();
+  await expect(position(page)).toHaveText('Slide 3 of 3');
+
+  // Whole page: it fits in the stage, and the choice stays on other pages
+  await page.getByTestId('fit-switch').click();
+  await expect(stage).toHaveAttribute('data-fit', 'page');
+  await expect(page.getByTestId('fit-switch')).toHaveText('Page width');
+  await expect.poll(async () => (await slide(page).boundingBox())!.height).toBeLessThanOrEqual((await stageSize()).height + 1);
+  expect((await slide(page).boundingBox())!.width).toBeLessThan(wide.width / 1.2);
+  await page.getByRole('button', { name: 'Previous slide' }).click();
+  await expect(position(page)).toHaveText('Slide 2 of 3');
+  await expect(stage).toHaveAttribute('data-fit', 'page');
+  // Arrow down moves straight on again
+  await page.getByRole('region', { name: 'Slides' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(position(page)).toHaveText('Slide 3 of 3');
+  // And back
+  await page.getByTestId('fit-switch').click();
+  await expect(stage).toHaveAttribute('data-fit', 'width');
+  await expect.poll(async () => (await slide(page).boundingBox())!.width).toBeGreaterThan(wide.width - 3);
+
   expect(await problems()).toEqual([]);
 });
 
