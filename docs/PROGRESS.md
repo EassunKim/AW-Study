@@ -39,6 +39,7 @@ slides" and "M6: AI helper and quizzes":
 | Quizzes: question banks and multiple-choice quizzes (app side) | #40 | Nathan's Claude | `src/types/quiz.ts`, `src/db/quiz.ts`, `src/quiz/`, quiz screens in `src/ui/` | **Done** (contract #41, storage #42, screens #43); scores move the schedule with milestone 5 |
 | Planner and today's checklist with Play (milestone 5) | #47 | Nathan's Claude | `src/types/plan.ts`, `src/db/plan.ts`, `src/plan/`, Today and session screens, the home route | **Done** (contract #48, storage and planner #49, screens #50) |
 | Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **Done** (contract and storage PR #57, viewer tools PR #58). Try on an iPhone after deploy |
+| UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
 
@@ -62,6 +63,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Decisions (newest first)
 
+- **Nov 19: The look** (Matt and Nathan): `docs/design/` is the reference for how the app looks and behaves.
+  Dark grey `#272727`, white `#f2f5f1`, green `#9fe870`, plus a light mode; three main pages (Tasks,
+  Classes, Settings) behind a nav bar; Tasks grouped by class in a saved order; no times shown. First-week
+  quizzes default to 10 questions (later ones still follow the score table).
 - **Nov 18: Redesign** (Matt and Nathan). FSRS and flashcards were a reference, not the product.
   Honed is built around **lectures**: classes, PDF slides studied in a built-in viewer, and AI
   multiple-choice quizzes whose scores schedule each section (a low score adds study time later,
@@ -111,6 +116,8 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 19:** The first UI design is in `docs/design/` (`screens.png` + README with Nathan's answers to the
+  open questions). No code yet: building it is planned in the README, one PR per step.
 - **Nov 19:** "Sign in for AI" goes to the helper's new `GET /ai/signin?then=<path>` (a plain page, strict CSP:
   "You're signed in for AI", **Back to the app**, "close this tab if it opened in one"), not `/ai/whoami`.
   On Nathan's iPhone Home Screen app the sign-in had left him on whoami's JSON with no way back. `then`
