@@ -5,14 +5,15 @@
 // Days are study days ("YYYY-MM-DD", src/lib/studyDay.ts: the day starts at 4 a.m.). A lecture's
 // date is a calendar day, which for a daytime lecture is its study day too.
 import { studyDay } from '../lib/studyDay';
-import type { Lecture, Section } from '../types/lecture';
+import type { Exam, Lecture, Section } from '../types/lecture';
 import type { StudySession } from '../types/plan';
 import type { QuizAttempt } from '../types/quiz';
 import { RULES } from './rules';
 
 export type PlanItem =
   | { kind: 'study'; sectionId: string; step: 1 | 2 | 3; minutes: number; quizSize: number; due: string; overdueDays: number }
-  | { kind: 'quiz'; sectionId: string; minutes: number; quizSize: number; due: string; overdueDays: number }
+  /** `examId`: pulled forward for that exam (#86), not the section's own schedule. */
+  | { kind: 'quiz'; sectionId: string; minutes: number; quizSize: number; due: string; overdueDays: number; examId?: string }
   | { kind: 'extra'; sectionId: string; minutes: number; due: string; overdueDays: number };
 
 export interface Plan {
@@ -22,6 +23,8 @@ export interface Plan {
   doneMinutes: number; // studied and quizzed already today (counts against the daily minutes)
   plannedMinutes: number; // today's items
   overBudget: boolean; // the first item alone is more than what's left of today
+  /** The exams whose sections took today past the daily minutes (DESIGN: allowed before an exam, and said). */
+  examsOver: Exam[];
 }
 
 export interface PlanInput {
@@ -33,6 +36,8 @@ export interface PlanInput {
   attempts: QuizAttempt[];
   timeZone: string;
   dayStartHour: number;
+  /** The classes' exams (#86): from RULES.examPullDays before one, its sections are pulled forward. */
+  exams?: Exam[];
 }
 
 /** `date` moved by `days`. */
@@ -76,8 +81,8 @@ export function afterScore(score: number, lastGap: number): { gap: number; size:
   throw new Error('unreachable: the last band starts at 0');
 }
 
-/** Everything the planner knows about one section: its due items, and its last score. */
-export function sectionItems(input: PlanInput, section: Section, lecture: Lecture): { items: PlanItem[]; lastScore: number | null } {
+/** Everything the planner knows about one section: its due items, its last score and its next quiz's size. */
+export function sectionItems(input: PlanInput, section: Section, lecture: Lecture): { items: PlanItem[]; lastScore: number | null; quizSize: number } {
   const day = (iso: string) => studyDay(new Date(iso), input.timeZone, input.dayStartHour);
   const sessions = input.sessions.filter((s) => s.sectionId === section.id);
   const attempts = input.attempts.filter((a) => a.sectionId === section.id).sort((a, b) => a.finishedAt.localeCompare(b.finishedAt));
@@ -110,10 +115,10 @@ export function sectionItems(input: PlanInput, section: Section, lecture: Lectur
   }
 
   // After the first week: quizzes, each score setting the next date and size
+  let size = firstWeekQuizSize(section);
   if (firstWeekDone) {
     let gap = RULES.firstGapDays;
     let next = addDays(firstWeekDone, gap);
-    let size = firstWeekQuizSize(section);
     for (const a of attempts) {
       const on = day(a.finishedAt);
       if (on <= firstWeekDone) continue; // the first week's own quizzes
@@ -134,25 +139,78 @@ export function sectionItems(input: PlanInput, section: Section, lecture: Lectur
       items.push({ kind: 'extra', sectionId: section.id, minutes: extraMinutes, ...due(date) });
     }
   }
-  return { items, lastScore: last ? last.score : null };
+  return { items, lastScore: last ? last.score : null, quizSize: size };
+}
+
+/** The exams whose run-up (RULES.examPullDays before, up to the day before) includes `today`, soonest first. */
+export function examsInRunUp(exams: readonly Exam[], today: string): Exam[] {
+  return exams
+    .filter((e) => {
+      const days = daysBetween(today, e.date);
+      return days >= 1 && days <= RULES.examPullDays;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+}
+
+/** Whether `exam` covers this lecture: the lectures it lists, or (null) every lecture of its class up to its date. */
+export function examCovers(exam: Exam, lecture: Lecture): boolean {
+  if (exam.courseId !== lecture.courseId) return false;
+  return exam.lectureIds ? exam.lectureIds.includes(lecture.id) : lecture.date <= exam.date;
+}
+
+/**
+ * When a section covered by `exam` needs its next exam quiz (#86), or null when it has had enough:
+ * with none in the run-up yet, at once (from the run-up's start, or the day after the lecture); after
+ * one, halfway from it to the exam (at least a day later, by the day before at the latest).
+ */
+export function examQuizDue(exam: Exam, lecture: Lecture, quizDays: readonly string[]): string | null {
+  const start = addDays(exam.date, -RULES.examPullDays);
+  const last = addDays(exam.date, -1);
+  const inRunUp = quizDays.filter((d) => d >= start && d < exam.date).sort();
+  if (inRunUp.length >= RULES.examQuizzes) return null;
+  if (inRunUp.length === 0) {
+    const afterLecture = addDays(lecture.date, 1);
+    const due = afterLecture > start ? afterLecture : start;
+    return due <= last ? due : null;
+  }
+  const previous = inRunUp.at(-1)!;
+  const due = addDays(previous, Math.max(1, Math.floor(daysBetween(previous, exam.date) / 2)));
+  return due <= last ? due : null;
 }
 
 /** Today's checklist. */
 export function planDay(input: PlanInput): Plan {
   const day = (iso: string) => studyDay(new Date(iso), input.timeZone, input.dayStartHour);
   const lectures = new Map(input.lectures.map((l) => [l.id, l]));
-  const candidates: { item: PlanItem; lastScore: number | null; lectureDate: string }[] = [];
+  const runUp = examsInRunUp(input.exams ?? [], input.today);
+  const candidates: { item: PlanItem; lastScore: number | null; lectureDate: string; exam: Exam | null }[] = [];
   for (const section of input.sections) {
     const lecture = lectures.get(section.lectureId);
     if (!lecture) continue;
-    const { items, lastScore } = sectionItems(input, section, lecture);
-    for (const item of items) candidates.push({ item, lastScore, lectureDate: lecture.date });
+    const { items, lastScore, quizSize } = sectionItems(input, section, lecture);
+    const exam = runUp.find((e) => examCovers(e, lecture)) ?? null;
+    // An exam soon (#86): quizzed at least twice in its run-up, unless today already ends in a quiz
+    if (exam && !items.some((i) => i.kind !== 'extra')) {
+      const quizDays = input.attempts.filter((a) => a.sectionId === section.id).map((a) => day(a.finishedAt));
+      const due = examQuizDue(exam, lecture, quizDays);
+      if (due && due <= input.today) {
+        items.push({ kind: 'quiz', sectionId: section.id, minutes: quizMinutes(quizSize), quizSize, due, overdueDays: daysBetween(due, input.today), examId: exam.id });
+      }
+    }
+    for (const item of items) candidates.push({ item, lastScore, lectureDate: lecture.date, exam });
   }
 
-  // Priority (DESIGN): the lowest recent scores, then new lectures, then the most overdue
+  // Priority (DESIGN): an exam soon (the soonest first, weakest first, never quizzed counting as weakest),
+  // then the lowest recent scores, then new lectures, then the most overdue
   const kindOrder = { extra: 0, study: 1, quiz: 2 } as const;
   const weak = (s: number | null) => s !== null && s < RULES.weakScore;
   candidates.sort((a, b) => {
+    if ((a.exam === null) !== (b.exam === null)) return a.exam ? -1 : 1;
+    if (a.exam && b.exam) {
+      const byExam = a.exam.date.localeCompare(b.exam.date) || a.exam.id.localeCompare(b.exam.id);
+      if (byExam !== 0) return byExam;
+      if (a.item.sectionId !== b.item.sectionId && a.lastScore !== b.lastScore) return (a.lastScore ?? -1) - (b.lastScore ?? -1);
+    }
     const aw = weak(a.lastScore);
     const bw = weak(b.lastScore);
     if (aw !== bw) return aw ? -1 : 1;
@@ -177,8 +235,13 @@ export function planDay(input: PlanInput): Plan {
   const today: PlanItem[] = [];
   const later: PlanItem[] = [];
   let overBudget = false;
-  for (const { item } of candidates) {
-    if (item.minutes <= left) {
+  const examsOver = new Map<string, Exam>();
+  for (const { item, exam } of candidates) {
+    if (exam && item.minutes > left) {
+      today.push(item); // before an exam, its sections are planned past the daily minutes
+      examsOver.set(exam.id, exam);
+      left = 0;
+    } else if (item.minutes <= left) {
       today.push(item);
       left -= item.minutes;
     } else if (today.length === 0 && doneMinutes === 0) {
@@ -194,5 +257,6 @@ export function planDay(input: PlanInput): Plan {
     doneMinutes,
     plannedMinutes: today.reduce((sum, i) => sum + i.minutes, 0),
     overBudget,
+    examsOver: [...examsOver.values()],
   };
 }

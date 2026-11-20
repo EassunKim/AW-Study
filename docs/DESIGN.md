@@ -110,7 +110,7 @@ The first gap after week one is 7 days. These numbers are a starting point, kept
 
 **Exams**
 
-- From **10 days before** an exam, every section it covers is pulled forward so it's quizzed at least twice before the day, weakest sections first.
+- From **10 days before** an exam, every section it covers is pulled forward so it's quizzed at least twice before the day, weakest sections first (Nov 20, #86): with no quiz in those days yet, one at once; after one, the next halfway to the exam (at least a day later, by the day before). A section whose study or quiz is already on today gets nothing extra. These go on today even past the daily minutes, and the Tasks page says which exam did it. Nothing is pulled on the exam day itself.
 - In the last **2 days**, an *exam practice* item appears: a mixed test with short-answer questions graded by AI.
 
 **Fitting the day**
@@ -120,7 +120,7 @@ The first gap after week one is 7 days. These numbers are a starting point, kept
 3. Fill today's minutes in that order. What doesn't fit moves to the next days, spread so no day goes over budget.
 4. Time estimates: a study item uses its planned minutes; a quiz is counted at about 40 seconds a question until Honed has measured your own pace.
 
-**How it's built (#47):** nothing the planner works out is stored. Each time, it reads the lectures, the study sessions done and the quiz attempts, and works out every section's state and today's list from them, so it stays right after an edit or a delete, and the rules can be retuned against the real history later. Exams pulling sections forward come with milestone 9.
+**How it's built (#47):** nothing the planner works out is stored. Each time, it reads the lectures, the study sessions done and the quiz attempts, and works out every section's state and today's list from them, so it stays right after an edit or a delete, and the rules can be retuned against the real history later. Exams pull their sections forward (#86) the same way: worked out from the exams and the quizzes taken.
 
 The day starts at 4 a.m. (`src/lib/studyDay.ts`), so late-night studying counts for the evening before. Missed days simply roll forward into the next days' plans; a proper *catch up* mode is a future idea.
 

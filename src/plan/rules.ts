@@ -17,6 +17,10 @@ export const RULES = {
   /** On the Tasks page's progress bar, slide time counts for up to this much of an item's study part;
    * the rest comes when its quiz is done (#72). */
   slidesCountUpTo: 0.8,
+  /** Exams (milestone 9, #86): from this many days before one, every section it covers is pulled forward
+   * so it's quizzed at least `examQuizzes` times before the day, even past the daily minutes. */
+  examPullDays: 10,
+  examQuizzes: 2,
   /** Below this, a section counts as weak: it comes first, and gets extra study. */
   weakScore: 0.7,
   /** DESIGN's score table, highest band first: what a quiz's score sets for the next one. (The 90% band's

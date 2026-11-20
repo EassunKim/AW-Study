@@ -32,7 +32,9 @@ export async function loadPlanning(store: StudyStore, now = new Date()): Promise
   const today = studyDay(now, timeZone, DAY_START_HOUR);
   const courses = await store.listCourses(today);
   const [perCourse, sections, attempts, sessions, settings] = await Promise.all([
-    Promise.all(courses.map(async (c) => ({ lectures: await store.listLectures(c.id), decks: await store.listSlideDecks(c.id) }))),
+    Promise.all(
+      courses.map(async (c) => ({ lectures: await store.listLectures(c.id), decks: await store.listSlideDecks(c.id), exams: await store.listExams(c.id) })),
+    ),
     store.listSections(),
     store.listQuizAttempts(),
     store.listStudySessions(),
@@ -43,7 +45,8 @@ export async function loadPlanning(store: StudyStore, now = new Date()): Promise
   const courseById = new Map<string, Course>(courses.map((c) => [c.id, c]));
   const sectionById = new Map(sections.map((s) => [s.id, s]));
   const lectureById = new Map(lectures.map((l) => [l.id, l]));
-  const input = { today, dailyMinutes: settings.dailyMinutes, lectures, sections, sessions, attempts, timeZone, dayStartHour: DAY_START_HOUR };
+  const exams = perCourse.flatMap((p) => p.exams);
+  const input = { today, dailyMinutes: settings.dailyMinutes, lectures, sections, sessions, attempts, exams, timeZone, dayStartHour: DAY_START_HOUR };
   const plan = planDay(input);
   const nextExam = Object.fromEntries(courses.map((c) => [c.id, c.nextExam?.date ?? null]));
   const place = (sectionId: string): ItemPlace | undefined => {
