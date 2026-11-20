@@ -8,7 +8,16 @@ import { StoreError } from './store';
 
 export const DAILY_MINUTES_MIN = 10;
 export const DAILY_MINUTES_MAX = 600;
+export const CLASS_ORDER_MAX = 200;
 const SETTINGS_ID = 'study';
+
+/** Saved settings as the app uses them: anything missing (classOrder before #72) takes its default. */
+export function readSettings(saved: Partial<StudySettings>): StudySettings {
+  return {
+    dailyMinutes: saved.dailyMinutes ?? DEFAULT_STUDY_SETTINGS.dailyMinutes,
+    classOrder: Array.isArray(saved.classOrder) ? saved.classOrder.filter((id): id is string => typeof id === 'string') : [],
+  };
+}
 
 const invalid = (message: string) => new StoreError('invalid', message);
 const isIso = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && !Number.isNaN(Date.parse(v));
@@ -60,21 +69,32 @@ export function planMethods(ctx: StoreContext): PlanStore {
       requireOpen();
       const row = await db.get('settings', SETTINGS_ID);
       if (!row) return { ...DEFAULT_STUDY_SETTINGS };
-      const { dailyMinutes } = await open<StudySettings & { id: string }>('settings', row);
-      return { dailyMinutes };
+      return readSettings(await open<Partial<StudySettings> & { id: string }>('settings', row));
     },
 
     saveStudySettings: (settings) =>
       exclusive(async () => {
         requireOpen();
-        const minutes = settings?.dailyMinutes;
+        const row = await db.get('settings', SETTINGS_ID);
+        const now = row ? readSettings(await open<Partial<StudySettings> & { id: string }>('settings', row)) : { ...DEFAULT_STUDY_SETTINGS };
+        const minutes = settings?.dailyMinutes ?? now.dailyMinutes;
         if (!Number.isInteger(minutes) || minutes < DAILY_MINUTES_MIN || minutes > DAILY_MINUTES_MAX) {
           throw invalid(`Daily study time is ${DAILY_MINUTES_MIN} to ${DAILY_MINUTES_MAX} whole minutes.`);
         }
-        const record = { id: SETTINGS_ID, dailyMinutes: minutes };
+        const order = settings?.classOrder ?? now.classOrder;
+        if (
+          !Array.isArray(order) ||
+          order.length > CLASS_ORDER_MAX ||
+          order.some((id) => typeof id !== 'string' || id.length === 0 || id.length > 100) ||
+          new Set(order).size !== order.length
+        ) {
+          throw invalid('The class order is a list of up to ' + CLASS_ORDER_MAX + ' different classes.');
+        }
+        const saved: StudySettings = { dailyMinutes: minutes, classOrder: [...order] };
+        const record = { id: SETTINGS_ID, ...saved };
         const [sealed, log] = await Promise.all([seal('settings', { ...record }), change('settings', 'put', SETTINGS_ID, record)]);
         await writeRows(db, [{ store: 'settings', row: sealed }], [], [log]);
-        return { dailyMinutes: minutes };
+        return saved;
       }),
   };
 }

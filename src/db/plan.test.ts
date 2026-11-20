@@ -5,6 +5,7 @@ import type { StudySessionInput } from '../types/plan';
 import { openHonedDb, RECORD_STORES } from './schema';
 import { openStudyStore, type StudyStore } from './store';
 import { containsText, fakePdf, newDataKey, testKeyring } from './test-helpers';
+import { readSettings } from './plan';
 
 const T1 = '2026-11-18T18:00:00.000Z';
 const T2 = '2026-11-18T18:20:00.000Z';
@@ -67,13 +68,29 @@ describe.each(['before setup (plain)', 'encrypted'] as const)('plan store, %s', 
   });
 
   it('settings start at 60 minutes, are saved, and are checked', async () => {
-    expect(await store.getStudySettings()).toEqual({ dailyMinutes: 60 });
-    expect(await store.saveStudySettings({ dailyMinutes: 45 })).toEqual({ dailyMinutes: 45 });
-    expect(await store.getStudySettings()).toEqual({ dailyMinutes: 45 });
+    expect(await store.getStudySettings()).toEqual({ dailyMinutes: 60, classOrder: [] });
+    expect(await store.saveStudySettings({ dailyMinutes: 45 })).toEqual({ dailyMinutes: 45, classOrder: [] });
+    expect(await store.getStudySettings()).toEqual({ dailyMinutes: 45, classOrder: [] });
     for (const bad of [9, 601, 30.5, Number.NaN]) {
       await expect(store.saveStudySettings({ dailyMinutes: bad })).rejects.toMatchObject({ code: 'invalid' });
     }
-    expect(await store.getStudySettings()).toEqual({ dailyMinutes: 45 });
+    expect(await store.getStudySettings()).toEqual({ dailyMinutes: 45, classOrder: [] });
+  });
+
+  it('settings saved before the class order existed read with an empty order', () => {
+    expect(readSettings({ dailyMinutes: 45 })).toEqual({ dailyMinutes: 45, classOrder: [] });
+    expect(readSettings({})).toEqual({ dailyMinutes: 60, classOrder: [] });
+  });
+
+  it('the class order (#72) is saved apart from the minutes: saving one keeps the other', async () => {
+    expect(await store.saveStudySettings({ classOrder: ['c2', 'c1'] })).toEqual({ dailyMinutes: 60, classOrder: ['c2', 'c1'] });
+    expect(await store.saveStudySettings({ dailyMinutes: 30 })).toEqual({ dailyMinutes: 30, classOrder: ['c2', 'c1'] });
+    expect(await store.saveStudySettings({ classOrder: ['c1', 'c2'] })).toEqual({ dailyMinutes: 30, classOrder: ['c1', 'c2'] });
+    expect(await store.getStudySettings()).toEqual({ dailyMinutes: 30, classOrder: ['c1', 'c2'] });
+    for (const bad of [['c1', 'c1'], [''], [7], 'c1', Array.from({ length: 201 }, (_, i) => `c${i}`)]) {
+      await expect(store.saveStudySettings({ classOrder: bad as string[] }), JSON.stringify(bad).slice(0, 30)).rejects.toMatchObject({ code: 'invalid' });
+    }
+    expect(await store.getStudySettings()).toEqual({ dailyMinutes: 30, classOrder: ['c1', 'c2'] });
   });
 
   it('deleting the lecture or the class takes its study sessions', async () => {
