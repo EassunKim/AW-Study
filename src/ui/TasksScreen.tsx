@@ -95,7 +95,9 @@ export function TasksScreen() {
   const left = classes.some((c) => c.status !== 'done');
   return (
     <section className="tasks" aria-labelledby="tasks-title">
-      <h2 id="tasks-title">Tasks</h2>
+      <h2 id="tasks-title" className="page-title">
+        Tasks
+      </h2>
       {classes.length === 0 ? (
         <div className="tasks-empty">
           <Penguin />

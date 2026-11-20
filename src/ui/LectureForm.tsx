@@ -143,7 +143,7 @@ export function LectureForm({
                   aria-pressed={p.source?.kind === 'deck' && p.source.deck.id === deck.id}
                   onClick={() => setPart(i, { source: { kind: 'deck', deck }, problem: null })}
                 >
-                  {deck.title} <span className="muted small">{deck.pageCount} slides</span>
+                  <span className="choice-name">{deck.title}</span> <span className="muted small">{deck.pageCount} slides</span>
                 </button>
               ))}
             </div>

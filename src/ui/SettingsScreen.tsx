@@ -67,7 +67,9 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
 
   return (
     <section className="settings" aria-labelledby="settings-title">
-      <h2 id="settings-title">Settings</h2>
+      <h2 id="settings-title" className="page-title">
+        Settings
+      </h2>
 
       <ThemeSetting />
 
