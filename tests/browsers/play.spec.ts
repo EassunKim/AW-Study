@@ -3,7 +3,7 @@
 // /ai/ is answered by the test, like the helper (service workers off so Playwright sees it).
 import { expect, test, type Page } from '@playwright/test';
 import { numberedSlides } from '../../src/viewer/test-pdf';
-import { addClass, pdfFile, watchProblems } from './class-helpers';
+import { addClass, navBar, pdfFile, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked } from './lock-helpers';
 
 test.use({ serviceWorkers: 'block', timezoneId: 'America/Los_Angeles' });
@@ -22,7 +22,7 @@ async function fakeHelper(page: Page) {
   });
 }
 
-/** A class with yesterday's 30-minute lecture on slides 2-4, back on the home screen. */
+/** A class with yesterday's 30-minute lecture on slides 2-4, back on Tasks (the home page). */
 async function lectureYesterday(page: Page, className: string, minutes = 30) {
   await addClass(page, className);
   await page.getByRole('button', { name: 'What was covered?' }).click();
@@ -36,6 +36,8 @@ async function lectureYesterday(page: Page, className: string, minutes = 30) {
   await form.getByRole('button', { name: 'Save lecture' }).click();
   await expect(page.getByTestId('lecture-row')).toHaveCount(1);
   await page.getByRole('link', { name: '← Classes' }).click();
+  await navBar(page).getByRole('link', { name: 'Tasks' }).click();
+  await expect(page.getByRole('heading', { level: 2, name: 'Tasks' })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {

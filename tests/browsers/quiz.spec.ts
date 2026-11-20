@@ -4,7 +4,7 @@
 // service worker makes.
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { numberedSlides } from '../../src/viewer/test-pdf';
-import { addClass, pdfFile, watchProblems } from './class-helpers';
+import { addClass, pdfFile, toClasses, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked, unlockWithPassphrase } from './lock-helpers';
 
 test.use({ serviceWorkers: 'block' });
@@ -293,6 +293,7 @@ test('locking stops the background work: a late answer writes nothing', async ({
   await expect.poll(() => answered).toBe(true);
   await unlockWithPassphrase(page);
   await expect(page.getByTestId('bank-jobs')).toBeHidden();
+  await toClasses(page); // unlocking opens Tasks
   await page.getByTestId('class-row').getByRole('link').click();
   await quizLink(page).click();
   await expect(page.getByTestId('bank-size')).toContainText('No questions yet');

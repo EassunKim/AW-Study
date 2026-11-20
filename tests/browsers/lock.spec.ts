@@ -61,7 +61,7 @@ test('set up with a passphrase, then unlock after a reload', async ({ page }) =>
   await expect(save).toBeDisabled();
   await confirmRecoveryKey(page, recoveryKey);
   await save.click();
-  await expect(page.getByRole('heading', { level: 2, name: 'Classes' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Tasks', exact: true })).toBeVisible(); // the home page
   await addClassAndReturn(page, 'Biology');
 
   // A reload locks; a wrong passphrase is refused; the right one opens the same classes
