@@ -8,7 +8,7 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 
 Milestones 3 to 7 are **done and live** (deployed Nov 19, main 8ee4c61). Now: the **restyle** to
 Matt's and Nathan's design (`docs/design/README.md`, "Building it"; one issue and PR per step: step 1
-#68, step 2 #77, step 3 #75, step 4 #79 and step 6 #70 done; step 5 free). Then milestone 8 (first run and after-class prompts). Open question
+#68, step 2 #77, step 3 #75, step 4 #79, step 5 #82 and step 6 #70: **all done**). Then milestone 8 (first run and after-class prompts). Open question
 for Matt and Nathan before 8 starts: are after-class prompts when you next open the app enough for
 now, or do we want real push notifications (DESIGN, "Open questions")?
 
@@ -46,6 +46,7 @@ slides" and "M6: AI helper and quizzes":
 | Restyle step 2: the Tasks page screen (rows by class, drag, ticks, penguin) | #77 | Nathan's Claude | `src/ui/TasksScreen.tsx`, `src/ui/Penguin.tsx`, `src/ui/planning.ts`, which items Play runs in `src/ui/PlayScreen.tsx`, the daily minutes in Settings, the Tasks styles | **Done** (PR #78) |
 | Restyle step 3: the Classes page (a heading and menu per class, date buttons for lectures to fill in, a round +) | #75 | Matt's Claude | `src/ui/ClassesScreen.tsx`, `src/ui/ClassMenu.tsx`, `unfilledLectures` and `shortDate` in `src/ui/classes.ts`, the class routes' part and date, opening at them in `ClassScreen.tsx`, the Classes styles in `src/app.css` | **Done** (PR #76) |
 | Restyle step 4: Settings on one page (AI sign-in check, Compare models) | #79 | Matt's Claude | `src/ui/AiSettings.tsx`, `status()` in `src/ai/` (backend, http, fake, tests), one line of `SettingsScreen.tsx`, the quiz route's `/compare` and its prop in `QuizScreen.tsx`, `tests/browsers/settings.spec.ts` | **Done** (PR #80). Daily minutes came to Settings with #78 |
+| Restyle step 5: the other screens to match (setup, unlock, a class's page, What was covered?, the viewer, quizzes, Play) | #82 | Matt's Claude | the step 5 block at the end of `src/app.css`, `className="back"` on the back links | **Done** (PR #83). The restyle is finished |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -123,6 +124,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#82):** Restyle step 5, the last. Every other screen was checked on an iPhone-sized screen, dark
+  and light: setup, the recovery key, unlock, a class's page, What was covered?, an exam, the viewer, a quiz
+  (asked and answered) and Play. Fixed: cards and forms are outlines on the page's background, not filled
+  boxes; back links are a bold green arrow and name (`a.back`), not underlined; file pickers' buttons are
+  green pills in our font (they were the browser's serif); checkboxes are green; focus rings are green; and
+  Play's text was 1.2× too big (an old rule for the Play button, which is gone).
 - **Nov 20 (#79):** Restyle step 4, Settings on one page. New **AI** section: **Check AI sign-in** asks
   the helper's `GET /ai/whoami` (no AI used; only when pressed, so opening Settings sends nothing) and says
   "Signed in for AI as … 3 of 200 AI requests used today", or not signed in, or not allowed; **Sign in for

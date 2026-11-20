@@ -104,3 +104,25 @@ test('the font is bundled with the app: loaded from this site, within the securi
   for (const url of fonts) expect(url.startsWith(`${baseURL}/assets/lexend-`), url).toBe(true);
   expect(await problems()).toEqual([]);
 });
+
+test('the browser’s own controls follow the look: file pickers in our font, green checkboxes, quiet back links', async ({ page }) => {
+  await openUnlocked(page);
+  await addClass(page, 'COMP 2000');
+  const look = await page.evaluate(() => {
+    const file = document.querySelector('input[type="file"]')!;
+    const back = document.querySelector('a.back')!;
+    const root = getComputedStyle(document.documentElement);
+    return {
+      fileButtonFont: getComputedStyle(file, '::file-selector-button').fontFamily,
+      backUnderline: getComputedStyle(back).textDecorationLine,
+      backText: back.textContent,
+      fill: root.getPropertyValue('--fill').trim(),
+    };
+  });
+  expect(look.fileButtonFont).toMatch(/Lexend/);
+  expect(look.backText).toBe('← Classes');
+  expect(look.backUnderline).toBe('none');
+  await page.getByRole('button', { name: 'What was covered?' }).click();
+  const checkbox = page.getByRole('form', { name: 'What was covered?' }).getByRole('checkbox').first();
+  expect(await checkbox.evaluate((el) => getComputedStyle(el).accentColor)).toBe('rgb(159, 232, 112)'); // #9fe870
+});

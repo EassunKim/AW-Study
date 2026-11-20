@@ -25,7 +25,7 @@ export default function SlidesScreen({ courseId, deckId, first, last }: { course
       <section>
         <h2>Slides not found</h2>
         <p className="muted">They may have been deleted.</p>
-        <a href={course ? href({ name: 'class', courseId }) : href({ name: 'classes' })}>← Back</a>
+        <a className="back" href={course ? href({ name: 'class', courseId }) : href({ name: 'classes' })}>← Back</a>
       </section>
     );
   }
@@ -34,7 +34,7 @@ export default function SlidesScreen({ courseId, deckId, first, last }: { course
   return (
     <section className="slides-screen">
       <p>
-        <a href={href({ name: 'class', courseId })}>← {course.name}</a>
+        <a className="back" href={href({ name: 'class', courseId })}>← {course.name}</a>
       </p>
       <h2>
         {deck.title}

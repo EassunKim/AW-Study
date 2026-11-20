@@ -109,7 +109,7 @@ export function ClassScreen({ courseId, part, cover }: { courseId: string; part?
   return (
     <section>
       <p>
-        <a href={href({ name: 'classes' })}>← Classes</a>
+        <a className="back" href={href({ name: 'classes' })}>← Classes</a>
       </p>
       {editingClass ? (
         <ClassEditor
@@ -433,7 +433,7 @@ export function MissingClass() {
     <section>
       <h2>Class not found</h2>
       <p className="muted">It may have been deleted.</p>
-      <a href={href({ name: 'classes' })}>← Back to your classes</a>
+      <a className="back" href={href({ name: 'classes' })}>← Back to your classes</a>
     </section>
   );
 }
