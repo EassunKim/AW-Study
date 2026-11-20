@@ -233,7 +233,9 @@ test('Explain this and Ask about this send only the words and nearby slides, and
   // Ask about the whole slide straight away (the kept note may still be saving: it mustn't close the
   // new question); the question and answer are pinned as a note
   await notes.getByRole('button', { name: 'Keep as note' }).click();
-  await notes.getByRole('button', { name: 'Ask about this slide' }).click();
+  // Enter, not a click: when the kept note lands, the panel grows and scrolls, and on a slow WebKit a
+  // click aimed a moment earlier hit the toolbar beside the button (#81). The key goes to the button itself.
+  await notes.getByRole('button', { name: 'Ask about this slide' }).press('Enter');
   await expect(notes.getByTestId('annotation')).toHaveCount(1);
   await expect(notes.getByTestId('annotation')).toContainText('It means the third fixture.');
   await expect(page.getByTestId('mark')).toHaveCount(1);
