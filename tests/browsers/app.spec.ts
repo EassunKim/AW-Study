@@ -1,6 +1,6 @@
 // The built app in real browsers (desktop Chrome, an Android phone, an iPhone), served with the
 // headers visitors get.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { APP_NAME } from '../../src/brand';
 import { openUnlocked, unlockWithPassphrase } from './lock-helpers';
 

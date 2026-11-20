@@ -1,7 +1,7 @@
 // The look (#68, docs/design/README.md): the nav bar on the three main pages, the Phone / Light / Dark
 // setting (kept on the device, so the unlock screen has it too) and the bundled font. Desktop Chrome,
 // an Android phone and an iPhone (WebKit).
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { addClass, navBar, watchProblems } from './class-helpers';
 import { openUnlocked } from './lock-helpers';
 

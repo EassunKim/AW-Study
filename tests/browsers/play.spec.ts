@@ -1,7 +1,7 @@
 // The Tasks page (#77) and Play (#47) through the real screens, in desktop Chrome, an Android phone and
 // an iPhone (WebKit), on a clock the test controls (Wednesday Nov 18, 2026, 10:00 in Los Angeles).
 // /ai/ is answered by the test, like the helper (service workers off so Playwright sees it).
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { numberedSlides } from '../../src/viewer/test-pdf';
 import { addClass, navBar, openClass, pdfFile, toClasses, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked } from './lock-helpers';

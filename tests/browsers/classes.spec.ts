@@ -2,7 +2,7 @@
 // and an iPhone (WebKit): add a class, upload slides and say what a lecture covered, open them in
 // the viewer, and find everything again after a reload. Checks for errors and Content-Security-
 // Policy violations throughout. PDFs are made in the test.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { makePdf, numberedSlides } from '../../src/viewer/test-pdf';
 import { addClass, classRow, openClass, pdfFile, toClasses, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked } from './lock-helpers';

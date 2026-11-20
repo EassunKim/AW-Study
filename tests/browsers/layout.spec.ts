@@ -1,5 +1,5 @@
 // Layout checks from real-phone findings (#84), on desktop, Android and iPhone.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { numberedSlides } from '../../src/viewer/test-pdf';
 import { addClass, pdfFile, toClasses, watchProblems } from './class-helpers';
 import { openUnlocked } from './lock-helpers';

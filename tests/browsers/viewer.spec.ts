@@ -2,7 +2,7 @@
 // (src/viewer/test-pdf.ts). Desktop Chrome, Android and iPhone (WebKit). Checks there are no
 // errors and no Content-Security-Policy violations: PDF.js's worker, fonts and decoders must all
 // come from our own site.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { numberedSlides } from '../../src/viewer/test-pdf';
 
 /** Console errors, page errors and CSP violations, collected from the start. */

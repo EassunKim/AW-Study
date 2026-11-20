@@ -127,6 +127,16 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#81):** iPhone (WebKit) tests that timed out under load. Measured with all three projects at
+  48 workers on a 24-thread PC, `--repeat-each=4`. Three separate causes:
+  1. WebKit is about 3× slower than Chromium, so its long tests take up to 50 s under load. The iphone
+     project now has a 90 s test budget and 15 s for each `expect` (`playwright.config.ts`).
+  2. Some WebKit pages stopped drawing frames, so a click waited forever on "stable". This is the test
+     browser, not Honed. Every browser test now imports `test`/`expect` from
+     `tests/browsers/fixtures.ts`, which keeps a frame loop running in WebKit pages. Before: about one
+     stall a run. After: 0 in 3 runs (1,812 tests). A run without the loop stalled again.
+  3. A click on "Ask about this slide" right after "Keep as note" landed beside the button when the panel
+     scrolled. It's now pressed with Enter.
 - **Nov 20 (#87, part 2):** The AI helper's new `written` job writes short-answer questions for exam practice (each
   with 1-6 points a full answer makes, and its slide), checked by the helper and again on the device
   (`checkWritten`); `AiBackend.makeWrittenQuestions` (HTTP and fake). Grading uses the existing `grade` job.
@@ -408,6 +418,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **Import `test` and `expect` from `tests/browsers/fixtures.ts`, never from '@playwright/test'.**
+  Under load, a WebKit page can stop drawing frames, and Playwright's clicks then wait forever for
+  "stable" (#81). The fixture keeps WebKit pages drawing. A test that makes its own browser context
+  calls `keepDrawing(context, browserName)` (see `backup.spec.ts`).
 - **Playwright's `getByRole(..., { name: 'Classes' })` matches any name *containing* "classes", any
   case**, so "Lock your classes and slides" on the setup screen passed for the Classes page's heading
   (found in #68). Use `exact: true` for headings and links whose words appear elsewhere.
