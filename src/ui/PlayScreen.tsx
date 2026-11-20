@@ -38,7 +38,7 @@ export default function PlayScreen() {
             {finished} of {items.length} item{items.length === 1 ? '' : 's'} done. The planner has set when each comes back.
           </p>
         )}
-        <a className="button primary" href={href({ name: 'classes' })}>
+        <a className="button primary" href={href({ name: 'tasks' })}>
           Home
         </a>
       </section>
@@ -57,7 +57,7 @@ export default function PlayScreen() {
         <span className="muted small" data-testid="play-position">
           {index + 1} of {items.length}
         </span>
-        <a className="button" href={href({ name: 'classes' })}>
+        <a className="button" href={href({ name: 'tasks' })}>
           Stop for now
         </a>
       </div>

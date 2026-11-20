@@ -1,38 +1,63 @@
 /* Phone first: everything works one-handed on a narrow screen, tap targets are at least 44px
    (Apple's minimum), and nothing moves under your thumb. Light and dark follow the device. */
 
+/* Colours (docs/design/README.md, "Look"): grey #272727, white #f2f5f1 and green #9fe870. Light is
+   the default here; dark comes from the phone's setting unless Settings chose Light (src/ui/theme.ts
+   sets <html data-theme>), or from choosing Dark. --accent is green for text and outlines (darker in
+   light mode, where #9fe870 is too faint to read); --fill is green behind things (the selected
+   choice, a main button, the progress bar), with --on-fill on top. */
 :root {
-  --bg: #f8fafc;
+  --bg: #f2f5f1;
   --surface: #ffffff;
-  --text: #0f172a;
-  --muted: #475569;
-  --accent: #4f46e5;
-  --accent-text: #ffffff;
-  --border: #e2e8f0;
-  --danger: #b91c1c;
-  --right: #15803d;
-  --right-bg: #f0fdf4;
-  --wrong-bg: #fef2f2;
+  --text: #272727;
+  --muted: #5a6157;
+  --accent: #3b7d1a;
+  --fill: #9fe870;
+  --on-fill: #272727;
+  --accent-text: var(--on-fill);
+  --nav-current: #272727;
+  --border: #d3dacf;
+  --danger: #b42318;
+  --right: #2f6f12;
+  --right-bg: #e7f6dc;
+  --wrong-bg: #fdecea;
   --radius: 0.75rem;
-  color-scheme: light dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --pill: 999px;
+  color-scheme: light;
+  font-family: 'Lexend Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111827;
-    --surface: #1f2937;
-    --text: #f1f5f9;
-    --muted: #94a3b8;
-    --accent: #818cf8;
-    --accent-text: #111827;
-    --border: #334155;
-    --danger: #f87171;
-    --right: #4ade80;
-    --right-bg: #052e16;
-    --wrong-bg: #450a0a;
+  :root:not([data-theme='light']) {
+    --bg: #272727;
+    --surface: #313131;
+    --text: #f2f5f1;
+    --muted: #b3b9b0;
+    --accent: #9fe870;
+    --nav-current: #f2f5f1;
+    --border: #4b4f49;
+    --danger: #ff8a80;
+    --right: #9fe870;
+    --right-bg: #2e3b25;
+    --wrong-bg: #4a2624;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #272727;
+  --surface: #313131;
+  --text: #f2f5f1;
+  --muted: #b3b9b0;
+  --accent: #9fe870;
+  --nav-current: #f2f5f1;
+  --border: #4b4f49;
+  --danger: #ff8a80;
+  --right: #9fe870;
+  --right-bg: #2e3b25;
+  --wrong-bg: #4a2624;
+  color-scheme: dark;
 }
 
 * {
@@ -61,6 +86,10 @@ a {
 }
 
 .top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding-top: max(1rem, env(safe-area-inset-top));
 }
 
@@ -88,6 +117,7 @@ a {
 
 h2 {
   margin: 1rem 0 0.5rem;
+  color: var(--accent);
 }
 
 h3 {
@@ -117,11 +147,11 @@ button,
   justify-content: center;
   gap: 0.4rem;
   min-height: 44px;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
+  padding: 0.5rem 1.1rem;
+  border: 2px solid var(--accent);
+  border-radius: var(--pill); /* pill-shaped and outlined in green; the main one filled (.primary) */
+  background: transparent;
+  color: var(--accent);
   font: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -134,15 +164,15 @@ button:disabled {
 }
 
 .primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
+  background: var(--fill);
+  border-color: var(--fill);
+  color: var(--on-fill);
 }
 
 .danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: #ffffff;
+  color: var(--bg);
 }
 
 .wide {
@@ -234,18 +264,22 @@ kbd {
   border-radius: 0;
 }
 
+.segmented button + button {
+  margin-left: -2px; /* one outline between two buttons, not two */
+}
+
 .segmented button:first-child {
-  border-radius: var(--radius) 0 0 var(--radius);
+  border-radius: var(--pill) 0 0 var(--pill);
 }
 
 .segmented button:last-child {
-  border-radius: 0 var(--radius) var(--radius) 0;
+  border-radius: 0 var(--pill) var(--pill) 0;
 }
 
 .segmented button[aria-pressed='true'] {
-  background: var(--accent);
+  background: var(--fill);
   border-color: var(--accent);
-  color: var(--accent-text);
+  color: var(--on-fill);
 }
 
 /* --- Lists --- */
@@ -443,9 +477,9 @@ label.file input {
 
 .days button[aria-pressed='true'],
 .choices button[aria-pressed='true'] {
-  background: var(--accent);
+  background: var(--fill);
   border-color: var(--accent);
-  color: var(--accent-text);
+  color: var(--on-fill);
 }
 
 .choices button[aria-pressed='true'] .muted {
@@ -484,6 +518,9 @@ label.file input {
 }
 
 .option {
+  border-color: var(--border);
+  border-radius: var(--radius); /* long answers wrap: a pill would cut their corners */
+  color: var(--text);
   justify-content: flex-start;
   text-align: left;
   width: 100%;
@@ -672,4 +709,46 @@ button.link {
   background: var(--surface);
   border-radius: 0 var(--radius) var(--radius) 0;
   font-size: 0.9rem;
+}
+
+/* --- The nav bar (NavBar.tsx): a pill at the bottom of the three main pages --- */
+
+.nav-bar {
+  position: fixed;
+  left: 50%;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  justify-content: space-around;
+  gap: 0.5rem;
+  width: min(24rem, calc(100% - 2rem));
+  padding: 0.3rem;
+  border: 2px solid var(--accent);
+  border-radius: var(--pill);
+  background: var(--bg);
+}
+
+.nav-bar a {
+  display: grid;
+  place-items: center;
+  min-width: 4.5rem;
+  min-height: 44px;
+  border-radius: var(--pill);
+  color: var(--accent);
+}
+
+.nav-bar a[aria-current='page'] {
+  background: var(--fill);
+  color: var(--nav-current);
+}
+
+.nav-bar svg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+/* Room under the last thing on the page, so the bar never covers it */
+.foot.above-nav {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }

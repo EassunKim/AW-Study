@@ -44,7 +44,8 @@ Three moments: setting up once, telling Honed what each lecture covered, and the
 
 **A normal day**
 
-- The home screen is **a short checklist** of today's work, such as *Study CHEM 101, slides 21–30 (25 min)* or *Quiz: Week 3 (10 questions)*, with how much of today's time it uses.
+- The app has three main pages behind a nav bar at the bottom: **Tasks** (the home page), **Classes** and **Settings** (Nov 19; the look is `docs/design/`). Full-screen screens (a class, the slides, a quiz, Play) hide the bar and have a back link.
+- The home page is **a short checklist** of today's work, such as *Study CHEM 101, slides 21–30 (25 min)* or *Quiz: Week 3 (10 questions)*, with how much of today's time it uses.
 - A big **Play** button runs through the whole checklist in order. Each item is a **study session**: the slides in the viewer for most of the time, then a multiple-choice quiz when the time is up or when you press *I'm ready*. The score decides when that section comes back.
 - You can stop at any point; what's left stays on the list.
 

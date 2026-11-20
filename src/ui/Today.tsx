@@ -1,7 +1,8 @@
-// Today's checklist on the home screen (#47, DESIGN "A normal day"): what the planner fitted into
-// today's minutes, a big Play button that runs through it, what's waiting beyond today's time, and the
-// daily minutes setting.
+// Today's checklist on the Tasks page, the home page (#47, DESIGN "A normal day"): what the planner
+// fitted into today's minutes, a big Play button that runs through it, what's waiting beyond today's
+// time, and the daily minutes setting. (Its look changes to docs/design's rows by class in step 2.)
 import { useState, type FormEvent } from 'react';
+import { APP_NAME } from '../brand';
 import { DAILY_MINUTES_MAX, DAILY_MINUTES_MIN } from '../db/plan';
 import { href } from './route';
 import { describeItem, loadPlanning } from './planning';
@@ -18,11 +19,18 @@ export function Today() {
   const { plan, place } = data;
   const items = plan.today.filter((i) => place(i.sectionId));
   const later = plan.later.filter((i) => place(i.sectionId));
-  if (!data.hasLectures) return null; // nothing to plan until a lecture is recorded
+  if (!data.hasLectures) {
+    // Nothing to plan until a lecture is recorded
+    return (
+      <p className="muted" data-testid="tasks-empty">
+        Nothing to study yet. Add your classes in <a href={href({ name: 'classes' })}>Classes</a>, and after each lecture tell{' '}
+        {APP_NAME} what it covered.
+      </p>
+    );
+  }
 
   return (
-    <section className="today" aria-labelledby="today-title">
-      <h2 id="today-title">Today</h2>
+    <section className="today" aria-label="Today">
       <p className="muted small" data-testid="today-minutes">
         {plan.doneMinutes > 0 && `${plan.doneMinutes} min done · `}
         {items.length > 0 ? `${plan.plannedMinutes} min planned` : 'Nothing left for today'} of {plan.dailyMinutes} min a day{' '}

@@ -1,4 +1,4 @@
-// Settings: how you unlock (change or add the passphrase, add or remove passkeys, a new recovery
+// Settings: the colours (Phone, Light or Dark: a setting for this device, src/ui/theme.ts), how you unlock (change or add the passphrase, add or remove passkeys, a new recovery
 // key) and Lock now. Every change that adds a way in asks you to prove it's you first. Removing a
 // passkey only asks "are you sure", and the store refuses to remove your last way in.
 // Backups and storage (#18) are their own section, src/backup/BackupSettings.tsx.
@@ -18,8 +18,8 @@ import {
   usePrfSupported,
   useVault,
 } from './lock-parts';
-import { href } from './route';
 import { useStore } from './store-context';
+import { savedTheme, saveTheme, THEME_LABELS, THEMES, type Theme } from './theme';
 import { messageOf, useLoad } from './useLoad';
 
 type Task = 'passphrase' | 'passkey' | 'recovery';
@@ -65,7 +65,8 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
   return (
     <section className="settings" aria-labelledby="settings-title">
       <h2 id="settings-title">Settings</h2>
-      <a href={href({ name: 'classes' })}>← Back to your classes</a>
+
+      <ThemeSetting />
 
       <h3>How you unlock</h3>
       <ul className="list" aria-label="Ways to unlock">
@@ -301,5 +302,27 @@ function NewRecoveryKey({ changeKey, onDone }: { changeKey: CryptoKey; onDone: (
         </p>
       )}
     </div>
+  );
+}
+
+/** Phone (follows the phone's light or dark setting, the default), Light or Dark, for this device. */
+function ThemeSetting() {
+  const [theme, setTheme] = useState<Theme>(savedTheme);
+  const choose = (next: Theme) => {
+    saveTheme(next);
+    setTheme(next);
+  };
+  return (
+    <>
+      <h3 id="theme-title">Colours</h3>
+      <div className="segmented" role="group" aria-labelledby="theme-title">
+        {THEMES.map((t) => (
+          <button key={t} type="button" aria-pressed={theme === t} onClick={() => choose(t)}>
+            {THEME_LABELS[t]}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">Phone follows your phone’s light or dark setting. This is kept on this device only.</p>
+    </>
   );
 }
