@@ -8,7 +8,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { PASSPHRASE, setUpWithPassphrase, unlockWithPassphrase } from './lock-helpers';
-import { addClassAndReturn } from './class-helpers';
+import { addClassAndReturn, toClasses } from './class-helpers';
 
 const MARKER = 'Quokka5Marker';
 
@@ -61,6 +61,7 @@ test('download a backup with no plaintext in it, then restore it on a new device
   await fresh.goto('/');
   await fresh.getByRole('button', { name: /Restore a backup/ }).click();
   await restore(fresh, file, 'Restore');
+  await toClasses(fresh);
   await expect(fresh.getByTestId('class-row').filter({ hasText: `${MARKER} class` })).toBeVisible();
 
   // It stays: a reload locks, and the backup's passphrase opens it
@@ -79,7 +80,7 @@ test('restoring in Settings replaces this device’s data; a file that isn’t a
   await addClassAndReturn(page, 'In the backup');
   await page.getByRole('link', { name: 'Settings' }).click();
   const file = await downloadBackup(page);
-  await page.getByRole('link', { name: /Back to your classes/ }).click();
+  await toClasses(page);
   await addClassAndReturn(page, 'Added later');
 
   await page.getByRole('link', { name: 'Settings' }).click();
@@ -89,7 +90,7 @@ test('restoring in Settings replaces this device’s data; a file that isn’t a
 
   await restore(page, file, 'Replace with the backup');
   await expect(page.getByRole('status').filter({ hasText: 'Backup restored.' })).toBeVisible();
-  await page.getByRole('link', { name: /Back to your classes/ }).click();
+  await toClasses(page);
   await expect(page.getByTestId('class-row').filter({ hasText: 'In the backup' })).toBeVisible();
   await expect(page.getByTestId('class-row').filter({ hasText: 'Added later' })).toHaveCount(0);
   expect(errors).toEqual([]);

@@ -18,8 +18,18 @@ export async function watchProblems(page: Page): Promise<() => Promise<string[]>
 
 export const classRow = (page: Page, name: string) => page.getByTestId('class-row').filter({ hasText: name });
 
-/** From the classes screen: adds a class (optionally with lecture days and time), ending on its page. */
+/** The nav bar at the bottom of the three main pages (Tasks, Classes, Settings). */
+export const navBar = (page: Page) => page.getByRole('navigation', { name: 'Pages' });
+
+/** From any main page (Tasks, the home page, after unlocking): to the Classes page, through the nav bar. */
+export async function toClasses(page: Page) {
+  await navBar(page).getByRole('link', { name: 'Classes' }).click();
+  await expect(page.getByRole('heading', { level: 2, name: 'Classes', exact: true })).toBeVisible();
+}
+
+/** From a main page: adds a class (optionally with lecture days and time), ending on its page. */
 export async function addClass(page: Page, name: string, times?: { days: string[]; start: string; minutes: number }) {
+  if (!(await page.getByRole('button', { name: 'Add a class' }).isVisible())) await toClasses(page);
   await page.getByRole('button', { name: 'Add a class' }).click();
   const form = page.getByRole('form', { name: 'New class' });
   await form.getByLabel('Class name').fill(name);

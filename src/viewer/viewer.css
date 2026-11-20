@@ -21,8 +21,14 @@
   gap: 0.5rem;
 }
 
+.sv-bar {
+  font-size: 0.9rem;
+}
+
+/* Compact, so the bar stays on two lines on a phone (the app's pill buttons are roomier); still 44 px tall */
 .sv-bar button {
   min-width: 44px;
+  padding: 0.25rem 0.7rem;
 }
 
 .sv-position {
@@ -107,6 +113,7 @@
   padding: 2px;
   min-height: 0;
   border: 2px solid transparent;
+  border-radius: 0.25rem; /* a thumbnail, not one of the app's pill buttons */
   background: none;
 }
 

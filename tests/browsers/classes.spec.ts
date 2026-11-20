@@ -4,7 +4,7 @@
 // Policy violations throughout. PDFs are made in the test.
 import { expect, test, type Page } from '@playwright/test';
 import { makePdf, numberedSlides } from '../../src/viewer/test-pdf';
-import { addClass, classRow, pdfFile, watchProblems } from './class-helpers';
+import { addClass, classRow, pdfFile, toClasses, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked } from './lock-helpers';
 
 const lectureRow = (page: Page) => page.getByTestId('lecture-row');
@@ -24,6 +24,9 @@ async function record(page: Page, { date, minutes, first, last }: { date?: strin
 test('add a class, record a lecture with new slides, view them, and find it all after a reload', async ({ page }) => {
   const problems = await watchProblems(page);
   await openUnlocked(page);
+  // Tasks, the home page, has nothing yet and points to Classes
+  await expect(page.getByTestId('tasks-empty')).toBeVisible();
+  await toClasses(page);
   await expect(page.getByText('No classes yet')).toBeVisible();
 
   await addClass(page, 'CHEM 101', { days: ['Mon', 'Wed', 'Fri'], start: '10:30', minutes: 50 });
@@ -251,6 +254,7 @@ test('a device with milestone 2’s flashcards upgrades: the cards are dropped, 
   );
 
   await openUnlocked(page); // sets up: nothing to encrypt but the database itself
+  await toClasses(page);
   await expect(page.getByText('No classes yet')).toBeVisible();
   await addClass(page, 'After the upgrade');
   const state = await page.evaluate(
@@ -276,6 +280,7 @@ test('a device with milestone 2’s flashcards upgrades: the cards are dropped, 
 
 test('the time, minutes and date fields are one line tall, like the other fields', async ({ page }) => {
   await openUnlocked(page);
+  await toClasses(page);
   await page.getByRole('button', { name: 'Add a class' }).click();
   const form = page.getByRole('form', { name: 'New class' });
   const nameHeight = (await form.getByLabel('Class name').boundingBox())!.height;
@@ -316,6 +321,7 @@ function portraitPdf(): Uint8Array {
 // The fix's rules are checked directly, and the real proof is an iPhone.
 test('the new class form keeps every box inside it, side by side boxes lined up and not overlapping', async ({ page }) => {
   await openUnlocked(page);
+  await toClasses(page);
   await page.getByRole('button', { name: 'Add a class' }).click();
   const form = page.getByRole('form', { name: 'New class' });
 

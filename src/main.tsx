@@ -3,9 +3,14 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App, { StorageProblem } from './App';
 import { openStudyStore } from './db/store';
+import { applyTheme } from './ui/theme';
 import { updateReady } from './ui/update';
 import { messageOf } from './ui/useLoad';
+import '@fontsource-variable/lexend'; // bundled with the app (font-src 'self'), never fetched from another site
 import './app.css';
+
+// The colours the person chose for this device (src/ui/theme.ts), before anything is drawn
+applyTheme();
 
 const element = document.getElementById('root');
 if (!element) throw new Error('index.html has no #root element');

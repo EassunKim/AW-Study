@@ -3,8 +3,9 @@ import { href, parseRoute, type Route } from './route';
 
 describe('parseRoute', () => {
   it('reads every screen', () => {
-    expect(parseRoute('')).toEqual({ name: 'classes' });
-    expect(parseRoute('#/')).toEqual({ name: 'classes' });
+    expect(parseRoute('')).toEqual({ name: 'tasks' });
+    expect(parseRoute('#/')).toEqual({ name: 'tasks' });
+    expect(parseRoute('#/classes')).toEqual({ name: 'classes' });
     expect(parseRoute('#/class/abc-123')).toEqual({ name: 'class', courseId: 'abc-123' });
     expect(parseRoute('#/class/c1/slides/abc-123')).toEqual({ name: 'slides', courseId: 'c1', deckId: 'abc-123' });
     expect(parseRoute('#/class/c1/slides/abc-123/21-30')).toEqual({ name: 'slides', courseId: 'c1', deckId: 'abc-123', first: 21, last: 30 });
@@ -30,6 +31,8 @@ describe('parseRoute', () => {
       '#/deck/abc',
       '#/review/abc',
       '#/settings/x',
+      '#/classes/',
+      '#/classes/x',
       '#/class/<script>',
       `#/class/${'x'.repeat(65)}`,
     ]) {
@@ -39,6 +42,7 @@ describe('parseRoute', () => {
 
   it('round-trips with href', () => {
     const routes: Exclude<Route, { name: 'not-found' }>[] = [
+      { name: 'tasks' },
       { name: 'classes' },
       { name: 'class', courseId: 'c1' },
       { name: 'slides', courseId: 'c1', deckId: 'd1' },
