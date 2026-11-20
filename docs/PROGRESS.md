@@ -8,7 +8,7 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 
 Milestones 3 to 7 are **done and live** (deployed Nov 19, main 8ee4c61). Now: the **restyle** to
 Matt's and Nathan's design (`docs/design/README.md`, "Building it"; one issue and PR per step: step 1
-#68 and step 6 #70 done, steps 2 to 5 free). Then milestone 8 (first run and after-class prompts). Open question
+#68, step 3 #75 and step 6 #70 done; step 2 with Nathan's Claude (#72); steps 4 and 5 free). Then milestone 8 (first run and after-class prompts). Open question
 for Matt and Nathan before 8 starts: are after-class prompts when you next open the app enough for
 now, or do we want real push notifications (DESIGN, "Open questions")?
 
@@ -42,6 +42,7 @@ slides" and "M6: AI helper and quizzes":
 | Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **Done** (contract and storage PR #57, viewer tools PR #58). Try on an iPhone after deploy |
 | First-week quizzes: 10 questions, scaled by the section's slides (restyle step 6) | #70 | Nathan's Claude | `src/plan/rules.ts`, `src/plan/planner.ts`, `src/quiz/pick.ts`, one line of `src/ui/PlayScreen.tsx` | **Done** (PR #71) |
 | Restyle step 1: colours (dark and light), Phone / Light / Dark setting, the Lexend font, the nav bar, the Tasks, Classes and Settings pages | #68 | Matt's Claude | `src/app.css` (colours, buttons, nav bar), `src/ui/theme.ts`, `src/ui/NavBar.tsx`, `src/ui/TasksScreen.tsx`, the routes, the frame in `src/App.tsx`, the theme part of Settings, `tests/browsers/look.spec.ts` | **Done** (PR #69). Steps 2 to 5 are free |
+| Restyle step 3: the Classes page (a heading and menu per class, date buttons for lectures to fill in, a round +) | #75 | Matt's Claude | `src/ui/ClassesScreen.tsx`, `src/ui/ClassMenu.tsx`, `unfilledLectures` and `shortDate` in `src/ui/classes.ts`, the class routes' part and date, opening at them in `ClassScreen.tsx`, the Classes styles in `src/app.css` | **Done** (PR #76) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -119,6 +120,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#75):** Restyle step 3, the Classes page. Each class is a heading (opening its page) with a
+  three-dots menu: What lectures covered, Class details, Exams, Files (each opens the class's page at
+  that part: `#/class/<id>/<part>`) and Delete class (asks first). Under it, a round button per lecture
+  not filled in yet (`unfilledLectures`: every lecture time from a week before the class was added, or
+  the term's start if later, to now, never past the term's end), opening "What was covered?" for that
+  date (`#/class/<id>/cover/<date>`) and coming back to Classes when saved or cancelled. The latest
+  lectures list and each class's details left this page; they're on the class's page.
 - **Nov 19 (#68):** Restyle step 1. The colours from `docs/design/` are CSS variables in `src/app.css`, dark
   and light (`--accent` for green text and outlines, darker in light mode; `--fill`/`--on-fill` for green
   behind things). Settings has **Colours: Phone / Light / Dark** (`src/ui/theme.ts`: localStorage
@@ -351,6 +359,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **Playwright's `getByRole(..., { name: 'Classes' })` matches any name *containing* "classes", any
+  case**, so "Lock your classes and slides" on the setup screen passed for the Classes page's heading
+  (found in #68). Use `exact: true` for headings and links whose words appear elsewhere.
 - **On a phone, the slides have a fixed height with the notes panel under them (`annotate.css`), so
   anything that makes the viewer's bar taller pushes the thumbnails over the panel**, where they catch
   taps meant for Box and Pin a note. The restyle's roomier pill buttons and the wider Lexend did it on

@@ -1,85 +1,95 @@
-// The Classes page (#/classes, one of the three main pages): your classes, a reminder for each
-// lecture that hasn't been filled in, and the latest lectures with their slides. (Its look changes to
-// docs/design's headings and date buttons in step 3 of the restyle.)
+// The Classes page (#/classes, one of the three main pages; docs/design "Classes"): a heading for each
+// class with its menu (ClassMenu), and under it a round button for each lecture that hasn't been
+// filled in yet, by date, which opens "What was covered?" for it. A round + adds a class. Everything
+// else about a class is on its own page (ClassScreen), which the heading opens.
 import { useState } from 'react';
 import { deviceTimeZone, studyDay } from '../lib/studyDay';
-import type { CourseSummary, LectureWithSections, SlideDeck } from '../types/lecture';
-import { describeMeetings, formatDate, latestLecture, orderSections, relativeDay, slidesLabel } from './classes';
+import type { CourseSummary } from '../types/lecture';
+import { formatDate, shortDate, unfilledLectures } from './classes';
 import { ClassEditor } from './ClassEditor';
+import { ClassMenu } from './ClassMenu';
+import { ConfirmDialog } from './ConfirmDialog';
 import { go, href } from './route';
 import { DAY_START_HOUR } from './settings';
 import { useStore } from './store-context';
-import { useLoad } from './useLoad';
-
-const LATEST_SHOWN = 5;
+import { messageOf, useLoad } from './useLoad';
 
 interface ClassData {
   course: CourseSummary;
-  lectures: LectureWithSections[];
-  decks: SlideDeck[];
+  toFill: { date: string; minutes: number }[];
 }
 
 export function ClassesScreen() {
   const store = useStore();
   const now = new Date();
-  const today = studyDay(now, deviceTimeZone(), DAY_START_HOUR);
-  const { data, error } = useLoad(async (): Promise<ClassData[]> => {
+  const zone = deviceTimeZone();
+  const today = studyDay(now, zone, DAY_START_HOUR);
+  const { data, error, reload } = useLoad(async (): Promise<ClassData[]> => {
     const courses = await store.listCourses(today);
     return Promise.all(
       courses.map(async (course) => {
-        const [lectures, decks] = await Promise.all([store.listLectures(course.id), store.listSlideDecks(course.id)]);
-        return { course, lectures, decks };
+        const lectures = await store.listLectures(course.id);
+        const filled = new Set(lectures.map((l) => l.lecture.date));
+        return { course, toFill: unfilledLectures(course, filled, now, zone) };
       }),
     );
   }, [store, today]);
   const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState<CourseSummary | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;
   const thisYear = today.slice(0, 4);
 
-  const toFill = data.flatMap(({ course, lectures }) => {
-    const latest = latestLecture(course.meetings, now, deviceTimeZone());
-    return latest && !lectures.some((l) => l.lecture.date === latest.date) ? [{ course, date: latest.date }] : [];
-  });
-  const recent = data
-    .flatMap(({ course, lectures, decks }) => lectures.map((item) => ({ course, item, decks })))
-    .sort((a, b) => b.item.lecture.date.localeCompare(a.item.lecture.date) || b.item.lecture.createdAt.localeCompare(a.item.lecture.createdAt))
-    .slice(0, LATEST_SHOWN);
+  const confirmDelete = async () => {
+    const course = deleting!;
+    setDeleting(null);
+    setProblem(null);
+    try {
+      await store.deleteCourse(course.id);
+    } catch (err) {
+      setProblem(messageOf(err));
+    }
+    await reload();
+  };
 
   return (
     <section aria-labelledby="classes-title">
       <h2 id="classes-title">Classes</h2>
-      {toFill.length > 0 && (
-        <ul className="list" aria-label="Lectures to fill in">
-          {toFill.map(({ course, date }) => (
-            <li key={course.id} className="prompt">
-              <a href={href({ name: 'class', courseId: course.id })}>
-                {course.name}, {formatDate(date, thisYear)}: what did the lecture cover?
-              </a>
-            </li>
-          ))}
-        </ul>
+      {problem && (
+        <p className="error" role="alert">
+          {problem}
+        </p>
       )}
 
       {data.length === 0 && !adding && (
         <p className="muted">No classes yet. Add each class you’re taking, with its lecture times, so Honed can plan your study around them.</p>
       )}
-      <ul className="list" aria-label="Classes">
-        {data.map(({ course }) => (
-          <li key={course.id} className="item" data-testid="class-row">
-            <a className="item-main item-link" href={href({ name: 'class', courseId: course.id })}>
-              <strong className="item-name">{course.name}</strong>
-              <span className="muted small">{describeMeetings(course.meetings)}</span>
-              <span className="muted small">
-                {course.lectureCount} lecture{course.lectureCount === 1 ? '' : 's'} · {course.deckCount} slide deck{course.deckCount === 1 ? '' : 's'}
-              </span>
-              {course.nextExam && (
-                <span className="small">
-                  {course.nextExam.title}: {formatDate(course.nextExam.date, thisYear)} ({relativeDay(today, course.nextExam.date)})
-                </span>
-              )}
-            </a>
+      <ul className="class-list" aria-label="Your classes">
+        {data.map(({ course, toFill }) => (
+          <li key={course.id} className="class-block" data-testid="class-row">
+            <div className="class-head">
+              <h3 className="class-name">
+                <a href={href({ name: 'class', courseId: course.id })}>{course.name}</a>
+              </h3>
+              <ClassMenu courseId={course.id} name={course.name} onDelete={() => setDeleting(course)} />
+            </div>
+            {toFill.length > 0 && (
+              <ul className="date-buttons" aria-label={`Lectures to fill in for ${course.name}`}>
+                {toFill.map(({ date }) => (
+                  <li key={date}>
+                    <a
+                      className="date-button"
+                      href={href({ name: 'class', courseId: course.id, cover: date })}
+                      aria-label={`${course.name}, ${formatDate(date, thisYear)}: what was covered?`}
+                    >
+                      {shortDate(date)}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ul>
@@ -87,33 +97,24 @@ export function ClassesScreen() {
       {adding ? (
         <ClassEditor onCancel={() => setAdding(false)} onSaved={(course) => go({ name: 'class', courseId: course.id })} />
       ) : (
-        <button type="button" className={data.length === 0 ? 'primary wide' : 'wide'} onClick={() => setAdding(true)}>
-          Add a class
-        </button>
+        <div className="add-class">
+          <button type="button" className={data.length === 0 ? 'round primary' : 'round'} aria-label="Add a class" onClick={() => setAdding(true)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M10.5 4h3v6.5H20v3h-6.5V20h-3v-6.5H4v-3h6.5Z" />
+            </svg>
+          </button>
+        </div>
       )}
 
-      {recent.length > 0 && (
-        <>
-          <h3>Latest lectures</h3>
-          <ul className="list" aria-label="Latest lectures">
-            {recent.map(({ course, item, decks }) => (
-              <li key={item.lecture.id} className="item">
-                <div className="item-main">
-                  <span>
-                    <strong>{course.name}</strong> <span className="muted small">{formatDate(item.lecture.date, thisYear)}</span>
-                  </span>
-                  {orderSections(item.sections, decks).map((s) => (
-                    <a key={s.id} className="small" href={href({ name: 'slides', courseId: course.id, deckId: s.deckId, first: s.firstPage, last: s.lastPage })}>
-                      {decks.find((d) => d.id === s.deckId)?.title ?? 'Slides'}, {slidesLabel(s.firstPage, s.lastPage)}
-                    </a>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete “${deleting.name}”?`}
+          message="Its lectures, exams and slides will be deleted from this device. This can’t be undone."
+          confirmLabel="Delete"
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => void confirmDelete()}
+        />
       )}
-
     </section>
   );
 }

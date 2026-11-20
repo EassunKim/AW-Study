@@ -7,6 +7,9 @@ describe('parseRoute', () => {
     expect(parseRoute('#/')).toEqual({ name: 'tasks' });
     expect(parseRoute('#/classes')).toEqual({ name: 'classes' });
     expect(parseRoute('#/class/abc-123')).toEqual({ name: 'class', courseId: 'abc-123' });
+    expect(parseRoute('#/class/c1/exams')).toEqual({ name: 'class', courseId: 'c1', part: 'exams' });
+    expect(parseRoute('#/class/c1/details')).toEqual({ name: 'class', courseId: 'c1', part: 'details' });
+    expect(parseRoute('#/class/c1/cover/2026-11-15')).toEqual({ name: 'class', courseId: 'c1', cover: '2026-11-15' });
     expect(parseRoute('#/class/c1/slides/abc-123')).toEqual({ name: 'slides', courseId: 'c1', deckId: 'abc-123' });
     expect(parseRoute('#/class/c1/slides/abc-123/21-30')).toEqual({ name: 'slides', courseId: 'c1', deckId: 'abc-123', first: 21, last: 30 });
     expect(parseRoute('#/class/c1/slides/abc-123/4-4')).toEqual({ name: 'slides', courseId: 'c1', deckId: 'abc-123', first: 4, last: 4 });
@@ -32,6 +35,10 @@ describe('parseRoute', () => {
       '#/review/abc',
       '#/settings/x',
       '#/classes/',
+      '#/class/c1/grades',
+      '#/class/c1/cover/2026-02-30',
+      '#/class/c1/cover/2026-11-5',
+      '#/class/c1/cover/',
       '#/classes/x',
       '#/class/<script>',
       `#/class/${'x'.repeat(65)}`,
@@ -45,6 +52,9 @@ describe('parseRoute', () => {
       { name: 'tasks' },
       { name: 'classes' },
       { name: 'class', courseId: 'c1' },
+      { name: 'class', courseId: 'c1', part: 'lectures' },
+      { name: 'class', courseId: 'c1', part: 'files' },
+      { name: 'class', courseId: 'c1', cover: '2026-11-15' },
       { name: 'slides', courseId: 'c1', deckId: 'd1' },
       { name: 'slides', courseId: 'c1', deckId: 'd1', first: 2, last: 4 },
       { name: 'quiz', courseId: 'c1', sectionId: 's1' },
