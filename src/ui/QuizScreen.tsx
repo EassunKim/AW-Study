@@ -30,7 +30,8 @@ export interface Setting {
 
 type Answered = { item: QuizItem; shown: number; chosen: OptionIndex; right: boolean; ms: number };
 
-export default function QuizScreen({ courseId, sectionId }: { courseId: string; sectionId: string }) {
+/** `compare`: opened from Settings' Compare models, with the comparison already showing. */
+export default function QuizScreen({ courseId, sectionId, compare = false }: { courseId: string; sectionId: string; compare?: boolean }) {
   const store = useStore();
   const { data, error, reload } = useLoad(async () => {
     const [course, sections, decks] = await Promise.all([store.getCourse(courseId), store.listSections(courseId), store.listSlideDecks(courseId)]);
@@ -86,6 +87,7 @@ export default function QuizScreen({ courseId, sectionId }: { courseId: string; 
           attempts={attempts}
           onStart={() => setQuiz({ items: pickQuiz(questions, attempts, QUIZ_SIZE), startedAt: new Date().toISOString() })}
           onBankChanged={reload}
+          comparing={compare}
         />
       )}
     </section>
@@ -99,6 +101,7 @@ export function Start({
   attempts,
   size: wanted = QUIZ_SIZE,
   compare = true,
+  comparing: startComparing = false,
   onStart,
   onBankChanged,
 }: {
@@ -109,6 +112,8 @@ export function Start({
   size?: number;
   /** Offer "Compare models" (not in a study session). */
   compare?: boolean;
+  /** Open with "Compare models" already showing (from Settings). */
+  comparing?: boolean;
   onStart: () => void;
   onBankChanged: () => Promise<void>;
 }) {
@@ -138,7 +143,7 @@ export function Start({
     }
   };
 
-  const [comparing, setComparing] = useState(false);
+  const [comparing, setComparing] = useState(startComparing && compare && slides.length > 0);
   const last = attempts[0];
   const size = Math.min(wanted, questions.length);
 

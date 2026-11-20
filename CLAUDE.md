@@ -90,7 +90,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   knowing nothing of storage; `geometry.ts` turns screen positions into fractions of the page.
   `src/ui/DeckSlides.tsx` joins it to the store and the AI (the Slides and Play screens use it).
 - `src/types/annotation.ts` and `src/db/annotations.ts` (#56): notes and highlights, per deck page.
-- `src/ai/`: the app's side of AI. `AiBackend` (every AI job goes through it), `HttpAiBackend`
+- `src/ai/`: the app's side of AI. `AiBackend` (every AI job goes through it, and `status()`, the
+  helper's `/ai/whoami` for Settings' sign-in check), `HttpAiBackend`
   (our helper at `/ai/`), `FakeAiBackend` (tests and development), and `check.ts` (replies are
   checked on the device before use).
 - `src/ui/`: the screens (React). `route.ts` (hash routes, no router library), `store-context.ts`
@@ -110,7 +111,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   while unlocked, where a banner offers Reload and Lock applies it).
   `bank-jobs.tsx` (making question banks in the background after "What was covered?"; held by App).
   `CompareModels` (the same slides to Haiku, Sonnet and Opus, side by side; the helper allows only those
-  three by name). Planner (#47): `Today` (the checklist on the Tasks page, Play, the daily minutes), `PlayScreen`
+  three by name; opened from Settings through `#/class/<id>/quiz/<sectionId>/compare`). `AiSettings` (#79):
+  Settings' AI sign-in check and Compare models. Planner (#47): `Today` (the checklist on the Tasks page, Play, the daily minutes), `PlayScreen`
   (`#/play`: each item's session with its timer, the quiz offered at 80%, then the quiz), `planning.ts`
   (loads what the planner needs and the names to show).
 - `src/plan/`: the planner (#47), pure, with tests: `planner.ts` works out today's checklist from the

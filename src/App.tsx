@@ -86,7 +86,7 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
       )}
       {route.name === 'quiz' && (
         <Suspense fallback={<p className="muted">Opening the quiz…</p>}>
-          <QuizScreen key={href(route)} courseId={route.courseId} sectionId={route.sectionId} />
+          <QuizScreen key={href(route)} courseId={route.courseId} sectionId={route.sectionId} compare={route.compare} />
         </Suspense>
       )}
       {route.name === 'play' && (

@@ -62,7 +62,16 @@ export interface AskRequest {
   slides: SlideText[];
 }
 
+/** Who the helper sees you as and today's use (its GET /ai/whoami), for Settings. Uses no AI. */
+export interface AiStatus {
+  email: string;
+  usedToday: number;
+  dailyLimit: number;
+}
+
 export interface AiBackend {
+  /** Whether you're signed in for AI; fails like the jobs do ('signed-out', 'not-allowed', 'offline'...). */
+  status(signal?: AbortSignal): Promise<AiStatus>;
   makeQuestions(request: MakeQuestionsRequest, signal?: AbortSignal): Promise<McQuestion[]>;
   gradeAnswer(request: GradeRequest, signal?: AbortSignal): Promise<Grade>;
   explain(request: ExplainRequest, signal?: AbortSignal): Promise<string>;

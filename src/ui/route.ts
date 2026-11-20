@@ -16,7 +16,7 @@ export type Route =
   | { name: 'classes' }
   | { name: 'class'; courseId: string; part?: ClassPart; cover?: string }
   | { name: 'slides'; courseId: string; deckId: string; first?: number; last?: number }
-  | { name: 'quiz'; courseId: string; sectionId: string }
+  | { name: 'quiz'; courseId: string; sectionId: string; compare?: boolean }
   | { name: 'play' }
   | { name: 'settings' }
   | { name: 'not-found' };
@@ -36,6 +36,7 @@ const PATTERNS: [RegExp, (m: RegExpMatchArray) => Route | null][] = [
       Number(m[3]) <= Number(m[4]) ? { name: 'slides', courseId: m[1]!, deckId: m[2]!, first: Number(m[3]), last: Number(m[4]) } : null,
   ],
   [new RegExp(`^#/class/${ID}/quiz/${ID}$`), (m) => ({ name: 'quiz', courseId: m[1]!, sectionId: m[2]! })],
+  [new RegExp(`^#/class/${ID}/quiz/${ID}/compare$`), (m) => ({ name: 'quiz', courseId: m[1]!, sectionId: m[2]!, compare: true })],
   [/^#\/play$/, () => ({ name: 'play' })],
   [/^#\/settings$/, () => ({ name: 'settings' })],
 ];
@@ -69,7 +70,7 @@ export function href(route: Exclude<Route, { name: 'not-found' }>): string {
       return route.first && route.last ? `${deck}/${route.first}-${route.last}` : deck;
     }
     case 'quiz':
-      return `#/class/${route.courseId}/quiz/${route.sectionId}`;
+      return `#/class/${route.courseId}/quiz/${route.sectionId}${route.compare ? '/compare' : ''}`;
     case 'play':
       return '#/play';
     case 'settings':

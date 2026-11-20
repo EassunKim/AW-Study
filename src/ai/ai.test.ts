@@ -71,6 +71,27 @@ describe('HttpAiBackend: requests', () => {
   });
 });
 
+describe('HttpAiBackend: status', () => {
+  it('asks /ai/whoami with a GET (no body, no AI used) and checks the answer', async () => {
+    const { seen, fetcher } = fakeFetch(() => json(200, { email: 'matt@example.com', ready: true, usedToday: 3, dailyLimit: 200 }));
+    expect(await new HttpAiBackend('/ai/', fetcher).status()).toEqual({ email: 'matt@example.com', usedToday: 3, dailyLimit: 200 });
+    expect(seen.map((s) => s.url)).toEqual(['/ai/whoami']);
+    expect(seen[0]!.init.method).toBe('GET');
+    expect(seen[0]!.init.body).toBeUndefined();
+    expect(seen[0]!.init.credentials).toBe('same-origin');
+    expect(seen[0]!.init.redirect).toBe('manual');
+  });
+  it('says signed out, not allowed or unreadable like the jobs do', async () => {
+    const status = (response: () => Response) => new HttpAiBackend('/ai/', fakeFetch(response).fetcher).status();
+    expect(await codeOf(status(() => json(401, { error: 'x' })))).toBe('signed-out');
+    expect(await codeOf(status(() => new Response(null, { status: 302, headers: { location: 'https://access.example' } })))).toBe('signed-out');
+    expect(await codeOf(status(() => json(403, { email: 'x@example.com', ready: false, error: 'This account can’t use the AI helper.' })))).toBe('not-allowed');
+    expect(await codeOf(status(() => json(200, { email: 'x@example.com', usedToday: -1, dailyLimit: 200 })))).toBe('unavailable');
+    expect(await codeOf(status(() => json(200, { email: 7, usedToday: 0, dailyLimit: 200 })))).toBe('unavailable');
+    expect(await codeOf(status(() => json(200, { usedToday: 0, dailyLimit: 200 })))).toBe('unavailable');
+  });
+});
+
 describe('HttpAiBackend: errors', () => {
   const ai = (response: () => Response) => new HttpAiBackend('/ai/', fakeFetch(response).fetcher);
   const explain = (backend: HttpAiBackend) => backend.explain({ selection: 'x', slides: SLIDES });
