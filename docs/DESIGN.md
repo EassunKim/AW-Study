@@ -44,7 +44,7 @@ Three moments: setting up once, telling Honed what each lecture covered, and the
 
 **A normal day**
 
-- The home screen is **a short checklist** of today's work, such as *Study CHEM 101, slides 21–30 (25 min)* or *Quiz: Week 3 (5 questions)*, with how much of today's time it uses.
+- The home screen is **a short checklist** of today's work, such as *Study CHEM 101, slides 21–30 (25 min)* or *Quiz: Week 3 (10 questions)*, with how much of today's time it uses.
 - A big **Play** button runs through the whole checklist in order. Each item is a **study session**: the slides in the viewer for most of the time, then a multiple-choice quiz when the time is up or when you press *I'm ready*. The score decides when that section comes back.
 - You can stop at any point; what's left stays on the list.
 
@@ -90,6 +90,7 @@ The planner turns your sections, their quiz history, upcoming exams and **your d
 
 - Its budget is the lecture's length, shared between the lecture's sections by page count. A 50-minute lecture covering one section gives that section 50 minutes.
 - That budget is spread over three study sessions in the first week: roughly **day 1, day 3 and day 7** after the lecture, each about a third of the budget, each ending in a quiz.
+- **Those quizzes are 10 questions by default** (Nov 19; was 5), more or fewer with how much the section covers: half a question a slide, so 20 slides make 10, never under 5 or over 15. The first quiz after the first week has no score to size it yet, so it's the same size; after that the score table below decides. A quiz started by hand from a class asks 10.
 
 **After the first week: quizzes keep it fresh**
 

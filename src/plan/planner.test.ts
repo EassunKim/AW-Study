@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Lecture, Section } from '../types/lecture';
 import type { StudySession } from '../types/plan';
 import type { QuizAttempt } from '../types/quiz';
-import { addDays, afterScore, planDay, quizMinutes, thirds, type PlanInput } from './planner';
+import { addDays, afterScore, firstWeekQuizSize, planDay, quizMinutes, thirds, type PlanInput } from './planner';
 
 let n = 0;
 const at = (day: string, hour = 12) => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
@@ -85,6 +85,15 @@ describe('pieces', () => {
     expect(afterScore(0.2, 18)).toEqual({ gap: 1, size: 10, extraMinutes: 20 });
     expect(quizMinutes(5)).toBe(4); // 200 seconds
   });
+
+  it('a first-week quiz is sized by the section: 10 for 20 slides, half a question a slide, 5 to 15', () => {
+    const pages = (firstPage: number, lastPage: number) => firstWeekQuizSize({ firstPage, lastPage });
+    expect(pages(21, 40)).toBe(10); // the default
+    expect(pages(1, 24)).toBe(12);
+    expect(pages(1, 15)).toBe(8); // 7.5 rounds up
+    expect(pages(1, 6)).toBe(5); // never under 5
+    expect(pages(1, 60)).toBe(15); // never over 15
+  });
 });
 
 describe('a new section’s first week', () => {
@@ -140,6 +149,15 @@ describe('after the first week: quizzes by score', () => {
     expect(plan('2026-11-14', parts()).today).toEqual([]);
     expect(summary(plan('2026-11-15', parts()).today)).toEqual([`quiz:${s.id}:4/5q`]);
     expect(plan('2026-11-20', parts()).today[0]!.overdueDays).toBe(5); // missed days roll forward
+  });
+
+  it('a bigger section gets bigger first-week quizzes, and so does its first quiz after (no score yet)', () => {
+    const big = { ...section(l), firstPage: 1, lastPage: 30 };
+    expect(summary(plan('2026-11-02', { lectures: [l], sections: [big] }).today)).toEqual([`study1:${big.id}:17/15q`]);
+    const done = [studied(big, '2026-11-02', 1), studied(big, '2026-11-04', 2), studied(big, '2026-11-08', 3)];
+    expect(summary(plan('2026-11-15', { lectures: [l], sections: [big], sessions: done }).today)).toEqual([`quiz:${big.id}:10/15q`]);
+    const after = [quizzed(big, '2026-11-15', 1)]; // then the score table takes over
+    expect(summary(plan('2026-12-03', { lectures: [l], sections: [big], sessions: done, attempts: after }).today)).toEqual([`quiz:${big.id}:2/3q`]);
   });
 
   it('90% or more: 2.5x the gap, 3 questions; 70-89%: 1.5x, 5 questions', () => {

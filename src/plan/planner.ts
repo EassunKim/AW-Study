@@ -51,6 +51,13 @@ export function quizMinutes(n: number): number {
   return Math.ceil((n * RULES.secondsPerQuestion) / 60);
 }
 
+/** Questions in a first-week quiz for this section: by its number of slides (RULES.firstWeekQuiz). */
+export function firstWeekQuizSize(section: Pick<Section, 'firstPage' | 'lastPage'>): number {
+  const { perSlide, min, max } = RULES.firstWeekQuiz;
+  const slides = section.lastPage - section.firstPage + 1;
+  return Math.min(max, Math.max(min, Math.round(slides * perSlide)));
+}
+
 /** A budget in thirds, whole minutes that add up (the earlier sessions get the odd minutes). */
 export function thirds(budget: number): [number, number, number] {
   const base = Math.floor(budget / 3);
@@ -97,7 +104,7 @@ export function sectionItems(input: PlanInput, section: Section, lecture: Lectur
     const afterPrevious = i > 0 ? addDays(doneOn[i - 1]!, offsets[i]! - offsets[i - 1]!) : earliest;
     const date = earliest > afterPrevious ? earliest : afterPrevious;
     if (date <= input.today) {
-      items.push({ kind: 'study', sectionId: section.id, step: (i + 1) as 1 | 2 | 3, minutes: minutes[i]!, quizSize: RULES.firstWeekQuizSize, ...due(date) });
+      items.push({ kind: 'study', sectionId: section.id, step: (i + 1) as 1 | 2 | 3, minutes: minutes[i]!, quizSize: firstWeekQuizSize(section), ...due(date) });
     }
     break; // one step at a time
   }
@@ -106,7 +113,7 @@ export function sectionItems(input: PlanInput, section: Section, lecture: Lectur
   if (firstWeekDone) {
     let gap = RULES.firstGapDays;
     let next = addDays(firstWeekDone, gap);
-    let size = RULES.firstWeekQuizSize;
+    let size = firstWeekQuizSize(section);
     for (const a of attempts) {
       const on = day(a.finishedAt);
       if (on <= firstWeekDone) continue; // the first week's own quizzes

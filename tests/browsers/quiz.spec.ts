@@ -76,14 +76,14 @@ test('make a section’s questions with AI, take a quiz with feedback and the sl
   const aiCalls: string[] = [];
   await page.route('**/ai/**', (route) => (aiCalls.push(route.request().url()), route.abort()));
 
-  await page.getByRole('button', { name: 'Start the quiz (5 questions)' }).click();
-  for (let n = 1; n <= 5; n++) {
-    await expect(page.getByTestId('quiz-position')).toHaveText(`Question ${n} of 5`);
+  await page.getByRole('button', { name: 'Start the quiz (10 questions)' }).click();
+  for (let n = 1; n <= 10; n++) {
+    await expect(page.getByTestId('quiz-position')).toHaveText(`Question ${n} of 10`);
     const answers = page.getByRole('group', { name: 'Answers' });
-    const pick = n <= 3 ? /Right/ : /Wrong/; // three right, two wrong
+    const pick = n <= 8 ? /Right/ : /Wrong/; // eight right, two wrong
     await answers.getByRole('button', { name: pick }).click();
     const feedback = page.getByTestId('quiz-feedback');
-    if (n <= 3) await expect(feedback).toContainText('Right.');
+    if (n <= 8) await expect(feedback).toContainText('Right.');
     else await expect(feedback).toContainText(/Not quite\. The answer is [A-D]: Right \d+\./);
     await expect(feedback).toContainText(/Slide \d explains it\./);
     await expect(answers.getByRole('button')).toHaveCount(4);
@@ -94,19 +94,19 @@ test('make a section’s questions with AI, take a quiz with feedback and the sl
       await feedback.getByRole('button', { name: /Show slide/ }).click();
       await expect(page.getByTestId('slide-position')).toHaveText(`Slide ${slide} of 4`);
     }
-    await feedback.getByRole('button', { name: n < 5 ? 'Next question' : 'See your score' }).click();
+    await feedback.getByRole('button', { name: n < 10 ? 'Next question' : 'See your score' }).click();
   }
-  await expect(page.getByTestId('quiz-score')).toHaveText('3 of 5 right (60%)');
+  await expect(page.getByTestId('quiz-score')).toHaveText('8 of 10 right (80%)');
   await expect(page.getByTestId('quiz-done').getByRole('listitem')).toHaveCount(2); // the two to look at again
   expect(aiCalls).toEqual([]);
 
   // The score stays: on the quiz page, on the class page, and after a reload
   await page.getByRole('button', { name: 'Done' }).click();
-  await expect(page.getByTestId('last-score')).toHaveText('Last quiz: 3 of 5 right (60%)');
+  await expect(page.getByTestId('last-score')).toHaveText('Last quiz: 8 of 10 right (80%)');
   await page.getByRole('link', { name: '← BIO 110' }).click();
-  await expect(page.getByTestId('section-last-quiz')).toContainText('3 of 5 right (60%)');
+  await expect(page.getByTestId('section-last-quiz')).toContainText('8 of 10 right (80%)');
   await reloadUnlocked(page);
-  await expect(page.getByTestId('section-last-quiz')).toContainText('3 of 5 right (60%)');
+  await expect(page.getByTestId('section-last-quiz')).toContainText('8 of 10 right (80%)');
   expect(await problems()).toEqual([]);
 });
 
@@ -236,7 +236,7 @@ test('saving what was covered makes the quiz questions in the background, so the
   await page.getByTestId('class-row').getByRole('link').click();
   await quizLink(page).click();
   await expect(page.getByTestId('bank-size')).toHaveText('10 questions in this section’s bank.');
-  await expect(page.getByRole('button', { name: 'Start the quiz (5 questions)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start the quiz (10 questions)' })).toBeVisible();
   expect(await problems()).toEqual([]);
 });
 

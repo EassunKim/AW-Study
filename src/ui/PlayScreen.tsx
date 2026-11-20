@@ -5,7 +5,7 @@
 // viewer (PDF.js).
 import { useEffect, useRef, useState } from 'react';
 import type { StudyStore } from '../db/store';
-import { pickQuiz, type QuizItem } from '../quiz/pick';
+import { pickQuiz, QUIZ_SIZE, type QuizItem } from '../quiz/pick';
 import type { PlanItem } from '../plan/planner';
 import type { Question, QuizAttempt } from '../types/quiz';
 import { DeckSlides } from './DeckSlides';
@@ -73,7 +73,7 @@ function PlayItem({ item, place, store, onDone, last }: { item: PlanItem; place:
   if (phase === 'study') {
     return <StudyTime item={item} place={place} store={store} onEnd={() => (item.kind === 'extra' ? onDone() : setPhase('quiz'))} />;
   }
-  return <PlayQuiz place={place} size={'quizSize' in item ? item.quizSize : 5} onDone={onDone} last={last} />;
+  return <PlayQuiz place={place} size={'quizSize' in item ? item.quizSize : QUIZ_SIZE} onDone={onDone} last={last} />;
 }
 
 function StudyTime({ item, place, store, onEnd }: { item: PlanItem; place: ItemPlace; store: StudyStore; onEnd: () => void }) {
