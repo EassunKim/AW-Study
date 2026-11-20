@@ -37,6 +37,19 @@ export interface MakeQuestionsRequest {
   model?: AiModel;
 }
 
+/** Short-answer questions for exam practice (#87): the slides to ask about and how many. */
+export interface WrittenRequest {
+  pages: SlideText[];
+  count: number; // 1-10
+}
+
+/** A short-answer question as the AI writes it: graded later (gradeAnswer) against its points. */
+export interface WrittenQuestion {
+  question: string;
+  points: string[]; // 1-6, what a full answer says
+  page: number; // one of the slides sent
+}
+
 export interface GradeRequest {
   question: string;
   /** What a full answer says, one point each. */
@@ -73,6 +86,8 @@ export interface AiBackend {
   /** Whether you're signed in for AI; fails like the jobs do ('signed-out', 'not-allowed', 'offline'...). */
   status(signal?: AbortSignal): Promise<AiStatus>;
   makeQuestions(request: MakeQuestionsRequest, signal?: AbortSignal): Promise<McQuestion[]>;
+  /** Short-answer questions for exam practice (#87), checked on the device like the others. */
+  makeWrittenQuestions(request: WrittenRequest, signal?: AbortSignal): Promise<WrittenQuestion[]>;
   gradeAnswer(request: GradeRequest, signal?: AbortSignal): Promise<Grade>;
   explain(request: ExplainRequest, signal?: AbortSignal): Promise<string>;
   ask(request: AskRequest, signal?: AbortSignal): Promise<string>;

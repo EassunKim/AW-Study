@@ -6,6 +6,7 @@
 // A lecture is done when its quiz is done (Nathan, Nov 19): slide time alone never ticks anything.
 import { studyDay } from '../lib/studyDay';
 import { daysBetween, planDay, quizMinutes, type PlanInput, type PlanItem } from './planner';
+import type { Exam } from '../types/lecture';
 import { RULES } from './rules';
 
 export type ClassStatus = 'exam-soon' | 'new' | 'review' | 'done';
@@ -28,6 +29,8 @@ export interface TasksDay {
   /** 0 to 1: how much of today's work is done (see `progress`). 1 when there's nothing today. */
   progress: number;
   overBudget: boolean;
+  /** Exams whose sections took today past the daily minutes (#86): the page says so. */
+  examsOver: Exam[];
 }
 
 export interface TasksInput extends PlanInput {
@@ -75,7 +78,7 @@ export function tasksForDay(input: TasksInput): TasksDay {
     const items = byCourse.get(id)!;
     return { courseId: id, items, status: statusOf(items, input.nextExam[id] ?? null, input.today) };
   });
-  return { classes, progress: progress(classes.flatMap((c) => c.items)), overBudget: plan.overBudget };
+  return { classes, progress: progress(classes.flatMap((c) => c.items)), overBudget: plan.overBudget, examsOver: plan.examsOver };
 }
 
 /** Done when every item is; otherwise an exam within RULES.examSoonDays, then anything new, then review. */

@@ -71,6 +71,37 @@ describe('HttpAiBackend: requests', () => {
   });
 });
 
+describe('HttpAiBackend: written questions (#87)', () => {
+  const asked = { pages: SLIDES, count: 2 };
+  const page = SLIDES[0]!.page;
+  const q = (over: Record<string, unknown> = {}) => ({ question: 'Why?', points: ['one', 'two'], page, ...over });
+
+  it('posts to /ai/written and keeps the questions that pass every check, up to the count', async () => {
+    const { seen, fetcher } = fakeFetch(() =>
+      json(200, {
+        questions: [
+          q(),
+          q({ question: 'why?' }), // the same question again
+          q({ question: 'No points?', points: [] }),
+          q({ question: 'Seven points?', points: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }),
+          q({ question: 'An empty point?', points: ['a', ' '] }),
+          q({ question: 'Another slide?', page: 999 }),
+          q({ question: 'Second' }),
+          q({ question: 'Third' }),
+        ],
+      }),
+    );
+    expect(await new HttpAiBackend('/ai/', fetcher).makeWrittenQuestions(asked)).toEqual([q(), q({ question: 'Second' })]);
+    expect(seen.map((s) => s.url)).toEqual(['/ai/written']);
+    expect(JSON.parse(seen[0]!.init.body as string)).toEqual(asked);
+  });
+
+  it('none usable is an error', async () => {
+    const ai = new HttpAiBackend('/ai/', fakeFetch(() => json(200, { questions: [q({ page: 999 })] })).fetcher);
+    expect(await codeOf(ai.makeWrittenQuestions(asked))).toBe('unavailable');
+  });
+});
+
 describe('HttpAiBackend: status', () => {
   it('asks /ai/whoami with a GET (no body, no AI used) and checks the answer', async () => {
     const { seen, fetcher } = fakeFetch(() => json(200, { email: 'matt@example.com', ready: true, usedToday: 3, dailyLimit: 200 }));

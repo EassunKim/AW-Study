@@ -3,7 +3,7 @@
 // /ai/ is answered by the test, like the helper (service workers off so Playwright sees it).
 import { expect, test, type Page } from './fixtures';
 import { numberedSlides } from '../../src/viewer/test-pdf';
-import { addClass, navBar, pdfFile, watchProblems } from './class-helpers';
+import { addClass, navBar, openClass, pdfFile, toClasses, watchProblems } from './class-helpers';
 import { openUnlocked, reloadUnlocked } from './lock-helpers';
 
 test.use({ serviceWorkers: 'block', timezoneId: 'America/Los_Angeles' });
@@ -220,5 +220,36 @@ test('the daily minutes, in Settings, decide what fits today; the rest waits', a
   await expect(classes(page)).toHaveCount(1);
   await navBar(page).getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByRole('form', { name: 'Study time' }).getByLabel('Minutes a day')).toHaveValue('10');
+  expect(await problems()).toEqual([]);
+});
+
+test('before an exam its class comes first, even past the daily minutes, and the page says why (#86)', async ({ page }) => {
+  const problems = await watchProblems(page);
+  await openUnlocked(page);
+  await lectureYesterday(page, 'CHEM 101', 60);
+  await lectureYesterday(page, 'PHYS 150', 60);
+
+  // PHYS 150 has a midterm in 5 days (today is Nov 18)
+  await toClasses(page);
+  await openClass(page, 'PHYS 150');
+  await page.getByRole('button', { name: 'Add an exam' }).click();
+  const examForm = page.getByRole('form', { name: 'New exam' });
+  await examForm.getByLabel('Title (optional)').fill('Midterm 1');
+  await examForm.getByLabel('Exam date').fill('2026-11-23');
+  await examForm.getByRole('button', { name: 'Add exam' }).click();
+  await expect(page.getByTestId('exam-row')).toContainText('Midterm 1');
+  await page.getByRole('link', { name: '← Classes' }).click();
+
+  // Ten minutes a day: PHYS 150's 20-minute session is still planned, and CHEM 101 waits
+  await navBar(page).getByRole('link', { name: 'Settings' }).click();
+  const form = page.getByRole('form', { name: 'Study time' });
+  await form.getByLabel('Minutes a day').fill('10');
+  await form.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved: 10 minutes a day.');
+  await navBar(page).getByRole('link', { name: 'Tasks' }).click();
+  await expect(classes(page)).toHaveCount(1);
+  await expect(classNamed(page, 'PHYS 150')).toBeVisible();
+  await expect(statusOf(page, 'PHYS 150')).toHaveText('Exam soon');
+  await expect(page.getByTestId('exam-note')).toHaveText('More than your daily time today, to get you ready for PHYS 150’s Midterm 1 (in 5 days).');
   expect(await problems()).toEqual([]);
 });

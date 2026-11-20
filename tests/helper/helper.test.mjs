@@ -244,6 +244,22 @@ describe('the other jobs', () => {
     expect((await post('grade', grade)).status).toBe(502);
   });
 
+  const written = (page = 21) => ({ question: 'Why do covalent bonds form?', points: ['atoms share electrons', 'to fill their outer shells'], page });
+
+  it('written: short-answer questions with their points, each from a slide that was sent (#87)', async () => {
+    await start([reply({ questions: [written(), written(22), written()] })]);
+    const response = await post('written', { pages: SLIDES, count: 2 });
+    expect(response.status).toBe(200);
+    expect((await response.json()).questions).toEqual([written(), written(22)]); // no more than asked for
+    expect(calls()[0].stdin).toContain('short-answer exam questions');
+  });
+
+  it('written: a question about a slide not sent, or with no points, is refused (and retried)', async () => {
+    await start([reply({ questions: [written(99)] }), reply({ questions: [{ ...written(), points: [] }] })]);
+    expect((await post('written', { pages: SLIDES, count: 1 })).status).toBe(502);
+    expect(calls()).toHaveLength(2);
+  });
+
   it('explain and ask: text', async () => {
     await start([reply({ text: 'An explanation.' })]);
     expect(await (await post('explain', { selection: 'covalent', slides: SLIDES })).json()).toEqual({ text: 'An explanation.' });
@@ -268,6 +284,8 @@ describe('checking requests', () => {
     ['too many slides', 'questions', { pages: Array.from({ length: 61 }, (_, i) => ({ page: i + 1, text: 'x' })), count: 1 }],
     ['text that isn’t text', 'questions', { pages: [{ page: 1, text: 5 }], count: 1 }],
     ['grade with no points', 'grade', { question: 'q', points: [], answer: 'a', slides: SLIDES }],
+    ['written with no count', 'written', { pages: SLIDES }],
+    ['too many written questions', 'written', { pages: SLIDES, count: 11 }],
     ['grade with an answer too long', 'grade', { question: 'q', points: ['p'], answer: 'x'.repeat(4_001), slides: SLIDES }],
     ['explain with no selection', 'explain', { selection: '', slides: SLIDES }],
     ['ask with no question', 'ask', { slides: SLIDES }],

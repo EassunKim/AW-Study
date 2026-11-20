@@ -1,10 +1,10 @@
 // The planner's rules, one by one (DESIGN "Planning the day"). Times are in UTC with the day starting
 // at 4 a.m., so a study day is simply the date of a time between 04:00 and the next 04:00.
 import { describe, expect, it } from 'vitest';
-import type { Lecture, Section } from '../types/lecture';
+import type { Exam, Lecture, Section } from '../types/lecture';
 import type { StudySession } from '../types/plan';
 import type { QuizAttempt } from '../types/quiz';
-import { addDays, afterScore, firstWeekQuizSize, planDay, quizMinutes, thirds, type PlanInput } from './planner';
+import { addDays, afterScore, examCovers, examQuizDue, examsInRunUp, firstWeekQuizSize, planDay, quizMinutes, thirds, type PlanInput } from './planner';
 
 let n = 0;
 const at = (day: string, hour = 12) => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
@@ -54,7 +54,7 @@ function quizzed(s: Section, day: string, score: number, asked = 10, hour = 13):
   };
 }
 
-function plan(today: string, parts: { lectures: Lecture[]; sections: Section[]; sessions?: StudySession[]; attempts?: QuizAttempt[] }, dailyMinutes = 60) {
+function plan(today: string, parts: { lectures: Lecture[]; sections: Section[]; sessions?: StudySession[]; attempts?: QuizAttempt[]; exams?: Exam[] }, dailyMinutes = 60) {
   const input: PlanInput = {
     today,
     dailyMinutes,
@@ -64,6 +64,7 @@ function plan(today: string, parts: { lectures: Lecture[]; sections: Section[]; 
     attempts: parts.attempts ?? [],
     timeZone: 'UTC',
     dayStartHour: 4,
+    exams: parts.exams,
   };
   return planDay(input);
 }
@@ -248,5 +249,80 @@ describe('fitting the day', () => {
   it('sections whose lecture is gone are left out', () => {
     expect(plan('2026-11-18', { lectures: [], sections: [weak] }).today).toEqual([]);
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+  });
+});
+
+describe('exams pull their sections forward (#86)', () => {
+  function exam(date: string, lectureIds: string[] | null = null, courseId = 'c'): Exam {
+    return { id: `e${++n}`, courseId, title: 'Midterm 1', kind: 'midterm', date, lectureIds, createdAt: at('2026-10-01'), updatedAt: at('2026-10-01') };
+  }
+  // Two sections long past their first week, with nothing of their own due in late November:
+  // strong (95%, then 95%: next Dec 17) and middling (95%, then 75%: next Nov 29)
+  const firstWeek = (s: Section) => [studied(s, '2026-10-02', 1), studied(s, '2026-10-04', 2), studied(s, '2026-10-08', 3)];
+  const la = lecture('2026-10-01');
+  const strong = section(la);
+  const lb = lecture('2026-10-01');
+  const middling = section(lb);
+  const base = {
+    lectures: [la, lb],
+    sections: [strong, middling],
+    sessions: [...firstWeek(strong), ...firstWeek(middling)],
+    attempts: [quizzed(strong, '2026-10-15', 0.95), quizzed(strong, '2026-11-02', 0.95), quizzed(middling, '2026-10-15', 0.95), quizzed(middling, '2026-11-02', 0.75)],
+  };
+  const midterm = exam('2026-11-28'); // every lecture up to it; its run-up starts Nov 18
+
+  it('nothing before the run-up; from 10 days before, each section it covers gets a quiz, weakest first', () => {
+    expect(plan('2026-11-17', { ...base, exams: [midterm] }).today).toEqual([]);
+    const p = plan('2026-11-18', { ...base, exams: [midterm] });
+    expect(summary(p.today)).toEqual([`quiz:${middling.id}:4/5q`, `quiz:${strong.id}:2/3q`]); // each at its own next size
+    expect(p.today.every((i) => i.kind === 'quiz' && i.examId === midterm.id)).toBe(true);
+    expect(plan('2026-11-18', base).today).toEqual([]); // the same day without the exam
+  });
+
+  it('the second quiz comes halfway to the exam; after two, no more; nothing on the day', () => {
+    const once = { ...base, exams: [midterm], attempts: [...base.attempts, quizzed(strong, '2026-11-18', 0.95)] };
+    expect(summary(plan('2026-11-22', once).today)).toEqual([`quiz:${middling.id}:4/5q`]); // 4 days overdue
+    expect(summary(plan('2026-11-23', once).today)).toEqual([`quiz:${middling.id}:4/5q`, `quiz:${strong.id}:2/3q`]); // Nov 18 + 5
+    const twice = { ...once, attempts: [...once.attempts, quizzed(strong, '2026-11-23', 0.95)] };
+    expect(summary(plan('2026-11-25', twice).today)).toEqual([`quiz:${middling.id}:4/5q`]);
+    expect(plan('2026-11-28', { ...base, exams: [midterm] }).today).toEqual([]);
+  });
+
+  it('only the lectures an exam lists, and only its own class', () => {
+    expect(summary(plan('2026-11-18', { ...base, exams: [exam('2026-11-28', [la.id])] }).today)).toEqual([`quiz:${strong.id}:2/3q`]);
+    expect(plan('2026-11-18', { ...base, exams: [exam('2026-11-28', null, 'other')] }).today).toEqual([]);
+  });
+
+  it('a section that already ends in a quiz today gets no second one, but still comes first', () => {
+    // A lecture on Nov 17 has its first session (and its quiz) on the 18th; one never quizzed comes before the scored ones
+    const lc = lecture('2026-11-17');
+    const fresh = section(lc);
+    const p = plan('2026-11-18', { ...base, lectures: [...base.lectures, lc], sections: [...base.sections, fresh], exams: [midterm] });
+    expect(summary(p.today)).toEqual([`study1:${fresh.id}:17/5q`, `quiz:${middling.id}:4/5q`, `quiz:${strong.id}:2/3q`]);
+  });
+
+  it('planned past the daily minutes, and the plan says which exam did it; other work waits', () => {
+    const lo = lecture('2026-11-17', 30);
+    const other = { ...section(lo), courseId: 'other' };
+    const p = plan('2026-11-18', { ...base, lectures: [...base.lectures, { ...lo, courseId: 'other' }], sections: [...base.sections, other], exams: [midterm] }, 5);
+    expect(summary(p.today)).toEqual([`quiz:${middling.id}:4/5q`, `quiz:${strong.id}:2/3q`]);
+    expect(p.examsOver.map((e) => e.id)).toEqual([midterm.id]);
+    expect(summary(p.later)).toEqual([`study1:${other.id}:10/5q`]);
+    expect(plan('2026-11-18', { ...base, exams: [midterm] }, 60).examsOver).toEqual([]); // within the minutes: nothing to say
+  });
+
+  it('the pieces: which exams are close, what they cover, when the next exam quiz is due', () => {
+    const soon = exam('2026-11-20');
+    const later = exam('2026-11-28');
+    expect(examsInRunUp([later, soon, exam('2026-11-18'), exam('2026-11-29')], '2026-11-18')).toEqual([soon, later]);
+    expect(examCovers(exam('2026-11-28'), lecture('2026-11-28'))).toBe(true);
+    expect(examCovers(exam('2026-11-28'), lecture('2026-11-29'))).toBe(false);
+    expect(examQuizDue(midterm, la, [])).toBe('2026-11-18');
+    expect(examQuizDue(midterm, lecture('2026-11-21'), [])).toBe('2026-11-22'); // the day after a lecture in the run-up
+    expect(examQuizDue(midterm, lecture('2026-11-27'), [])).toBeNull(); // too late: the exam is the next day
+    expect(examQuizDue(midterm, la, ['2026-11-02'])).toBe('2026-11-18'); // before the run-up doesn't count
+    expect(examQuizDue(midterm, la, ['2026-11-26'])).toBe('2026-11-27'); // at least a day later
+    expect(examQuizDue(midterm, la, ['2026-11-27'])).toBeNull(); // by the day before at the latest
+    expect(examQuizDue(midterm, la, ['2026-11-19', '2026-11-24'])).toBeNull();
   });
 });

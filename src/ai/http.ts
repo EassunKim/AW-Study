@@ -5,8 +5,8 @@
 // When the Access sign-in has lapsed, Access answers with a redirect to its sign-in page (on
 // another site). We never follow it (`redirect: 'manual'`): the fetch sees an "opaque redirect",
 // and we say 'signed-out' so the screen can open signInUrl() in a window for the user.
-import { AiError, type AiBackend, type AiStatus, type AskRequest, type ExplainRequest, type GradeRequest, type MakeQuestionsRequest } from './backend';
-import { checkGrade, checkQuestions, checkText } from './check';
+import { AiError, type AiBackend, type AiStatus, type AskRequest, type ExplainRequest, type GradeRequest, type MakeQuestionsRequest, type WrittenRequest } from './backend';
+import { checkGrade, checkQuestions, checkText, checkWritten } from './check';
 
 /**
  * Opens in a window to sign in to Cloudflare Access. The helper's /ai/signin page then says you're in
@@ -42,6 +42,11 @@ export class HttpAiBackend implements AiBackend {
   async makeQuestions(request: MakeQuestionsRequest, signal?: AbortSignal) {
     const reply = await this.post('questions', request, signal);
     return checkQuestions(reply, request.pages.map((p) => p.page), request.count);
+  }
+
+  async makeWrittenQuestions(request: WrittenRequest, signal?: AbortSignal) {
+    const reply = await this.post('written', request, signal);
+    return checkWritten(reply, request.pages.map((p) => p.page), request.count);
   }
 
   async gradeAnswer(request: GradeRequest, signal?: AbortSignal) {

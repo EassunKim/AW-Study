@@ -4,7 +4,9 @@
 // are shown (the daily minutes are in Settings). Nothing today: the penguin.
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { APP_NAME } from '../brand';
+import { daysBetween } from '../plan/planner';
 import { STATUS_TEXT, type ClassTasks, type TaskItem } from '../plan/tasks';
+import type { Exam } from '../types/lecture';
 import { Penguin } from './Penguin';
 import { loadPlanning, type ItemPlace } from './planning';
 import { href } from './route';
@@ -33,6 +35,7 @@ export function TasksScreen() {
   const { tasks, place } = data;
   const byId = new Map(tasks.classes.map((c) => [c.courseId, c]));
   const classes = order.map((id) => byId.get(id)).filter((c): c is ClassTasks => c !== undefined);
+  const courseNames = new Map(tasks.classes.map((c) => [c.courseId, place(c.items[0]!.item.sectionId)?.course.name]));
 
   const save = async (next: string[]) => {
     // The ones shown, in their new order, then any saved before that aren't on today's list
@@ -119,6 +122,11 @@ export function TasksScreen() {
             </a>
           ) : (
             <p className="tasks-done-note">All done for today.</p>
+          )}
+          {tasks.examsOver.length > 0 && (
+            <p className="muted small" data-testid="exam-note">
+              {examNote(tasks.examsOver, data.today, (id) => courseNames.get(id))}
+            </p>
           )}
           <p className="visually-hidden" role="status" data-testid="order-saved">
             {saved}
@@ -223,4 +231,15 @@ function Tick({ label }: { label: string }) {
 function lectureName(date: string): string {
   const day = new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
   return `${day} lecture`;
+}
+
+/** Why today is longer than the daily minutes (#86): "More than your daily time today, to get you ready for
+ * BIO 110's Midterm 1 (in 4 days)." */
+export function examNote(exams: Exam[], today: string, courseName: (id: string) => string | undefined): string {
+  const each = exams.map((e) => {
+    const days = daysBetween(today, e.date);
+    const name = courseName(e.courseId);
+    return `${name ? `${name}’s ` : ''}${e.title} (${days === 1 ? 'tomorrow' : `in ${days} days`})`;
+  });
+  return `More than your daily time today, to get you ready for ${each.join(' and ')}.`;
 }
