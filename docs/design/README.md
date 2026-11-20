@@ -38,7 +38,8 @@ it chose, and Matt and Nathan may change it later.
 
 A pill-shaped bar at the bottom with three icons: **Tasks** (a house), **Classes** (a stack of books;
 the `+` in the drawing was a placeholder) and **Settings** (a gear). The current page's icon is
-white on a filled green rounded rectangle; the others are green outlines.
+dark grey (`#272727`) on a filled green rounded rectangle (white as drawn was too faint on green;
+Nathan, Nov 19); the others are green outlines.
 
 The nav bar is on the three main pages only. Full-screen screens (the slide viewer, a quiz, Play,
 editing a class) hide it and have a back button instead (our call).
@@ -91,10 +92,9 @@ app is still an MVP).
 
 ## Changes to how the app works (not just looks)
 
-- **Quizzes default to 10 questions** instead of 5, with more or fewer depending on how much
-  material was covered. **Open:** does this change only the first-week quizzes (5 now,
-  `RULES.firstWeekQuizSize`), with later quizzes still sized by the score table (3, 5, 8 or 10), or
-  every quiz?
+- **First-week quizzes default to 10 questions** instead of 5 (`RULES.firstWeekQuizSize`), with more
+  or fewer depending on how much material was covered. Later quizzes are still sized by the score
+  table (3, 5, 8 or 10) (Nathan, Nov 19).
 - **No times shown to the user**; the estimates stay, for the planner and the progress bar.
 - **Tasks are grouped by class** and their order is saved (see Tasks).
 - **Classes lists unfilled lectures** as date buttons.

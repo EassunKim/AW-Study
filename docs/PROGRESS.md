@@ -65,8 +65,8 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 - **Nov 19: The look** (Matt and Nathan): `docs/design/` is the reference for how the app looks and behaves.
   Dark grey `#272727`, white `#f2f5f1`, green `#9fe870`, plus a light mode; three main pages (Tasks,
-  Classes, Settings) behind a nav bar; Tasks grouped by class in a saved order; no times shown. Quizzes
-  default to 10 questions (open: first-week only, or every quiz?).
+  Classes, Settings) behind a nav bar; Tasks grouped by class in a saved order; no times shown. First-week
+  quizzes default to 10 questions (later ones still follow the score table).
 - **Nov 18: Redesign** (Matt and Nathan). FSRS and flashcards were a reference, not the product.
   Honed is built around **lectures**: classes, PDF slides studied in a built-in viewer, and AI
   multiple-choice quizzes whose scores schedule each section (a low score adds study time later,
