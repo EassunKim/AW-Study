@@ -48,6 +48,8 @@ slides" and "M6: AI helper and quizzes":
 | Restyle step 3: the Classes page (a heading and menu per class, date buttons for lectures to fill in, a round +) | #75 | Matt's Claude | `src/ui/ClassesScreen.tsx`, `src/ui/ClassMenu.tsx`, `unfilledLectures` and `shortDate` in `src/ui/classes.ts`, the class routes' part and date, opening at them in `ClassScreen.tsx`, the Classes styles in `src/app.css` | **Done** (PR #76) |
 | Restyle step 4: Settings on one page (AI sign-in check, Compare models) | #79 | Matt's Claude | `src/ui/AiSettings.tsx`, `status()` in `src/ai/` (backend, http, fake, tests), one line of `SettingsScreen.tsx`, the quiz route's `/compare` and its prop in `QuizScreen.tsx`, `tests/browsers/settings.spec.ts` | **Done** (PR #80). Daily minutes came to Settings with #78 |
 | Restyle step 5: the other screens to match (setup, unlock, a class's page, What was covered?, the viewer, quizzes, Play) | #82 | Matt's Claude | the step 5 block at the end of `src/app.css`, `className="back"` on the back links | **Done** (PR #83). The restyle is finished |
+| Milestone 9a: exams pull their sections forward (planner) | #86 | Matt's Claude | the exam rules in `src/plan/planner.ts` (+ `RULES.examPullDays`, `examQuizzes`), `PlanInput.exams`, `Plan.examsOver` (through `tasks.ts`), loading exams in `planning.ts`, the note on `TasksScreen.tsx` | **Done** (PR #88) |
+| Milestone 9b: exam practice with AI-graded short answers | #87 | Matt's Claude | to be proposed in #87 (contract first) | Next |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -62,7 +64,7 @@ slides" and "M6: AI helper and quizzes":
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
 | 7 | Viewer tools: highlights, notes, explain, ask | **Done** (#56); not yet tried on a real phone |
 | 8 | First run (tutorial) and after-class prompts | Not started |
-| 9 | Exams: pulling forward, practice tests with AI-graded short answers | Not started |
+| 9 | Exams: pulling forward, practice tests with AI-graded short answers | **Pulling forward done** (#86); exam practice next (#87) |
 
 ## Live
 
@@ -125,6 +127,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#86):** Exams pull their sections forward. From 10 days before an exam (`RULES.examPullDays`), each
+  section it covers (its listed lectures, or all of its class's up to the date) is quizzed at least twice
+  (`examQuizzes`) before the day: the first quiz at once, the second halfway to the exam, never on the day. Those
+  sections come first, weakest first (never quizzed counts as weakest), and are planned even past the daily
+  minutes; `Plan.examsOver` names the exam, and Tasks says "More than your daily time today, to get you ready for
+  PHYS 150's Midterm 1 (in 5 days)." Pulled quizzes are `kind: 'quiz'` with an `examId`.
 - **Nov 20 (#82):** Restyle step 5, the last. Every other screen was checked on an iPhone-sized screen, dark
   and light: setup, the recovery key, unlock, a class's page, What was covered?, an exam, the viewer, a quiz
   (asked and answered) and Play. Fixed: cards and forms are outlines on the page's background, not filled
