@@ -56,6 +56,19 @@ export interface EncryptedRecord {
   ct: Uint8Array; // AES-GCM ciphertext with its 16-byte tag
 }
 
+/**
+ * This device's remembered unlock (#99, docs/SECURITY.md "Remembering a device"): the data key wrapped
+ * by a device key that can't be read out of the page. Kept in this device's `meta` only: never in the
+ * keyring, a backup or a sync.
+ */
+export interface RememberedKey {
+  v: 1;
+  deviceKey: CryptoKey; // AES-GCM 256, extractable: false
+  iv: Uint8Array; // 12 random bytes
+  wrapped: Uint8Array; // the data key, AES-GCM-wrapped by deviceKey
+  at: string; // ISO time it was remembered
+}
+
 /** What the user gives to unlock. */
 export type UnlockSecret =
   | { method: 'passphrase'; passphrase: string }

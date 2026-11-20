@@ -295,7 +295,7 @@ device's data with the account's (the restore warning, since this device's data 
 this device. Merging two separately made sets of data (decrypting one and re-adding it under the
 account's key) is possible, but left for later.
 
-### Remembering a device (#97, design only)
+### Remembering a device (#97, built in #99)
 
 So Honed opens straight in instead of asking for a passkey every time (Nathan, Nov 20: "sign in the first
 time, save that log in after that").
@@ -303,8 +303,11 @@ time, save that log in after that").
 - **What it is:** after a device is unlocked once (passkey, passphrase or recovery key), it keeps the data
   key for next time, wrapped by a **device key**: a random 256-bit AES-GCM key made on the device with
   `extractable: false` and stored as a `CryptoKey` in this device's IndexedDB (`meta`, key `remembered`:
-  the device key plus the data key wrapped by it, with its IV). Opening Honed unwraps it and unlocks with no
-  prompt. Making it needs the data key in wrappable form once, so it happens right at unlock, while the
+  the device key plus the data key wrapped by it, with its IV; `RememberedKey` in `src/types/crypto.ts`,
+  `rememberKey`/`recallKey` in `src/lib/crypto.ts`). Opening Honed unwraps it and unlocks with no
+  prompt; if it fails (damaged, or for another key after a restore elsewhere) it is forgotten and the
+  unlock screen asks. The store accepts one only if it opens the key check, and a backup restore
+  forgets it. The key used day to day is the one unwrapped from it, never extractable. Making it needs the data key in wrappable form once, so it happens right at unlock, while the
   unlock secret has just been given (as "Changing how you unlock" says).
 - **Never leaves the device:** not in the keyring, not synced, not in backups (backups copy only the
   record stores and the keyring), never sent anywhere. The server can't read any more than before.

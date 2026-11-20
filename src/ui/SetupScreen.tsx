@@ -1,13 +1,15 @@
 // First run: explain, choose a passkey or a passphrase, save the recovery key, then encrypt any
 // data already on this device with progress. Nothing is saved until the recovery
-// key has been confirmed, so closing the page half-way just starts setup again.
+// key has been confirmed, so closing the page half-way just starts setup again. "Remember this device"
+// (#99) is ticked unless the person unticks it: then Honed opens straight in from the next time.
 import { useState, type FormEvent } from 'react';
 import { askToPersist } from '../backup/persist';
 import { RestoreBackup } from '../backup/RestoreBackup';
 import { APP_NAME } from '../brand';
+import { recallKey, rememberKey } from '../lib/crypto';
 import { createPasskey } from '../lib/passkey';
 import { makeKeys, passphraseProblem, unlockMessage, type NewKeys } from './keys';
-import { guessDeviceLabel, NewPassphraseFields, RecoveryKeySheet, usePrfSupported, useVault } from './lock-parts';
+import { guessDeviceLabel, NewPassphraseFields, RecoveryKeySheet, RememberField, usePrfSupported, useVault } from './lock-parts';
 import { useStore } from './store-context';
 
 type Step = 'intro' | 'passphrase' | 'passkey' | 'recovery' | 'saving' | 'restore';
@@ -24,6 +26,7 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [rememberIt, setRememberIt] = useState(true);
 
   const choosePassphrase = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,6 +67,13 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
     setProblem(null);
     try {
       await vault.setUp(keys.keyring, keys.dataKey, (done, total) => setProgress({ done, total }));
+      // From here on only a key that can't be read out of the page: the remembered one, or one from the keyring
+      if (rememberIt) {
+        const remembered = await rememberKey(keys.dataKey);
+        vault.lock();
+        await vault.unlock(await recallKey(remembered));
+        await vault.remember(remembered);
+      }
       setKeys(null);
       void askToPersist(); // right after setup, when browsers are likeliest to say yes
       onDone();
@@ -134,7 +144,10 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
       )}
 
       {step === 'recovery' && keys && (
-        <RecoveryKeySheet recoveryKey={keys.recoveryKey} onSaved={save} saveLabel="I’ve saved it: lock my data" />
+        <>
+          <RecoveryKeySheet recoveryKey={keys.recoveryKey} onSaved={save} saveLabel="I’ve saved it: lock my data" />
+          <RememberField checked={rememberIt} onChange={setRememberIt} />
+        </>
       )}
 
       {step === 'saving' && (

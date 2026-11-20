@@ -13,6 +13,7 @@ import {
   type Keyring,
   type KeyringEntry,
   type Pbkdf2Params,
+  type RememberedKey,
   type UnlockSecret,
 } from '../types/crypto';
 
@@ -288,5 +289,47 @@ export async function decryptBytes(dataKey: CryptoKey, aad: string, record: Encr
     );
   } catch {
     throw new CryptoError('corrupt', 'This record can’t be decrypted: it was changed, moved, or the key is wrong.');
+  }
+}
+
+// --- Remembering a device (#99, docs/SECURITY.md "Remembering a device") ---
+
+const REMEMBER_AAD = 'honed:v1:meta:remembered';
+
+/**
+ * Wraps an extractable data key (just unlocked, or just made at setup) under a new device key that
+ * can't be read out of the page, to keep in this device's `meta`. Drop the extractable key afterwards.
+ */
+export async function rememberKey(dataKey: CryptoKey): Promise<RememberedKey> {
+  if (!dataKey.extractable) throw new CryptoError('invalid', 'Remembering needs the key straight after unlocking.');
+  const deviceKey = await subtle().generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']);
+  const iv = random(12);
+  const wrapped = await subtle().wrapKey('raw', dataKey, deviceKey, { name: 'AES-GCM', iv, additionalData: utf8.encode(REMEMBER_AAD) });
+  return { v: 1, deviceKey, iv, wrapped: new Uint8Array(wrapped), at: new Date().toISOString() };
+}
+
+/** The data key from a remembered unlock, never extractable. Throws CryptoError 'corrupt' if it won't open. */
+export async function recallKey(remembered: RememberedKey): Promise<CryptoKey> {
+  if (
+    remembered?.v !== 1 ||
+    !(remembered.deviceKey instanceof CryptoKey) ||
+    !(remembered.iv instanceof Uint8Array) ||
+    remembered.iv.length !== 12 ||
+    !(remembered.wrapped instanceof Uint8Array)
+  ) {
+    throw new CryptoError('corrupt', 'This device’s remembered unlock is damaged.');
+  }
+  try {
+    return await subtle().unwrapKey(
+      'raw',
+      bytes(remembered.wrapped),
+      remembered.deviceKey,
+      { name: 'AES-GCM', iv: bytes(remembered.iv), additionalData: utf8.encode(REMEMBER_AAD) },
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    );
+  } catch {
+    throw new CryptoError('corrupt', 'This device’s remembered unlock no longer works.');
   }
 }

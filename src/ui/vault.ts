@@ -6,7 +6,7 @@
 // The crypto calls (unlock, the wrapWith* functions) happen in the screens, through ./keys: the
 // store never sees a passphrase, a recovery key or a passkey's PRF output, only wrapped keys and
 // the data key.
-import type { Keyring, KeyringEntry, UnlockMethod } from '../types/crypto';
+import type { Keyring, KeyringEntry, RememberedKey, UnlockMethod } from '../types/crypto';
 
 export type VaultStatus = 'new' | 'locked' | 'unlocked';
 
@@ -18,6 +18,12 @@ export interface Vault {
   setUp(keyring: Keyring, dataKey: CryptoKey, onProgress?: (done: number, total: number) => void): Promise<void>;
   unlock(dataKey: CryptoKey): Promise<void>;
   lock(): void;
+  /** This device's remembered unlock (#99), readable while locked; null if it doesn't remember. */
+  getRemembered(): Promise<RememberedKey | null>;
+  /** Remembers the unlock on this device (unlocked only). */
+  remember(remembered: RememberedKey): Promise<void>;
+  /** Forgets it: the next open asks again. */
+  forget(): Promise<void>;
   addKeyringEntry(entry: KeyringEntry): Promise<void>;
   removeKeyringEntry(id: string): Promise<void>;
   /** Removes every entry of `method` and adds `entry`, in one go (change passphrase, new recovery key). */

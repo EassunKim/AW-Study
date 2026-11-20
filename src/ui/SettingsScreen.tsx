@@ -7,6 +7,7 @@ import { useState, type FormEvent } from 'react';
 import { BackupSettings } from '../backup/BackupSettings';
 import { AccountSettings } from '../sync/AccountSettings';
 import { AiSettings } from './AiSettings';
+import { ThisDevice } from './ThisDevice';
 import { APP_NAME } from '../brand';
 import { DAILY_MINUTES_MAX, DAILY_MINUTES_MIN } from '../db/plan';
 import { newRecoveryKey, wrapWithPasskey, wrapWithPassphrase, wrapWithRecoveryKey } from '../lib/crypto';
@@ -139,11 +140,7 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
 
       <BackupSettings store={store} onRestored={() => void reload()} />
 
-      <h3>This device</h3>
-      <p className="muted small">Locking forgets the key until you unlock again. Reloading the page locks too.</p>
-      <button type="button" onClick={onLock}>
-        Lock now
-      </button>
+      <ThisDevice onLock={onLock} />
 
       {removing && (
         <ConfirmDialog

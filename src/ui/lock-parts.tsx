@@ -201,6 +201,20 @@ function downloadText(filename: string, text: string) {
 // --- A recovery key field ---
 
 /** A field for typing a recovery key, saying at once when it can't be right. */
+/** "Remember this device" (#99): ticked unless the person unticks it (a shared or school computer). */
+export function RememberField({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <div className="remember">
+      <label>
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /> Remember this device
+      </label>
+      <p className="muted small">
+        Opens straight in next time, without asking. Untick on a shared or school computer. Lock makes it ask again.
+      </p>
+    </div>
+  );
+}
+
 export function RecoveryKeyField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [wellFormed, setWellFormed] = useState<boolean | null>(null);
   useEffect(() => {
