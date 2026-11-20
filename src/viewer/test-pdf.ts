@@ -1,6 +1,6 @@
 // Test helper (not used by the app, so not in the build; it lives in src/ because the image build
 // type-checks src/ without tests/). Makes small, valid PDF files for tests: landscape "slides"
-// (720 × 540 points, 4:3) with a title and a line of text on each, in Helvetica (one of PDF's
+// (720 × 540 points, 4:3, or another size such as a portrait LETTER page) with a title and a line of text on each, in Helvetica (one of PDF's
 // standard fonts, not embedded). No real lecture slides are ever committed (CLAUDE.md).
 
 export interface FixturePage {
@@ -8,8 +8,17 @@ export interface FixturePage {
   body?: string;
 }
 
+/** A page's size in points: a 4:3 slide unless given. */
+export interface PageSize {
+  width: number;
+  height: number;
+}
+
+/** US Letter, portrait: a Word document saved as PDF (#46). */
+export const LETTER: PageSize = { width: 612, height: 792 };
+
 /** A PDF with these pages, as bytes. */
-export function makePdf(pages: FixturePage[]): Uint8Array {
+export function makePdf(pages: FixturePage[], size: PageSize = { width: 720, height: 540 }): Uint8Array {
   const objects: string[] = [];
   const add = (body: string) => objects.push(body); // its object number: they start at 1
 
@@ -18,14 +27,15 @@ export function makePdf(pages: FixturePage[]): Uint8Array {
   const font = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
   const kids: number[] = [];
   for (const page of pages) {
-    const lines = [`BT /F1 36 Tf 60 440 Td (${escape(page.title)}) Tj ET`];
-    if (page.body) lines.push(`BT /F1 20 Tf 60 380 Td (${escape(page.body)}) Tj ET`);
-    lines.push('0.2 0.4 0.8 rg 60 100 600 12 re f'); // a coloured bar, so pages aren't blank
+    const top = size.height - 100;
+    const lines = [`BT /F1 36 Tf 60 ${top} Td (${escape(page.title)}) Tj ET`];
+    if (page.body) lines.push(`BT /F1 20 Tf 60 ${top - 60} Td (${escape(page.body)}) Tj ET`);
+    lines.push(`0.2 0.4 0.8 rg 60 100 ${size.width - 120} 12 re f`); // a coloured bar, so pages aren't blank
     const stream = lines.join('\n');
     const content = add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
     kids.push(
       add(
-        `<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 720 540] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${content} 0 R >>`,
+        `<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${size.width} ${size.height}] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${content} 0 R >>`,
       ),
     );
   }
@@ -46,8 +56,11 @@ export function makePdf(pages: FixturePage[]): Uint8Array {
 }
 
 /** `count` numbered slides: "Slide 1" … with "Fixture text 1" … underneath. */
-export function numberedSlides(count: number): Uint8Array {
-  return makePdf(Array.from({ length: count }, (_, i) => ({ title: `Slide ${i + 1}`, body: `Fixture text ${i + 1}` })));
+export function numberedSlides(count: number, size?: PageSize): Uint8Array {
+  return makePdf(
+    Array.from({ length: count }, (_, i) => ({ title: `Slide ${i + 1}`, body: `Fixture text ${i + 1}` })),
+    size,
+  );
 }
 
 function escape(text: string): string {

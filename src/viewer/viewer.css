@@ -63,6 +63,9 @@
   display: grid;
   overflow: hidden;
   touch-action: none; /* swipes and pinches are ours at fit size */
+  /* The room for a scrollbar is always kept (on both sides, so the slide stays centred): one appearing
+     in fit width would otherwise narrow the stage, refit the page and could switch the fit back. */
+  scrollbar-gutter: stable both-edges;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -70,6 +73,12 @@
 .sv-stage.zoomed {
   overflow: auto;
   touch-action: pan-x pan-y;
+}
+
+/* Fit width (#46): the page fills the width and scrolls down. Sideways swipes and pinches stay ours. */
+.sv-stage.scrolling {
+  overflow: hidden auto;
+  touch-action: pan-y;
 }
 
 .sv-page {
@@ -121,10 +130,11 @@
   border-color: var(--accent);
 }
 
+/* 72 px tall (THUMB_HEIGHT in SlideViewer.tsx), as wide as the page's shape makes it: 96 px for a 4:3 slide */
 .sv-thumb {
   display: block;
-  width: 96px;
-  height: auto;
+  width: auto;
+  height: 72px;
   background: #fff;
 }
 

@@ -4,10 +4,14 @@
 // deck stays reachable. A text layer (invisible, selectable text over the slide) lets words be
 // selected; `overlay` draws on top of the slide (notes and highlights, #56: ./AnnotatedViewer.tsx).
 //
+// Portrait pages (documents saved as PDF) fit the width instead and scroll down (#46, ./fit.ts), with a
+// Whole page / Page width switch in the bar.
+//
 // Only what's needed is drawn: the current slide at screen size, and thumbnails as they scroll
 // into view, so a 200-page deck stays quick.
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { RenderingCancelledException, TextLayer, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { fitPage, type Fit, type Size } from './fit';
 import { openPdf } from './pdf';
 import './viewer.css';
 
@@ -45,10 +49,16 @@ export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange, overla
   const [problem, setProblem] = useState<string | null>(null);
   const [page, setPage] = useState(wanted);
   const [zoom, setZoom] = useState(1);
+  const [chosenFit, setChosenFit] = useState<Fit | null>(null); // null: picked by the page's shape
+  const [natural, setNatural] = useState<Size | null>(null); // the current page's size, in points
   const stageRef = useRef<HTMLDivElement>(null);
   const size = useElementSize(stageRef);
   const count = doc?.numPages ?? 0;
   const shown = count ? clamp(page, 1, count) : page;
+  const layout = natural && size.width > 0 && size.height > 0 ? fitPage(natural, size, chosenFit) : null;
+  const fit = layout?.fit ?? 'page';
+  /** Fit width, at fit size: the stage scrolls down, and up/down keys scroll before they move. */
+  const scrolling = fit === 'width' && zoom === 1;
 
   // Open the PDF; close it when it changes or the viewer goes away
   useEffect(() => {
@@ -69,6 +79,29 @@ export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange, overla
       void close?.();
     };
   }, [pdf]);
+
+  // The current page's size, which picks its fit. Until it's known the last page's size stands in (a
+  // deck's pages are nearly always one size), so moving doesn't blank the slide.
+  useEffect(() => {
+    if (!doc) return void setNatural(null);
+    let live = true;
+    doc.getPage(clamp(shown, 1, doc.numPages)).then(
+      (p) => {
+        if (!live) return;
+        const { width, height } = p.getViewport({ scale: 1 });
+        setNatural((old) => (old?.width === width && old.height === height ? old : { width, height }));
+      },
+      () => {}, // drawing the page reports the problem
+    );
+    return () => {
+      live = false;
+    };
+  }, [doc, shown]);
+
+  // A new page, or a new fit, starts at its top
+  useEffect(() => {
+    stageRef.current?.scrollTo?.({ top: 0, left: 0 });
+  }, [shown, fit]);
 
   // Follow the `page` prop
   useEffect(() => {
@@ -94,9 +127,32 @@ export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange, overla
   );
 
   const zoomBy = (factor: number) => setZoom((z) => clamp(round2(z * factor), 1, ZOOM_MAX));
+  const switchFit = (to: Fit) => {
+    setChosenFit(to);
+    setZoom(1);
+  };
+
+  /** In fit width: scroll the page by `by` pixels, or move to the next or previous page at its end. */
+  const scrollOrMove = (by: number) => {
+    const stage = stageRef.current;
+    if (stage) {
+      const room = by > 0 ? stage.scrollHeight - stage.clientHeight - stage.scrollTop : stage.scrollTop;
+      if (room > 1) return void stage.scrollBy({ top: by });
+    }
+    go(shown + Math.sign(by));
+  };
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (scrolling) {
+      const screen = (stageRef.current?.clientHeight ?? 0) * 0.85;
+      const scroll: Record<string, number> = { ArrowDown: 60, ArrowUp: -60, PageDown: screen, ' ': screen, PageUp: -screen };
+      const by = scroll[e.key];
+      if (by !== undefined && !e.shiftKey) {
+        e.preventDefault();
+        return scrollOrMove(by);
+      }
+    }
     const actions: Record<string, () => void> = {
       ArrowRight: () => go(shown + 1),
       ArrowDown: () => go(shown + 1),
@@ -162,14 +218,25 @@ export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange, overla
             </button>
           )}
         </span>
+        {layout?.choice && (
+          <button type="button" data-testid="fit-switch" onClick={() => switchFit(fit === 'width' ? 'page' : 'width')}>
+            {fit === 'width' ? 'Whole page' : 'Page width'}
+          </button>
+        )}
         {barExtra}
       </div>
 
-      <div ref={stageRef} className={`sv-stage ${zoom > 1 ? 'zoomed' : ''}`} {...gestures} data-testid="slide-stage">
+      <div
+        ref={stageRef}
+        className={`sv-stage ${zoom > 1 ? 'zoomed' : scrolling ? 'scrolling' : ''}`}
+        {...gestures}
+        data-testid="slide-stage"
+        data-fit={layout ? fit : undefined}
+      >
         {problem ? (
           <p className="error">{problem}</p>
         ) : (
-          doc && size.width > 0 && <Slide doc={doc} page={shown} width={size.width} height={size.height} zoom={zoom} onProblem={setProblem} overlay={overlay} />
+          doc && layout && <Slide doc={doc} page={shown} scale={layout.scale * zoom} onProblem={setProblem} overlay={overlay} />
         )}
       </div>
 
@@ -183,17 +250,14 @@ export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange, overla
 function Slide({
   doc,
   page,
-  width,
-  height,
-  zoom,
+  scale,
   onProblem,
   overlay,
 }: {
   doc: PDFDocumentProxy;
   page: number;
-  width: number;
-  height: number;
-  zoom: number;
+  /** PDF.js's scale: CSS pixels per point (fitted, then zoomed). */
+  scale: number;
   onProblem: (message: string) => void;
   overlay?: (page: number) => ReactNode;
 }) {
@@ -208,9 +272,7 @@ function Slide({
     const draw = async () => {
       const pdfPage = await doc.getPage(page);
       if (cancelled) return;
-      const natural = pdfPage.getViewport({ scale: 1 });
-      const fit = Math.min(width / natural.width, height / natural.height);
-      const viewport = pdfPage.getViewport({ scale: fit * zoom });
+      const viewport = pdfPage.getViewport({ scale });
       const box = boxRef.current!;
       const canvas = canvasRef.current!;
       const pixels = pixelRatio(viewport.width, viewport.height);
@@ -237,7 +299,7 @@ function Slide({
       task?.cancel();
       text?.cancel();
     };
-  }, [doc, page, width, height, zoom, onProblem]);
+  }, [doc, page, scale, onProblem]);
 
   return (
     <div ref={boxRef} className="sv-page" data-testid="slide-page">
@@ -258,6 +320,7 @@ function pixelRatio(width: number, height: number): number {
 // --- Thumbnails ---
 
 const THUMB_WIDTH = 96;
+const THUMB_HEIGHT = 72; // keep in step with .sv-thumb's height in viewer.css
 
 function Thumbnails({
   doc,
@@ -323,7 +386,8 @@ function Thumbnail({ doc, page, root }: { doc: PDFDocumentProxy; page: number; r
       const pdfPage = await doc.getPage(page);
       if (cancelled) return;
       const natural = pdfPage.getViewport({ scale: 1 });
-      const viewport = pdfPage.getViewport({ scale: THUMB_WIDTH / natural.width });
+      // Within THUMB_WIDTH × THUMB_HEIGHT: a portrait page's thumbnail is narrower, never taller (#46)
+      const viewport = pdfPage.getViewport({ scale: Math.min(THUMB_WIDTH / natural.width, THUMB_HEIGHT / natural.height) });
       const canvas = canvasRef.current!;
       const pixels = Math.min(globalThis.devicePixelRatio || 1, 2);
       canvas.width = Math.floor(viewport.width * pixels);
@@ -338,7 +402,7 @@ function Thumbnail({ doc, page, root }: { doc: PDFDocumentProxy; page: number; r
     };
   }, [near, doc, page]);
 
-  return <canvas ref={canvasRef} className="sv-thumb" width={THUMB_WIDTH} height={Math.round((THUMB_WIDTH * 3) / 4)} />;
+  return <canvas ref={canvasRef} className="sv-thumb" width={THUMB_WIDTH} height={THUMB_HEIGHT} />;
 }
 
 // --- Swipes and pinches ---
