@@ -98,7 +98,7 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
       {route.name === 'not-found' && (
         <section>
           <h2>Page not found</h2>
-          <a href={href({ name: 'tasks' })}>← Back to Tasks</a>
+          <a className="back" href={href({ name: 'tasks' })}>← Back to Tasks</a>
         </section>
       )}
     </>

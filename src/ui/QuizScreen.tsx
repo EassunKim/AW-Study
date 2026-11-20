@@ -54,7 +54,7 @@ export default function QuizScreen({ courseId, sectionId, compare = false }: { c
       <section>
         <h2>Quiz not found</h2>
         <p className="muted">That lecture may have been deleted.</p>
-        <a href={href({ name: 'class', courseId })}>← Back</a>
+        <a className="back" href={href({ name: 'class', courseId })}>← Back</a>
       </section>
     );
   }
@@ -64,7 +64,7 @@ export default function QuizScreen({ courseId, sectionId, compare = false }: { c
   return (
     <section className="quiz-screen">
       <p>
-        <a href={href({ name: 'class', courseId })}>← {course.name}</a>
+        <a className="back" href={href({ name: 'class', courseId })}>← {course.name}</a>
       </p>
       <h2>
         Quiz: {deck.title} <span className="muted small">· {slidesLabel(section.firstPage, section.lastPage)}</span>
