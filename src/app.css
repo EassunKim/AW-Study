@@ -68,6 +68,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  overflow-wrap: break-word; /* a long file name breaks instead of widening the page (#84) */
 }
 
 a {
@@ -118,6 +119,12 @@ a {
 h2 {
   margin: 1rem 0 0.5rem;
   color: var(--accent);
+}
+
+/* The three main pages' titles (Tasks, Classes, Settings): clearly above what they hold (#84) */
+h2.page-title {
+  margin: 0.75rem 0 1.5rem;
+  font-size: 2rem;
 }
 
 h3 {
@@ -482,6 +489,23 @@ label.file input {
   color: var(--on-fill);
 }
 
+/* A deck's button keeps to the width of the screen: a long name ends in "…", the slide count stays */
+.choices button {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.choice-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.choices button .muted {
+  flex: none;
+}
+
 .choices button[aria-pressed='true'] .muted {
   color: inherit;
 }
@@ -755,10 +779,6 @@ button.link {
 
 /* --- The Tasks page (TasksScreen.tsx, #77; docs/design): the bar, Start, a row per class --- */
 
-.tasks h2 {
-  font-size: 1.75rem;
-}
-
 .tasks-progress {
   -webkit-appearance: none;
   appearance: none;
@@ -981,7 +1001,7 @@ button.link {
 
 h3.class-name {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.35rem;
   color: var(--accent);
   overflow-wrap: anywhere;
 }

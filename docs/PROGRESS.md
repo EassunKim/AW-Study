@@ -44,6 +44,7 @@ slides" and "M6: AI helper and quizzes":
 | Tasks page logic: grouped by class, saved order, statuses, progress (restyle step 2, no screen) | #72 | Nathan's Claude | `src/types/plan.ts` (`StudySettings`), the settings part of `src/db/plan.ts`, new `src/plan/tasks.ts` | Contract and storage (PR #73) and the logic (`src/plan/tasks.ts`, PR #74) **done**; the screen next (#68 is in) |
 | Restyle step 1: colours (dark and light), Phone / Light / Dark setting, the Lexend font, the nav bar, the Tasks, Classes and Settings pages | #68 | Matt's Claude | `src/app.css` (colours, buttons, nav bar), `src/ui/theme.ts`, `src/ui/NavBar.tsx`, `src/ui/TasksScreen.tsx`, the routes, the frame in `src/App.tsx`, the theme part of Settings, `tests/browsers/look.spec.ts` | **Done** (PR #69). Steps 2 to 5 are free |
 | Restyle step 2: the Tasks page screen (rows by class, drag, ticks, penguin) | #77 | Nathan's Claude | `src/ui/TasksScreen.tsx`, `src/ui/Penguin.tsx`, `src/ui/planning.ts`, which items Play runs in `src/ui/PlayScreen.tsx`, the daily minutes in Settings, the Tasks styles | **Done** (PR #78) |
+| Layout fixes from Nathan's iPhone: main page titles, long file names | #84 | Nathan's Claude | the title, class-name and `.choices` rules in `src/app.css`, `className` on the three main pages' `h2`, the deck button text in `LectureForm.tsx`, `tests/browsers/layout.spec.ts` | **Done** (PR #85) |
 | Restyle step 3: the Classes page (a heading and menu per class, date buttons for lectures to fill in, a round +) | #75 | Matt's Claude | `src/ui/ClassesScreen.tsx`, `src/ui/ClassMenu.tsx`, `unfilledLectures` and `shortDate` in `src/ui/classes.ts`, the class routes' part and date, opening at them in `ClassScreen.tsx`, the Classes styles in `src/app.css` | **Done** (PR #76) |
 | Restyle step 4: Settings on one page (AI sign-in check, Compare models) | #79 | Matt's Claude | `src/ui/AiSettings.tsx`, `status()` in `src/ai/` (backend, http, fake, tests), one line of `SettingsScreen.tsx`, the quiz route's `/compare` and its prop in `QuizScreen.tsx`, `tests/browsers/settings.spec.ts` | **Done** (PR #80). Daily minutes came to Settings with #78 |
 | Restyle step 5: the other screens to match (setup, unlock, a class's page, What was covered?, the viewer, quizzes, Play) | #82 | Matt's Claude | the step 5 block at the end of `src/app.css`, `className="back"` on the back links | **Done** (PR #83). The restyle is finished |
@@ -130,6 +131,10 @@ the "Test and publish" run on `main` to finish, then press Update.
   boxes; back links are a bold green arrow and name (`a.back`), not underlined; file pickers' buttons are
   green pills in our font (they were the browser's serif); checkboxes are green; focus rings are green; and
   Play's text was 1.2× too big (an old rule for the Play button, which is gone).
+- **Nov 20 (#84):** From Nathan's iPhone: the Classes title looked like the class names (now `h2.page-title`, 2rem with
+  room under it, on all three main pages; class names 1.35rem), and a long file name (a hash with no spaces) pushed
+  "What was covered?" sideways (now the page breaks long words, `overflow-wrap: break-word` on `body`, and a deck's
+  button ends its name in "…" but keeps the slide count). `tests/browsers/layout.spec.ts` fails without either.
 - **Nov 20 (#79):** Restyle step 4, Settings on one page. New **AI** section: **Check AI sign-in** asks
   the helper's `GET /ai/whoami` (no AI used; only when pressed, so opening Settings sends nothing) and says
   "Signed in for AI as … 3 of 200 AI requests used today", or not signed in, or not allowed; **Sign in for

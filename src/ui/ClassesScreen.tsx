@@ -56,7 +56,9 @@ export function ClassesScreen() {
 
   return (
     <section aria-labelledby="classes-title">
-      <h2 id="classes-title">Classes</h2>
+      <h2 id="classes-title" className="page-title">
+        Classes
+      </h2>
       {problem && (
         <p className="error" role="alert">
           {problem}
