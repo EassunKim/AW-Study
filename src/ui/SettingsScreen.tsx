@@ -1,9 +1,11 @@
 // Settings: the colours (Phone, Light or Dark: a setting for this device, src/ui/theme.ts), how you unlock (change or add the passphrase, add or remove passkeys, a new recovery
 // key) and Lock now. Every change that adds a way in asks you to prove it's you first. Removing a
 // passkey only asks "are you sure", and the store refuses to remove your last way in.
-// Backups and storage (#18) are their own section, src/backup/BackupSettings.tsx.
+// Backups and storage (#18) are their own section, src/backup/BackupSettings.tsx; AI sign-in and
+// Compare models are src/ui/AiSettings.tsx (#79).
 import { useState, type FormEvent } from 'react';
 import { BackupSettings } from '../backup/BackupSettings';
+import { AiSettings } from './AiSettings';
 import { APP_NAME } from '../brand';
 import { DAILY_MINUTES_MAX, DAILY_MINUTES_MIN } from '../db/plan';
 import { newRecoveryKey, wrapWithPasskey, wrapWithPassphrase, wrapWithRecoveryKey } from '../lib/crypto';
@@ -127,6 +129,8 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
           {problem}
         </p>
       )}
+
+      <AiSettings />
 
       <BackupSettings store={store} onRestored={() => void reload()} />
 

@@ -1,8 +1,9 @@
 // A stand-in AiBackend for tests and for building screens: answers instantly from the slide text,
 // sends nothing anywhere, costs nothing. It records every request, and can be told to fail.
-import { AiError, type AiBackend, type AiErrorCode, type AskRequest, type ExplainRequest, type GradeRequest, type McQuestion, type MakeQuestionsRequest } from './backend';
+import { AiError, type AiBackend, type AiErrorCode, type AiStatus, type AskRequest, type ExplainRequest, type GradeRequest, type McQuestion, type MakeQuestionsRequest } from './backend';
 
 export type FakeCall =
+  | { job: 'status' }
   | { job: 'makeQuestions'; request: MakeQuestionsRequest }
   | { job: 'gradeAnswer'; request: GradeRequest }
   | { job: 'explain'; request: ExplainRequest }
@@ -12,6 +13,11 @@ export class FakeAiBackend implements AiBackend {
   readonly calls: FakeCall[] = [];
   /** Set to make the next calls fail with this error code. */
   failWith: AiErrorCode | null = null;
+
+  async status(): Promise<AiStatus> {
+    this.record({ job: 'status' });
+    return { email: 'student@example.com', usedToday: this.calls.filter((c) => c.job !== 'status').length, dailyLimit: 200 };
+  }
 
   async makeQuestions(request: MakeQuestionsRequest): Promise<McQuestion[]> {
     this.record({ job: 'makeQuestions', request });

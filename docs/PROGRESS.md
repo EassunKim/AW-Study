@@ -8,7 +8,7 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 
 Milestones 3 to 7 are **done and live** (deployed Nov 19, main 8ee4c61). Now: the **restyle** to
 Matt's and Nathan's design (`docs/design/README.md`, "Building it"; one issue and PR per step: step 1
-#68, step 3 #75 and step 6 #70 done; step 2 with Nathan's Claude (#72); steps 4 and 5 free). Then milestone 8 (first run and after-class prompts). Open question
+#68, step 2 #77, step 3 #75, step 4 #79 and step 6 #70 done; step 5 free). Then milestone 8 (first run and after-class prompts). Open question
 for Matt and Nathan before 8 starts: are after-class prompts when you next open the app enough for
 now, or do we want real push notifications (DESIGN, "Open questions")?
 
@@ -45,6 +45,7 @@ slides" and "M6: AI helper and quizzes":
 | Restyle step 1: colours (dark and light), Phone / Light / Dark setting, the Lexend font, the nav bar, the Tasks, Classes and Settings pages | #68 | Matt's Claude | `src/app.css` (colours, buttons, nav bar), `src/ui/theme.ts`, `src/ui/NavBar.tsx`, `src/ui/TasksScreen.tsx`, the routes, the frame in `src/App.tsx`, the theme part of Settings, `tests/browsers/look.spec.ts` | **Done** (PR #69). Steps 2 to 5 are free |
 | Restyle step 2: the Tasks page screen (rows by class, drag, ticks, penguin) | #77 | Nathan's Claude | `src/ui/TasksScreen.tsx`, `src/ui/Penguin.tsx`, `src/ui/planning.ts`, which items Play runs in `src/ui/PlayScreen.tsx`, the daily minutes in Settings, the Tasks styles | **Done** (PR #78) |
 | Restyle step 3: the Classes page (a heading and menu per class, date buttons for lectures to fill in, a round +) | #75 | Matt's Claude | `src/ui/ClassesScreen.tsx`, `src/ui/ClassMenu.tsx`, `unfilledLectures` and `shortDate` in `src/ui/classes.ts`, the class routes' part and date, opening at them in `ClassScreen.tsx`, the Classes styles in `src/app.css` | **Done** (PR #76) |
+| Restyle step 4: Settings on one page (AI sign-in check, Compare models) | #79 | Matt's Claude | `src/ui/AiSettings.tsx`, `status()` in `src/ai/` (backend, http, fake, tests), one line of `SettingsScreen.tsx`, the quiz route's `/compare` and its prop in `QuizScreen.tsx`, `tests/browsers/settings.spec.ts` | **Done** (PR #80). Daily minutes came to Settings with #78 |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -122,6 +123,15 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#79):** Restyle step 4, Settings on one page. New **AI** section: **Check AI sign-in** asks
+  the helper's `GET /ai/whoami` (no AI used; only when pressed, so opening Settings sends nothing) and says
+  "Signed in for AI as … 3 of 200 AI requests used today", or not signed in, or not allowed; **Sign in for
+  AI** is always there. `AiBackend.status()` is new (HTTP and fake). **Compare models** lists your 5 latest
+  sections, each opening its quiz screen with the comparison showing (`#/class/<id>/quiz/<sectionId>/compare`).
+  Daily study minutes move here with #78 (Nathan's Claude).
+  Also fixed a race in `annotations.spec.ts` ("dragging across words"): closing the notes panel redraws the
+  slide wider, so the test now waits for the slide's size to hold before measuring the words (it failed
+  1 run in 5 on desktop, and once in CI).
 - **Nov 20 (#75):** Restyle step 3, the Classes page. Each class is a heading (opening its page) with a
   three-dots menu: What lectures covered, Class details, Exams, Files (each opens the class's page at
   that part: `#/class/<id>/<part>`) and Delete class (asks first). Under it, a round button per lecture
