@@ -275,6 +275,19 @@ test('dragging across words selects them instead of turning the slide', async ({
   if ((await toggle.getAttribute('aria-expanded')) === 'true') await toggle.click();
   await expect(page.getByRole('complementary', { name: 'Notes and highlights' })).toBeHidden();
   await expect(page.getByTestId('slide-page')).toHaveAttribute('data-rendered', '2');
+  // Closing the panel widens the slide and redraws it (data-rendered already says 2): wait until its
+  // size holds, or the words measured below are replaced mid-drag and the selection is lost
+  let last = '';
+  await expect
+    .poll(async () => {
+      const b = await page.getByTestId('slide-page').boundingBox();
+      const now = JSON.stringify(b);
+      const same = now === last;
+      last = now;
+      return same;
+    }, { intervals: [150] })
+    .toBe(true);
+  await expect(page.locator('.sv-page .textLayer span', { hasText: 'Fixture text 2' })).toBeVisible();
   const words = page.locator('.sv-page .textLayer span', { hasText: 'Fixture text 2' });
   const box = (await words.boundingBox())!;
   await page.mouse.move(box.x + 2, box.y + box.height / 2);

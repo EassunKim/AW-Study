@@ -129,6 +129,9 @@ the "Test and publish" run on `main` to finish, then press Update.
   AI** is always there. `AiBackend.status()` is new (HTTP and fake). **Compare models** lists your 5 latest
   sections, each opening its quiz screen with the comparison showing (`#/class/<id>/quiz/<sectionId>/compare`).
   Daily study minutes move here with #78 (Nathan's Claude).
+  Also fixed a race in `annotations.spec.ts` ("dragging across words"): closing the notes panel redraws the
+  slide wider, so the test now waits for the slide's size to hold before measuring the words (it failed
+  1 run in 5 on desktop, and once in CI).
 - **Nov 20 (#75):** Restyle step 3, the Classes page. Each class is a heading (opening its page) with a
   three-dots menu: What lectures covered, Class details, Exams, Files (each opens the class's page at
   that part: `#/class/<id>/<part>`) and Delete class (asks first). Under it, a round button per lecture
