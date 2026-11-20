@@ -95,8 +95,11 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   checked on the device before use).
 - `src/ui/`: the screens (React). `route.ts` (hash routes, no router library), `store-context.ts`
   (the store reaches screens through React context). Three main pages behind `NavBar` (#68): `TasksScreen`
-  (`#/`, the home page: today's checklist), `ClassesScreen` (`#/classes`) and `SettingsScreen`; every other
-  screen is full-screen, without the bar, and has a back link. Classes (#26): `ClassesScreen`,
+  (`#/`, the home page: today's checklist), `ClassesScreen` (`#/classes`: a heading and `ClassMenu` per class, a date button per lecture to fill in,
+  from `unfilledLectures` in `classes.ts`) and `SettingsScreen`; every other
+  screen is full-screen, without the bar, and has a back link. A class's page opens at a part
+  (`#/class/<id>/exams` and so on, from the menu) or at "What was covered?" for a date
+  (`#/class/<id>/cover/<date>`, from a date button). Classes (#26): `ClassesScreen`,
   `ClassScreen`, `ClassEditor`, `ExamEditor`, `LectureForm` ("What was covered?"), `SlidesScreen`
   (the viewer, loaded lazily with PDF.js), `pdf-file.ts` (reading a picked PDF) and `classes.ts`
   (pure helpers with tests: lecture times, the latest lecture, labels). Quizzes (#40): `QuizScreen` (making

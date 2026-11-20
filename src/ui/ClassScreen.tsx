@@ -1,18 +1,21 @@
 // One class: its lecture times and term, "What was covered?" (with a prompt for the latest lecture
 // when it hasn't been filled in), its lectures and their slides, its exams, and its slide decks.
-import { useState, type FormEvent } from 'react';
+// The class menu on the Classes page opens it at one part (`part`: scrolled to it, or the class
+// editor for "details"), and a lecture's date button opens "What was covered?" for that date (`cover`),
+// going back to the Classes page when it's saved or cancelled.
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { DECK_TITLE_MAX } from '../db/lectures';
 import { deviceTimeZone, studyDay } from '../lib/studyDay';
 import type { Exam, LectureWithSections, SlideDeck } from '../types/lecture';
 import { describeScore } from '../quiz/pick';
 import type { QuizAttempt } from '../types/quiz';
-import { describeMeetings, formatDate, latestLecture, orderSections, relativeDay, slidesLabel, titleFromFileName } from './classes';
+import { describeMeetings, formatDate, latestLecture, lectureMinutesOn, orderSections, relativeDay, slidesLabel, titleFromFileName } from './classes';
 import { ClassEditor } from './ClassEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ExamEditor, KIND_NAMES } from './ExamEditor';
 import { LectureForm } from './LectureForm';
 import { PdfProblem, readPdfFile } from './pdf-file';
-import { go, href } from './route';
+import { go, href, type ClassPart } from './route';
 import { DAY_START_HOUR } from './settings';
 import { useStore } from './store-context';
 import { messageOf, useLoad } from './useLoad';
@@ -23,7 +26,7 @@ type Deleting =
   | { kind: 'exam'; exam: Exam }
   | { kind: 'deck'; deck: SlideDeck };
 
-export function ClassScreen({ courseId }: { courseId: string }) {
+export function ClassScreen({ courseId, part, cover }: { courseId: string; part?: ClassPart; cover?: string }) {
   const store = useStore();
   const { data, error, reload } = useLoad(async () => {
     const [course, lectures, decks, exams, attempts] = await Promise.all([
@@ -38,8 +41,18 @@ export function ClassScreen({ courseId }: { courseId: string }) {
     for (const a of attempts) if (a.courseId === courseId && !lastQuiz.has(a.sectionId)) lastQuiz.set(a.sectionId, a);
     return { course, lectures, decks, exams, lastQuiz };
   }, [store, courseId]);
-  const [editingClass, setEditingClass] = useState(false);
+  const [editingClass, setEditingClass] = useState(part === 'details');
   const [recording, setRecording] = useState<{ date: string; minutes: number | null } | null>(null);
+  // Opened at a part or a date: once, when the class has loaded
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!data?.course || opened.current) return;
+    opened.current = true;
+    if (cover) setRecording({ date: cover, minutes: lectureMinutesOn(data.course.meetings, cover) });
+    const heading = part && part !== 'details' ? document.getElementById(`class-${part}`) : null;
+    heading?.scrollIntoView({ block: 'start' });
+    heading?.focus({ preventScroll: true });
+  }, [data, part, cover]);
   const [editingLecture, setEditingLecture] = useState<string | null>(null);
   const [exam, setExam] = useState<'new' | Exam | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -143,10 +156,12 @@ export function ClassScreen({ courseId }: { courseId: string }) {
           lectures={lectures}
           defaults={recording}
           onCancel={async () => {
+            if (cover) return go({ name: 'classes' }); // back where the date button was
             setRecording(null);
             await reload(); // a PDF may have been stored before the lecture was refused
           }}
           onSaved={async () => {
+            if (cover) return go({ name: 'classes' });
             setRecording(null);
             await reload();
           }}
@@ -164,7 +179,7 @@ export function ClassScreen({ courseId }: { courseId: string }) {
         </div>
       )}
 
-      <h3>
+      <h3 id="class-lectures" tabIndex={-1}>
         {lectures.length} lecture{lectures.length === 1 ? '' : 's'}
       </h3>
       {lectures.length === 0 && <p className="muted">None yet. After a lecture, say which slides it covered.</p>}
@@ -220,7 +235,9 @@ export function ClassScreen({ courseId }: { courseId: string }) {
         ))}
       </ul>
 
-      <h3>Exams</h3>
+      <h3 id="class-exams" tabIndex={-1}>
+        Exams
+      </h3>
       {exams.length === 0 && exam === null && <p className="muted">No exams added. Adding them lets the planner get you ready in time.</p>}
       <ul className="list" aria-label="Exams">
         {exams.map((e) =>
@@ -259,7 +276,9 @@ export function ClassScreen({ courseId }: { courseId: string }) {
         </button>
       )}
 
-      <h3>Slide decks</h3>
+      <h3 id="class-files" tabIndex={-1}>
+        Slide decks
+      </h3>
       {decks.length === 0 && <p className="muted">No slides yet. Upload them here, or when you say what a lecture covered.</p>}
       <ul className="list" aria-label="Slide decks">
         {decks.map((deck) =>

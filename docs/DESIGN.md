@@ -40,6 +40,7 @@ Three moments: setting up once, telling Honed what each lecture covered, and the
 **After each lecture**
 
 - Honed knows when your classes happen, so after one it asks: *What did you cover today?* (in the prototype, when you next open the app; see Open questions).
+- Until you do, the Classes page shows a round button for each lecture not filled in yet, by date (Nov 20, #75); they pile up while you're behind, and each opens "What was covered?" for its lecture.
 - You answer with the slides and a range, e.g. *slides 21–30 of Week 4.pdf*, or by uploading a new file. The lecture's length (from the class) becomes that section's study budget.
 
 **A normal day**

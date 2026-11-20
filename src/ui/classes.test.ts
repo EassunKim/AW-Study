@@ -9,11 +9,14 @@ import {
   formatTime,
   groupMeetings,
   latestLecture,
+  lectureMinutesOn,
   localNow,
   orderSections,
   relativeDay,
+  shortDate,
   slidesLabel,
   titleFromFileName,
+  unfilledLectures,
 } from './classes';
 
 const TZ = 'America/Los_Angeles';
@@ -153,5 +156,49 @@ describe('carryOn', () => {
     expect(carryOn([lecture('2026-11-18', [['w4', 21, 30]])], [w3, w4])).toBeNull();
     expect(carryOn([], [w3, w4])).toBeNull();
     expect(carryOn([lecture('2026-11-18', [['gone', 1, 3]])], [w3, w4])).toBeNull();
+  });
+});
+
+describe('unfilledLectures', () => {
+  // Los Angeles is UTC−8 in November. MWF 10:30; added Fri Nov 13 at 9 a.m. local
+  const at = (local: string) => new Date(`${local}-08:00`);
+  const course = { meetings: mwf, termStart: null, termEnd: null, createdAt: '2026-11-13T17:00:00.000Z' };
+  const none = new Set<string>();
+  const dates = (list: { date: string }[]) => list.map((l) => l.date);
+
+  it('lists every lecture since a week before the class was added, oldest first, once each has started', () => {
+    // From Fri Nov 6: Nov 6, 9, 11, 13, 16, and Wed Nov 18 once 10:30 has come
+    expect(dates(unfilledLectures(course, none, at('2026-11-18T10:29'), TZ))).toEqual(['2026-11-06', '2026-11-09', '2026-11-11', '2026-11-13', '2026-11-16']);
+    const list = unfilledLectures(course, none, at('2026-11-18T10:30'), TZ);
+    expect(dates(list).at(-1)).toBe('2026-11-18');
+    expect(list.at(-1)!.minutes).toBe(50);
+  });
+  it('leaves out the lectures already filled in', () => {
+    expect(dates(unfilledLectures(course, new Set(['2026-11-06', '2026-11-11', '2026-11-16']), at('2026-11-17T12:00'), TZ))).toEqual(['2026-11-09', '2026-11-13']);
+  });
+  it('keeps within the term', () => {
+    expect(dates(unfilledLectures({ ...course, termStart: '2026-11-11' }, none, at('2026-11-17T12:00'), TZ))).toEqual(['2026-11-11', '2026-11-13', '2026-11-16']);
+    expect(dates(unfilledLectures({ ...course, termEnd: '2026-11-11' }, none, at('2026-11-30T12:00'), TZ))).toEqual(['2026-11-06', '2026-11-09', '2026-11-11']);
+  });
+  it('uses the local date the class was added, and each day’s last lecture for its length', () => {
+    // 2 a.m. UTC on Nov 14 is still Nov 13 in Los Angeles: from Nov 6, not Nov 7
+    const late = { ...course, createdAt: '2026-11-14T02:00:00.000Z', meetings: [{ day: 5, start: '09:00', minutes: 50 }, { day: 5, start: '14:00', minutes: 80 }] as Meeting[] };
+    expect(unfilledLectures(late, none, at('2026-11-14T12:00'), TZ)).toEqual([
+      { date: '2026-11-06', minutes: 80 },
+      { date: '2026-11-13', minutes: 80 },
+    ]);
+  });
+  it('is empty for a class with no set times, or a term not started yet', () => {
+    expect(unfilledLectures({ ...course, meetings: [] }, none, at('2026-11-18T12:00'), TZ)).toEqual([]);
+    expect(unfilledLectures({ ...course, termStart: '2027-01-05' }, none, at('2026-11-18T12:00'), TZ)).toEqual([]);
+  });
+});
+
+describe('lectureMinutesOn and shortDate', () => {
+  it('gives a date’s lecture length, and the date for a button', () => {
+    expect(lectureMinutesOn(mwf, '2026-11-18')).toBe(50);
+    expect(lectureMinutesOn(mwf, '2026-11-17')).toBeNull();
+    expect(shortDate('2026-11-05')).toBe('Nov 5');
+    expect(shortDate('2027-01-15')).toBe('Jan 15');
   });
 });

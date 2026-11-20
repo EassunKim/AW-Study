@@ -233,7 +233,7 @@ test('saving what was covered makes the quiz questions in the background, so the
   await expect(page.getByTestId('bank-jobs')).toBeHidden();
 
   // The quiz is ready, without pressing Make questions
-  await page.getByTestId('class-row').getByRole('link').click();
+  await page.getByTestId('class-row').getByRole('heading').getByRole('link').click();
   await quizLink(page).click();
   await expect(page.getByTestId('bank-size')).toHaveText('10 questions in this section’s bank.');
   await expect(page.getByRole('button', { name: 'Start the quiz (10 questions)' })).toBeVisible();
@@ -294,7 +294,7 @@ test('locking stops the background work: a late answer writes nothing', async ({
   await unlockWithPassphrase(page);
   await expect(page.getByTestId('bank-jobs')).toBeHidden();
   await toClasses(page); // unlocking opens Tasks
-  await page.getByTestId('class-row').getByRole('link').click();
+  await page.getByTestId('class-row').getByRole('heading').getByRole('link').click();
   await quizLink(page).click();
   await expect(page.getByTestId('bank-size')).toContainText('No questions yet');
 });

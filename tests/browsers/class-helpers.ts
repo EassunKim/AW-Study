@@ -18,6 +18,12 @@ export async function watchProblems(page: Page): Promise<() => Promise<string[]>
 
 export const classRow = (page: Page, name: string) => page.getByTestId('class-row').filter({ hasText: name });
 
+/** On the Classes page: opens a class's own page, from its heading. */
+export async function openClass(page: Page, name: string) {
+  await classRow(page, name).getByRole('heading').getByRole('link').click();
+  await expect(page.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
+}
+
 /** The nav bar at the bottom of the three main pages (Tasks, Classes, Settings). */
 export const navBar = (page: Page) => page.getByRole('navigation', { name: 'Pages' });
 

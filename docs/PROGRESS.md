@@ -8,7 +8,7 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 
 Milestones 3 to 7 are **done and live** (deployed Nov 19, main 8ee4c61). Now: the **restyle** to
 Matt's and Nathan's design (`docs/design/README.md`, "Building it"; one issue and PR per step: step 1
-#68 and step 6 #70 done, steps 2 to 5 free). Then milestone 8 (first run and after-class prompts). Open question
+#68, step 3 #75 and step 6 #70 done; step 2 with Nathan's Claude (#72); steps 4 and 5 free). Then milestone 8 (first run and after-class prompts). Open question
 for Matt and Nathan before 8 starts: are after-class prompts when you next open the app enough for
 now, or do we want real push notifications (DESIGN, "Open questions")?
 
@@ -44,6 +44,7 @@ slides" and "M6: AI helper and quizzes":
 | Tasks page logic: grouped by class, saved order, statuses, progress (restyle step 2, no screen) | #72 | Nathan's Claude | `src/types/plan.ts` (`StudySettings`), the settings part of `src/db/plan.ts`, new `src/plan/tasks.ts` | Contract and storage (PR #73) and the logic (`src/plan/tasks.ts`, PR #74) **done**; the screen next (#68 is in) |
 | Restyle step 1: colours (dark and light), Phone / Light / Dark setting, the Lexend font, the nav bar, the Tasks, Classes and Settings pages | #68 | Matt's Claude | `src/app.css` (colours, buttons, nav bar), `src/ui/theme.ts`, `src/ui/NavBar.tsx`, `src/ui/TasksScreen.tsx`, the routes, the frame in `src/App.tsx`, the theme part of Settings, `tests/browsers/look.spec.ts` | **Done** (PR #69). Steps 2 to 5 are free |
 | Restyle step 2: the Tasks page screen (rows by class, drag, ticks, penguin) | #77 | Nathan's Claude | `src/ui/TasksScreen.tsx`, `src/ui/Penguin.tsx`, `src/ui/planning.ts`, which items Play runs in `src/ui/PlayScreen.tsx`, the daily minutes in Settings, the Tasks styles | **Done** (PR #78) |
+| Restyle step 3: the Classes page (a heading and menu per class, date buttons for lectures to fill in, a round +) | #75 | Matt's Claude | `src/ui/ClassesScreen.tsx`, `src/ui/ClassMenu.tsx`, `unfilledLectures` and `shortDate` in `src/ui/classes.ts`, the class routes' part and date, opening at them in `ClassScreen.tsx`, the Classes styles in `src/app.css` | **Done** (PR #76) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -121,6 +122,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#75):** Restyle step 3, the Classes page. Each class is a heading (opening its page) with a
+  three-dots menu: What lectures covered, Class details, Exams, Files (each opens the class's page at
+  that part: `#/class/<id>/<part>`) and Delete class (asks first). Under it, a round button per lecture
+  not filled in yet (`unfilledLectures`: every lecture time from a week before the class was added, or
+  the term's start if later, to now, never past the term's end), opening "What was covered?" for that
+  date (`#/class/<id>/cover/<date>`) and coming back to Classes when saved or cancelled. The latest
+  lectures list and each class's details left this page; they're on the class's page.
 - **Nov 19 (#77):** The Tasks page as drawn: progress bar, Start, a row per class (`::` to drag, saved; arrow keys
   too), tap to open its lectures (name = slides, Quiz = quiz, a tick when done), the penguin when there's nothing.
   Play runs the same list in the same order, skipping what's done (slides read but no quiz yet: straight to the
@@ -130,7 +138,7 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 19 (#72):** `src/plan/tasks.ts`: the Tasks page's day, grouped by class in the saved order, fixed at the start of
   the day (worked out from the history before today, so done items stay, ticked), done = its quiz done, statuses
   (Exam soon within 7 days, New, Review, done) and the progress bar (slide time creeps up to 80% of the study part).
-  No screen yet: it goes on `Today.tsx` after #68.
+  The screen is #77.
 - **Nov 19 (#72):** `StudySettings.classOrder` (contract change): the Tasks page's class order, saved with the daily
   minutes and encrypted like them. `saveStudySettings` now takes only what changes (`{ dailyMinutes }` keeps the order);
   settings saved before read with an empty order.
@@ -366,6 +374,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **Playwright's `getByRole(..., { name: 'Classes' })` matches any name *containing* "classes", any
+  case**, so "Lock your classes and slides" on the setup screen passed for the Classes page's heading
+  (found in #68). Use `exact: true` for headings and links whose words appear elsewhere.
 - **On a phone, the slides have a fixed height with the notes panel under them (`annotate.css`), so
   anything that makes the viewer's bar taller pushes the thumbnails over the panel**, where they catch
   taps meant for Box and Pin a note. The restyle's roomier pill buttons and the wider Lexend did it on

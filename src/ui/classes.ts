@@ -1,7 +1,7 @@
 // Plain helpers for the class and lecture screens: lecture times grouped the way people say them
 // ("Mon, Wed, Fri 10:30 am, 50 min"), the latest lecture that has happened (the default answer to
 // "What was covered?"), and labels for dates and slide ranges. No React, so they're unit-tested.
-import type { LectureWithSections, Meeting, SlideDeck, Weekday } from '../types/lecture';
+import type { Course, LectureWithSections, Meeting, SlideDeck, Weekday } from '../types/lecture';
 
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 /** Monday first, as timetables are. */
@@ -103,6 +103,50 @@ export function latestLecture(meetings: readonly Meeting[], at: Date, timeZone: 
     if (started[0]) return { date, minutes: started[0].minutes };
   }
   return null; // unreachable: every weekday comes up within 7 days
+}
+
+/** How long the lecture on `date` was: the last one that day (as latestLecture picks), or null if none. */
+export function lectureMinutesOn(meetings: readonly Meeting[], date: string): number | null {
+  const day = weekday(date);
+  const that = meetings.filter((m) => m.day === day).sort((a, b) => b.start.localeCompare(a.start))[0];
+  return that ? that.minutes : null;
+}
+
+/** How far before a class was added its lectures still count as "to fill in": latestLecture's week. */
+export const UNFILLED_LOOK_BACK_DAYS = 7;
+
+/**
+ * The lectures that have happened but aren't filled in yet, oldest first (the Classes page's date
+ * buttons, docs/design "Classes"). Every lecture time from a week before the class was added (or the
+ * term's start, if later) up to now, never past the term's end, less the dates in `filled`. Like
+ * latestLecture, a lecture counts once it has started.
+ */
+export function unfilledLectures(
+  course: Pick<Course, 'meetings' | 'termStart' | 'termEnd' | 'createdAt'>,
+  filled: ReadonlySet<string>,
+  at: Date,
+  timeZone: string,
+): { date: string; minutes: number }[] {
+  if (course.meetings.length === 0) return [];
+  const now = localNow(at, timeZone);
+  let from = addDays(localNow(new Date(course.createdAt), timeZone).date, -UNFILLED_LOOK_BACK_DAYS);
+  if (course.termStart && course.termStart > from) from = course.termStart;
+  const to = course.termEnd && course.termEnd < now.date ? course.termEnd : now.date;
+  const found: { date: string; minutes: number }[] = [];
+  for (let date = from; date <= to; date = addDays(date, 1)) {
+    if (filled.has(date)) continue;
+    const day = weekday(date);
+    const started = course.meetings
+      .filter((m) => m.day === day && (date < now.date || m.start <= now.time))
+      .sort((a, b) => b.start.localeCompare(a.start));
+    if (started[0]) found.push({ date, minutes: started[0].minutes });
+  }
+  return found;
+}
+
+/** "Nov 15": a lecture's date on its button. */
+export function shortDate(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
 }
 
 /** "Wed, Nov 18" (and the year when it isn't `thisYear`). */
