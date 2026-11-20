@@ -71,8 +71,8 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#111827',
-        theme_color: '#111827',
+        background_color: '#272727', // docs/design: the dark grey
+        theme_color: '#272727',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -85,7 +85,8 @@ export default defineConfig({
         skipWaiting: true,
         // .mjs: PDF.js's worker. Its fonts and decoders are precached too, so slides open offline;
         // its character maps (for Chinese, Japanese and Korean text, 1.4 MB) are cached when used.
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,webmanifest,wasm}', 'pdfjs/standard_fonts/*', 'pdfjs/iccs/*.icc'],
+        // The app's font (Lexend, about 30 KB a file) too, so it looks the same offline.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,webmanifest,wasm}', 'assets/lexend-*.woff2', 'pdfjs/standard_fonts/*', 'pdfjs/iccs/*.icc'],
         globIgnores: ['pdfjs/**/LICENSE*', 'pdfjs/wasm/*_nowasm_fallback.js'], // the fallbacks: cached if ever used
         runtimeCaching: [
           {

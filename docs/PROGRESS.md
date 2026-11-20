@@ -6,8 +6,9 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 
 ## Now (updated Nov 19, 2026)
 
-Milestones 3 to 7 are **done and live** (deployed Nov 19, main 8ee4c61). Next: trying it all on a
-real phone (Nathan, Nov 19), then milestone 8 (first run and after-class prompts). Open question
+Milestones 3 to 7 are **done and live** (deployed Nov 19, main 8ee4c61). Now: the **restyle** to
+Matt's and Nathan's design (`docs/design/README.md`, "Building it"; one issue and PR per step: step 1
+#68 and step 6 #70 done, steps 2 to 5 free). Then milestone 8 (first run and after-class prompts). Open question
 for Matt and Nathan before 8 starts: are after-class prompts when you next open the app enough for
 now, or do we want real push notifications (DESIGN, "Open questions")?
 
@@ -41,6 +42,7 @@ slides" and "M6: AI helper and quizzes":
 | Viewer tools: highlights, notes, Explain this, Ask about this (milestone 7) | #56 | Matt's Claude | `src/types/annotation.ts`, `src/db/annotations.ts` (and its wiring in `schema.ts`, `store.ts`, the delete cascades in `lectures.ts`), `src/viewer/`, the viewer props in the Slides, Play and Quiz screens | **Done** (contract and storage PR #57, viewer tools PR #58). Try on an iPhone after deploy |
 | First-week quizzes: 10 questions, scaled by the section's slides (restyle step 6) | #70 | Nathan's Claude | `src/plan/rules.ts`, `src/plan/planner.ts`, `src/quiz/pick.ts`, one line of `src/ui/PlayScreen.tsx` | **Done** (PR #71) |
 | Tasks page logic: grouped by class, saved order, statuses, progress (restyle step 2, no screen) | #72 | Nathan's Claude | `src/types/plan.ts` (`StudySettings`), the settings part of `src/db/plan.ts`, new `src/plan/tasks.ts` | Contract and storage **done** (PR #73); the logic next |
+| Restyle step 1: colours (dark and light), Phone / Light / Dark setting, the Lexend font, the nav bar, the Tasks, Classes and Settings pages | #68 | Matt's Claude | `src/app.css` (colours, buttons, nav bar), `src/ui/theme.ts`, `src/ui/NavBar.tsx`, `src/ui/TasksScreen.tsx`, the routes, the frame in `src/App.tsx`, the theme part of Settings, `tests/browsers/look.spec.ts` | **Done** (PR #69). Steps 2 to 5 are free |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -121,6 +123,14 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 19 (#72):** `StudySettings.classOrder` (contract change): the Tasks page's class order, saved with the daily
   minutes and encrypted like them. `saveStudySettings` now takes only what changes (`{ dailyMinutes }` keeps the order);
   settings saved before read with an empty order.
+- **Nov 19 (#68):** Restyle step 1. The colours from `docs/design/` are CSS variables in `src/app.css`, dark
+  and light (`--accent` for green text and outlines, darker in light mode; `--fill`/`--on-fill` for green
+  behind things). Settings has **Colours: Phone / Light / Dark** (`src/ui/theme.ts`: localStorage
+  `honed:theme`, not the encrypted store, so the unlock screen has it; `<html data-theme>`, none for Phone).
+  Lexend is bundled (`@fontsource-variable/lexend`, OFL, precached). Buttons are green outlined pills, the
+  main one filled. The nav bar (`NavBar.tsx`) is on Tasks (`#/`, now the home page), Classes (`#/classes`)
+  and Settings only. Tasks and Classes keep their old content until steps 2 and 3. Lock stays in the
+  header too (every screen), and Settings lost its back link (the bar replaces it).
 - **Nov 19 (#70):** First-week quizzes are sized by the section: half a question a slide, 5 to 15 (20 slides make the
   default 10; `RULES.firstWeekQuiz`). The first quiz after the first week uses the same size; the score table takes over
   after it. A quiz started by hand from a class asks 10 (`QUIZ_SIZE`, was 5).
@@ -345,6 +355,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **On a phone, the slides have a fixed height with the notes panel under them (`annotate.css`), so
+  anything that makes the viewer's bar taller pushes the thumbnails over the panel**, where they catch
+  taps meant for Box and Pin a note. The restyle's roomier pill buttons and the wider Lexend did it on
+  the iPhone (#68): the bar's buttons are compact on purpose (`viewer.css`, `.sv-bar button`). The
+  iPhone run of `annotations.spec.ts` catches it (a click that waits forever on "intercepts pointer
+  events").
 - **On an iPhone, a passkey saved to Chrome (Google Password Manager) can't be trusted for unlocking.**
   Nathan's (Nov 19) unlocked once, then every try through "More from Chrome…" ended in "cancelled or
   timed out" (`NotAllowedError`). A new one saved to Apple's Passwords works. Exact cause unknown (PRF

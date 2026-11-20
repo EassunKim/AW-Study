@@ -1,5 +1,6 @@
-// The home screen for now (milestone 5 puts today's checklist and Play here): your classes, a
-// reminder for each lecture that hasn't been filled in, and the latest lectures with their slides.
+// The Classes page (#/classes, one of the three main pages): your classes, a reminder for each
+// lecture that hasn't been filled in, and the latest lectures with their slides. (Its look changes to
+// docs/design's headings and date buttons in step 3 of the restyle.)
 import { useState } from 'react';
 import { deviceTimeZone, studyDay } from '../lib/studyDay';
 import type { CourseSummary, LectureWithSections, SlideDeck } from '../types/lecture';
@@ -8,7 +9,6 @@ import { ClassEditor } from './ClassEditor';
 import { go, href } from './route';
 import { DAY_START_HOUR } from './settings';
 import { useStore } from './store-context';
-import { Today } from './Today';
 import { useLoad } from './useLoad';
 
 const LATEST_SHOWN = 5;
@@ -48,9 +48,8 @@ export function ClassesScreen() {
     .slice(0, LATEST_SHOWN);
 
   return (
-    <section>
-      <Today />
-      <h2>Classes</h2>
+    <section aria-labelledby="classes-title">
+      <h2 id="classes-title">Classes</h2>
       {toFill.length > 0 && (
         <ul className="list" aria-label="Lectures to fill in">
           {toFill.map(({ course, date }) => (

@@ -7,11 +7,13 @@ import { deviceTimeZone, studyDay } from './lib/studyDay';
 import { ClassesScreen } from './ui/ClassesScreen';
 import { ClassScreen } from './ui/ClassScreen';
 import { VaultContext } from './ui/lock-parts';
+import { mainPage, NavBar } from './ui/NavBar';
 import { go, href, useRoute } from './ui/route';
 import { DAY_START_HOUR } from './ui/settings';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { SetupScreen } from './ui/SetupScreen';
 import { StoreContext } from './ui/store-context';
+import { TasksScreen } from './ui/TasksScreen';
 import { UnlockScreen } from './ui/UnlockScreen';
 import { isUpdateReady, onUpdateChange, setActivity } from './ui/update';
 import type { Vault, VaultStatus } from './ui/vault';
@@ -21,9 +23,10 @@ const SlidesScreen = lazy(() => import('./ui/SlidesScreen'));
 const QuizScreen = lazy(() => import('./ui/QuizScreen'));
 const PlayScreen = lazy(() => import('./ui/PlayScreen'));
 
-// The page frame: the name (back to the classes), the current screen, and a footer with today's
-// study day and whether the app is ready to work offline. Until the app is unlocked, the only
-// screen is setup (first run) or unlock.
+// The page frame: the name (back to Tasks, the home page) and Lock, the current screen, a footer with
+// today's study day and whether the app is ready to work offline, and on the three main pages (Tasks,
+// Classes, Settings) the nav bar. Until the app is unlocked, the only screen is setup (first run) or
+// unlock.
 export default function App({ store, vault }: { store: StudyStore; vault: Vault }) {
   const route = useRoute();
   const [status, setStatus] = useState<VaultStatus>(() => vault.status());
@@ -35,8 +38,9 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   const lock = () => {
     vault.lock();
     refresh();
-    go({ name: 'classes' });
+    go({ name: 'tasks' });
   };
+  const page = status === 'unlocked' ? mainPage(route) : null;
 
   return (
     <VaultContext value={vault}>
@@ -45,17 +49,12 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
         <StopJobsWhenLocked unlocked={status === 'unlocked'} />
         <header className={wide ? 'top wide' : 'top'}>
           <h1>
-            <a href={href({ name: 'classes' })}>{APP_NAME}</a>
+            <a href={href({ name: 'tasks' })}>{APP_NAME}</a>
           </h1>
           {status === 'unlocked' && (
-            <nav className="row" aria-label="App">
-              <a className="button" href={href({ name: 'settings' })}>
-                Settings
-              </a>
-              <button type="button" onClick={lock}>
-                Lock
-              </button>
-            </nav>
+            <button type="button" onClick={lock}>
+              Lock
+            </button>
           )}
         </header>
         <main className={wide ? 'app wide' : 'app'}>
@@ -66,7 +65,8 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
           {status === 'unlocked' && <BankJobsStatus />}
           {status === 'unlocked' && <Screen route={route} onLock={lock} />}
         </main>
-        <Footer wide={wide} />
+        <Footer wide={wide} nav={page !== null} />
+        {page && <NavBar current={page} />}
         </BankJobsProvider>
       </StoreContext>
     </VaultContext>
@@ -76,6 +76,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
 function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock: () => void }) {
   return (
     <>
+      {route.name === 'tasks' && <TasksScreen />}
       {route.name === 'classes' && <ClassesScreen />}
       {route.name === 'class' && <ClassScreen key={route.courseId} courseId={route.courseId} />}
       {route.name === 'slides' && (
@@ -97,7 +98,7 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
       {route.name === 'not-found' && (
         <section>
           <h2>Page not found</h2>
-          <a href={href({ name: 'classes' })}>← Back to your classes</a>
+          <a href={href({ name: 'tasks' })}>← Back to Tasks</a>
         </section>
       )}
     </>
@@ -132,7 +133,7 @@ function StopJobsWhenLocked({ unlocked }: { unlocked: boolean }) {
   return null;
 }
 
-function Footer({ wide }: { wide: boolean }) {
+function Footer({ wide, nav }: { wide: boolean; nav: boolean }) {
   const [now, setNow] = useState(() => new Date());
   const [offlineReady, setOfflineReady] = useState(false);
 
@@ -147,7 +148,7 @@ function Footer({ wide }: { wide: boolean }) {
   }, []);
 
   return (
-    <footer className={wide ? 'foot muted small wide' : 'foot muted small'}>
+    <footer className={['foot muted small', wide && 'wide', nav && 'above-nav'].filter(Boolean).join(' ')}>
       <span>
         Study day <span data-testid="study-day">{studyDay(now, deviceTimeZone(), DAY_START_HOUR)}</span>
       </span>

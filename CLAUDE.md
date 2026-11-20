@@ -94,7 +94,9 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   (our helper at `/ai/`), `FakeAiBackend` (tests and development), and `check.ts` (replies are
   checked on the device before use).
 - `src/ui/`: the screens (React). `route.ts` (hash routes, no router library), `store-context.ts`
-  (the store reaches screens through React context). Classes (#26): `ClassesScreen` (home for now),
+  (the store reaches screens through React context). Three main pages behind `NavBar` (#68): `TasksScreen`
+  (`#/`, the home page: today's checklist), `ClassesScreen` (`#/classes`) and `SettingsScreen`; every other
+  screen is full-screen, without the bar, and has a back link. Classes (#26): `ClassesScreen`,
   `ClassScreen`, `ClassEditor`, `ExamEditor`, `LectureForm` ("What was covered?"), `SlidesScreen`
   (the viewer, loaded lazily with PDF.js), `pdf-file.ts` (reading a picked PDF) and `classes.ts`
   (pure helpers with tests: lecture times, the latest lecture, labels). Quizzes (#40): `QuizScreen` (making
@@ -105,7 +107,7 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   while unlocked, where a banner offers Reload and Lock applies it).
   `bank-jobs.tsx` (making question banks in the background after "What was covered?"; held by App).
   `CompareModels` (the same slides to Haiku, Sonnet and Opus, side by side; the helper allows only those
-  three by name). Planner (#47): `Today` (the checklist on the home screen, Play, the daily minutes), `PlayScreen`
+  three by name). Planner (#47): `Today` (the checklist on the Tasks page, Play, the daily minutes), `PlayScreen`
   (`#/play`: each item's session with its timer, the quiz offered at 80%, then the quiz), `planning.ts`
   (loads what the planner needs and the names to show).
 - `src/plan/`: the planner (#47), pure, with tests: `planner.ts` works out today's checklist from the
@@ -116,7 +118,12 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   (`tests/browsers/quiz.spec.ts`, service workers off there), so they never spend usage. Forms use `noValidate` and
   show our own messages; no `<select>` (WebKit's pulls in a stylesheet the CSP blocks). `ConfirmDialog` (never `confirm()`), `settings.ts` (day
   start 4 a.m.).
-- `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design.
+- `docs/PROGRESS.md`: the status board. `docs/DESIGN.md`: the design. `docs/design/`: how the app looks
+  (`screens.png` and its README: colours, the nav bar, the Tasks and Classes pages, the restyle's order).
+- The look (#68): colours are CSS variables in `src/app.css`, dark and light (`--accent` green for text and
+  outlines, `--fill`/`--on-fill` for green behind things); never a colour typed into a screen.
+  `src/ui/theme.ts` (Phone / Light / Dark, a device setting in localStorage, applied before the first
+  draw); the Lexend font is bundled (`@fontsource-variable/lexend`), never fetched from another site.
 - `helper/`: the AI helper (milestone 6), its own image `ghcr.io/nandminc/aw-study-ai`: a Node
   server (its own modules only) that checks the Cloudflare Access token, picks the person's own
   Claude Code token and runs `claude -p` with no tools (`helper/claude.mjs`). Tests in

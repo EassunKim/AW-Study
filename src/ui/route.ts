@@ -1,4 +1,4 @@
-// Which screen to show, from the URL's hash: #/ (classes), #/class/<id>, #/class/<id>/slides/<deckId>
+// Which screen to show, from the URL's hash: #/ (Tasks, the home page), #/classes, #/class/<id>, #/class/<id>/slides/<deckId>
 // (a deck in the viewer, optionally .../<first>-<last> for a section), #/class/<id>/quiz/<sectionId>,
 // #/play (today's checklist, one item after another), #/settings.
 // The hash keeps everything on one page (the service worker serves it offline) while the back
@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 
 export type Route =
+  | { name: 'tasks' }
   | { name: 'classes' }
   | { name: 'class'; courseId: string }
   | { name: 'slides'; courseId: string; deckId: string; first?: number; last?: number }
@@ -17,7 +18,8 @@ export type Route =
 const ID = '([A-Za-z0-9-]{1,64})';
 const PAGE = '([1-9][0-9]{0,3})';
 const PATTERNS: [RegExp, (m: RegExpMatchArray) => Route | null][] = [
-  [/^#?\/?$/, () => ({ name: 'classes' })],
+  [/^#?\/?$/, () => ({ name: 'tasks' })],
+  [/^#\/classes$/, () => ({ name: 'classes' })],
   [new RegExp(`^#/class/${ID}$`), (m) => ({ name: 'class', courseId: m[1]! })],
   [new RegExp(`^#/class/${ID}/slides/${ID}$`), (m) => ({ name: 'slides', courseId: m[1]!, deckId: m[2]! })],
   [
@@ -41,8 +43,10 @@ export function parseRoute(hash: string): Route {
 
 export function href(route: Exclude<Route, { name: 'not-found' }>): string {
   switch (route.name) {
-    case 'classes':
+    case 'tasks':
       return '#/';
+    case 'classes':
+      return '#/classes';
     case 'class':
       return `#/class/${route.courseId}`;
     case 'slides': {
