@@ -602,3 +602,137 @@ describe('Google unlock (#101)', () => {
     rmSync(old, { recursive: true, force: true });
   });
 });
+
+describe('sync: the keyring (#105)', () => {
+  const KEYRING = { v: 1, entries: [{ id: 'e1', method: 'recovery', wrapped: 'AAAA' }] };
+  const KEYCHECK = { v: 1, iv: 'aaaaaaaaaaaaaaaa', ct: 'bbbb' };
+
+  it('the first device uploads it; later uploads name the version they replace; the key check never changes', async () => {
+    const pc = browser();
+    await signIn(pc, NATHAN);
+    expect((await pc.go('/api/keyring')).status).toBe(404);
+    expect((await pc.send('PUT', '/api/keyring', { version: 3, keyring: KEYRING, keycheck: KEYCHECK })).status).toBe(409);
+    expect(await (await pc.send('PUT', '/api/keyring', { version: 0, keyring: KEYRING, keycheck: KEYCHECK })).json()).toEqual({ version: 1 });
+    expect(await (await pc.go('/api/keyring')).json()).toEqual({ version: 1, keyring: KEYRING, keycheck: KEYCHECK });
+
+    // A passkey added on the phone: replaces version 1
+    const phone = browser(IPHONE);
+    await signIn(phone, NATHAN);
+    const more = { v: 1, entries: [...KEYRING.entries, { id: 'e2', method: 'passkey', wrapped: 'CCCC' }] };
+    expect(await (await phone.send('PUT', '/api/keyring', { version: 1, keyring: more, keycheck: KEYCHECK })).json()).toEqual({ version: 2 });
+    // The PC, not knowing, tries to replace version 1 too: refused, told the current version
+    const late = await pc.send('PUT', '/api/keyring', { version: 1, keyring: KEYRING, keycheck: KEYCHECK });
+    expect(late.status).toBe(409);
+    expect(await late.json()).toMatchObject({ version: 2 });
+    // A keyring for another data key (another key check) is refused, whatever the version
+    const other = await pc.send('PUT', '/api/keyring', { version: 2, keyring: KEYRING, keycheck: { ...KEYCHECK, ct: 'zzzz' } });
+    expect(other.status).toBe(422);
+    expect(await (await pc.go('/api/keyring')).json()).toMatchObject({ version: 2, keyring: more });
+    // Another account sees none of it
+    const matt = browser();
+    await signIn(matt, MATT);
+    expect((await matt.go('/api/keyring')).status).toBe(404);
+  });
+
+  it('refuses a badly formed or oversized keyring', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    expect((await b.send('PUT', '/api/keyring', { version: 0, keyring: { v: 2 }, keycheck: KEYCHECK })).status).toBe(400);
+    expect((await b.send('PUT', '/api/keyring', { version: -1, keyring: KEYRING, keycheck: KEYCHECK })).status).toBe(400);
+    const huge = { v: 1, entries: [{ id: 'e', wrapped: 'A'.repeat(70_000) }] };
+    // Bigger than the 16 KB body limit: refused
+    expect((await b.send('PUT', '/api/keyring', { version: 0, keyring: huge, keycheck: KEYCHECK })).status).toBe(400);
+    expect((await b.go('/api/keyring')).status).toBe(404);
+  });
+});
+
+describe('sync: changes (#105)', () => {
+  const change = (n, extra = {}) => ({
+    id: `c${n}`,
+    entity: 'course',
+    entityId: `k${n}`,
+    op: 'put',
+    at: `2026-11-20T18:00:0${n % 10}.000Z`,
+    iv: 'aaaaaaaaaaaaaaaa',
+    ct: `sealed${n}`,
+    ...extra,
+  });
+
+  it('keeps changes in arrival order, each id once, and hands out what comes after a number', async () => {
+    const pc = browser();
+    await signIn(pc, NATHAN);
+    expect(await (await pc.send('POST', '/api/changes', { changes: [change(1), change(2)] })).json()).toEqual({ stored: 2, last: 2 });
+    const phone = browser(IPHONE);
+    await signIn(phone, NATHAN);
+    // The same change sent again (a retry after a lost answer) is kept once. (Numbers may skip one: devices
+    // only ever ask for "after N", so gaps don't matter.)
+    const second = await (await phone.send('POST', '/api/changes', { changes: [change(2), change(3)] })).json();
+    expect(second.stored).toBe(1);
+
+    const all = await (await phone.go('/api/changes?after=0')).json();
+    expect(all.changes.map((c) => c.id)).toEqual(['c1', 'c2', 'c3']);
+    const seqs = all.changes.map((c) => c.seq);
+    expect([...seqs].sort((a, b) => a - b)).toEqual(seqs); // in arrival order
+    expect(all).toMatchObject({ more: false, last: seqs[2] });
+    expect(second.last).toBe(seqs[2]);
+    expect(all.changes[0]).toEqual({ seq: seqs[0], ...change(1) });
+    expect(await (await phone.go(`/api/changes?after=${seqs[1]}`)).json()).toMatchObject({ changes: [{ id: 'c3' }], last: seqs[2] });
+    expect(await (await phone.go(`/api/changes?after=${seqs[2]}`)).json()).toEqual({ changes: [], more: false, last: seqs[2] });
+    // A page at a time
+    expect(await (await phone.go('/api/changes?after=0&limit=2')).json()).toMatchObject({ more: true, last: seqs[1] });
+
+    // Another account shares nothing; the same change id there is its own
+    const matt = browser();
+    await signIn(matt, MATT);
+    expect(await (await matt.go('/api/changes?after=0')).json()).toEqual({ changes: [], more: false, last: 0 });
+    await matt.send('POST', '/api/changes', { changes: [change(1)] });
+    expect(await (await matt.go('/api/changes?after=0')).json()).toMatchObject({ changes: [{ id: 'c1' }] });
+  });
+
+  it('refuses badly formed changes, and takes a whole batch or none of it', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    const bad = [
+      { ...change(1), entity: 'deckFiles' },
+      { ...change(1), op: 'patch' },
+      { ...change(1), id: 'has spaces' },
+      { ...change(1), at: 'yesterday' },
+      { ...change(1), iv: 'short' },
+      { ...change(1), ct: '' },
+      { ...change(1), ct: 'not+base64/url=' },
+    ];
+    for (const c of bad) {
+      expect((await b.send('POST', '/api/changes', { changes: [change(5), c] })).status, JSON.stringify(c)).toBe(400);
+    }
+    expect((await b.send('POST', '/api/changes', { changes: [] })).status).toBe(400);
+    expect((await b.send('POST', '/api/changes', { changes: Array.from({ length: 501 }, (_, i) => change(i)) })).status).toBe(400);
+    expect(await (await b.go('/api/changes?after=0')).json()).toMatchObject({ changes: [] }); // change(5) never got in
+    expect((await b.go('/api/changes?after=-1')).status).toBe(400);
+  });
+
+  it('needs a signed-in request from our own site, and everything goes with the account', async () => {
+    expect((await browser().go('/api/changes?after=0')).status).toBe(401);
+    expect((await browser().send('POST', '/api/changes', { changes: [change(1)] })).status).toBe(401);
+    const b = browser();
+    await signIn(b, NATHAN);
+    const evil = await b.go('/api/changes', {
+      method: 'POST',
+      headers: { Origin: 'https://evil.example', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ changes: [change(1)] }),
+    });
+    expect(evil.status).toBe(403);
+    await b.send('POST', '/api/changes', { changes: [change(1)] });
+    await b.send('PUT', '/api/keyring', { version: 0, keyring: { v: 1, entries: [] }, keycheck: { v: 1 } });
+    await b.send('DELETE', '/api/account');
+    expect(db.prepare('SELECT COUNT(*) AS n FROM changes').get().n).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM keyrings').get().n).toBe(0);
+  });
+
+  it('logs no change contents', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    await b.send('POST', '/api/changes', { changes: [change(7, { ct: 'secretcipher' })] });
+    await b.go('/api/changes?after=0');
+    expect(JSON.stringify(logs)).not.toContain('secretcipher');
+  });
+});
