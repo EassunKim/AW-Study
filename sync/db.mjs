@@ -1,7 +1,8 @@
 // The sync server's data (#95): one SQLite file, sync.db, in the data folder, through Node's own
 // node:sqlite. Numbered schema steps (PRAGMA user_version): never edit a step that has shipped, add one.
 //
-// Step 1: accounts and sessions. Step 2: Google unlock keys and when they were used. What's readable here is exactly docs/SECURITY.md's "What the sync
+// Step 1: accounts and sessions. Step 2: Google unlock keys and when they were used. Step 3: sync
+// (the keyring and the sealed changes). What's readable here is exactly docs/SECURITY.md's "What the sync
 // server holds": the Google account id and email, and sessions as SHA-256 hashes, never the tokens.
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
@@ -40,6 +41,31 @@ const STEPS = [
      at          TEXT NOT NULL
    );
    CREATE INDEX unlock_uses_account ON unlock_uses(account_id, at);`,
+  // Step 3 (Nov 20, 2026, #105): sync. The account's keyring and key check (wrapped keys only, as the
+  // device sent them), and an append-only list of sealed changes. The server can read only the hints
+  // (entity, its id, put or delete, when) and sizes: docs/SECURITY.md "What the sync server holds".
+  `CREATE TABLE keyrings (
+     account_id  TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+     keyring     TEXT NOT NULL,                 -- JSON, bytes as base64url, as the device sent it
+     keycheck    TEXT NOT NULL,                 -- JSON; never changes once set
+     version     INTEGER NOT NULL,              -- compare and swap: each upload names the one it replaces
+     updated_at  TEXT NOT NULL
+   );
+   CREATE TABLE changes (
+     seq         INTEGER PRIMARY KEY AUTOINCREMENT,  -- the order changes arrived in, across the account's devices
+     account_id  TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     id          TEXT NOT NULL,                 -- the change's own id: the same change twice is stored once
+     entity      TEXT NOT NULL,                 -- hints only: devices never act on these
+     entity_id   TEXT NOT NULL,
+     op          TEXT NOT NULL,
+     at          TEXT NOT NULL,
+     iv          TEXT NOT NULL,                 -- base64url
+     ct          TEXT NOT NULL,                 -- base64url, sealed with additional data honed:v1:sync:<id>
+     size        INTEGER NOT NULL,
+     received_at TEXT NOT NULL,
+     UNIQUE (account_id, id)
+   );
+   CREATE INDEX changes_account_seq ON changes(account_id, seq);`,
 ];
 
 /** Opens (and if needed creates or upgrades) the database in `dir`, or in memory for ':memory:'. */

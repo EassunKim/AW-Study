@@ -12,6 +12,10 @@
 //   GET    /api/unlock-key                          the key, for unlocking (needs a sign-in in the last 5 minutes; recorded)
 //   DELETE /api/unlock-key                          Google unlock off: the key is deleted
 //   GET    /api/unlock-uses                         when and on which device the key was given out
+//   GET    /api/keyring                             sync (#105): the account's keyring and key check, or 404
+//   PUT    /api/keyring  { version, keyring, keycheck }  compare and swap; the key check never changes
+//   POST   /api/changes  { changes: [...] }          sealed changes, added (the same id twice is kept once)
+//   GET    /api/changes?after=N[&limit=M]           the changes after number N, oldest first
 //   GET    /healthz                                 for the container's health check
 //
 // Requests that change something must come from our own site (Origin) as JSON. Answers are never
@@ -28,6 +32,14 @@ export const RECENT_SIGN_IN_MS = 5 * 60_000;
 export const SIGN_IN_WAIT_MS = 10 * 60_000; // how long a started sign-in may take
 const MAX_PENDING = 500;
 const MAX_BODY = 16 * 1024;
+const MAX_CHANGES_BODY = 8 * 1024 * 1024; // POST /api/changes: up to MAX_BATCH changes
+export const MAX_BATCH = 500;
+export const MAX_CHANGE_BYTES = 1024 * 1024; // one sealed change, base64url (records are small; PDFs aren't changes)
+export const MAX_ACCOUNT_BYTES = 200 * 1024 * 1024; // all of an account's changes, in the testing phase
+export const MAX_KEYRING_BYTES = 64 * 1024;
+const ENTITIES = new Set(['course', 'exam', 'slideDeck', 'lecture', 'section', 'question', 'quizAttempt', 'studySession', 'settings', 'annotation']);
+const ID = /^[\w-]{1,64}$/;
+const B64URL = /^[\w-]*$/;
 const TOUCH_EVERY_MS = 3_600_000; // a session's "last used" is saved at most hourly
 
 const hashToken = (token) => createHash('sha256').update(token).digest('base64url');
@@ -64,6 +76,15 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
     deleteUnlockKey: db.prepare('DELETE FROM unlock_keys WHERE account_id = ?'),
     addUnlockUse: db.prepare('INSERT INTO unlock_uses (account_id, device, at) VALUES (?, ?, ?)'),
     unlockUses: db.prepare('SELECT device, at FROM unlock_uses WHERE account_id = ? ORDER BY at DESC LIMIT 20'),
+    keyring: db.prepare('SELECT keyring, keycheck, version FROM keyrings WHERE account_id = ?'),
+    addKeyring: db.prepare('INSERT INTO keyrings (account_id, keyring, keycheck, version, updated_at) VALUES (?, ?, ?, 1, ?)'),
+    swapKeyring: db.prepare('UPDATE keyrings SET keyring = ?, version = version + 1, updated_at = ? WHERE account_id = ? AND version = ?'),
+    addChange: db.prepare(
+      'INSERT OR IGNORE INTO changes (account_id, id, entity, entity_id, op, at, iv, ct, size, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ),
+    changesAfter: db.prepare('SELECT seq, id, entity, entity_id, op, at, iv, ct FROM changes WHERE account_id = ? AND seq > ? ORDER BY seq LIMIT ?'),
+    lastChange: db.prepare('SELECT COALESCE(MAX(seq), 0) AS last FROM changes WHERE account_id = ?'),
+    accountBytes: db.prepare('SELECT COALESCE(SUM(size), 0) AS bytes FROM changes WHERE account_id = ?'),
   };
 
   /** The signed-in session for this request, or null (an expired or no-longer-allowed one is removed). */
@@ -188,7 +209,7 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
     let body = {};
     if (changing) {
       try {
-        body = await readJson(req);
+        body = await readJson(req, url.pathname === '/api/changes' ? MAX_CHANGES_BODY : MAX_BODY);
       } catch {
         return json(400, { error: 'Bad JSON.' });
       }
@@ -254,6 +275,76 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
       return json(200, { off: true });
     }
 
+    // --- Sync (#105, docs/SECURITY.md "The keyring on the server", "Changes") ---
+
+    if (url.pathname === '/api/keyring' && req.method === 'GET') {
+      const row = q.keyring.get(s.account_id);
+      if (!row) return json(404, { none: true });
+      return json(200, { version: row.version, keyring: JSON.parse(row.keyring), keycheck: JSON.parse(row.keycheck) });
+    }
+
+    if (url.pathname === '/api/keyring' && req.method === 'PUT') {
+      const { version, keyring, keycheck } = body;
+      if (!Number.isInteger(version) || version < 0) return json(400, { error: 'Say which version this replaces.' });
+      if (keyring?.v !== 1 || !Array.isArray(keyring.entries) || keycheck?.v !== 1) return json(400, { error: 'Bad keyring.' });
+      const keyringText = JSON.stringify(keyring);
+      const keycheckText = JSON.stringify(keycheck);
+      if (keyringText.length + keycheckText.length > MAX_KEYRING_BYTES) return json(413, { error: 'Keyring too big.' });
+      const row = q.keyring.get(s.account_id);
+      const at = now().toISOString();
+      if (!row) {
+        if (version !== 0) return json(409, { error: 'The account has no keyring yet.', version: 0 });
+        q.addKeyring.run(s.account_id, keyringText, keycheckText, at);
+        return json(200, { version: 1 });
+      }
+      // The data key never changes, so neither does the key check: a keyring for another key is refused
+      if (row.keycheck !== keycheckText) return json(422, { error: 'That keyring is for a different key.', differentKey: true });
+      if (q.swapKeyring.run(keyringText, at, s.account_id, version).changes !== 1) {
+        return json(409, { error: 'The keyring changed on another device first.', version: q.keyring.get(s.account_id).version });
+      }
+      return json(200, { version: version + 1 });
+    }
+
+    if (url.pathname === '/api/changes' && req.method === 'POST') {
+      const list = body.changes;
+      if (!Array.isArray(list) || list.length === 0 || list.length > MAX_BATCH) return json(400, { error: `Send 1 to ${MAX_BATCH} changes.` });
+      for (const c of list) {
+        const ok =
+          typeof c === 'object' && c !== null &&
+          typeof c.id === 'string' && ID.test(c.id) &&
+          ENTITIES.has(c.entity) &&
+          typeof c.entityId === 'string' && ID.test(c.entityId) &&
+          (c.op === 'put' || c.op === 'delete') &&
+          typeof c.at === 'string' && c.at.length <= 40 && !Number.isNaN(Date.parse(c.at)) &&
+          typeof c.iv === 'string' && c.iv.length === 16 && B64URL.test(c.iv) &&
+          typeof c.ct === 'string' && c.ct.length > 0 && c.ct.length <= MAX_CHANGE_BYTES && B64URL.test(c.ct);
+        if (!ok) return json(400, { error: 'A change is badly formed.' });
+      }
+      const adding = list.reduce((n, c) => n + c.ct.length, 0);
+      if (q.accountBytes.get(s.account_id).bytes + adding > MAX_ACCOUNT_BYTES) return json(413, { error: 'This account is full for now.', full: true });
+      const at = now().toISOString();
+      let stored = 0;
+      db.exec('BEGIN');
+      try {
+        for (const c of list) stored += q.addChange.run(s.account_id, c.id, c.entity, c.entityId, c.op, c.at, c.iv, c.ct, c.ct.length, at).changes;
+        db.exec('COMMIT');
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      }
+      return json(200, { stored, last: q.lastChange.get(s.account_id).last });
+    }
+
+    if (url.pathname === '/api/changes' && req.method === 'GET') {
+      const after = Number(url.searchParams.get('after') ?? 0);
+      const limit = Math.min(Number(url.searchParams.get('limit') ?? MAX_BATCH), MAX_BATCH);
+      if (!Number.isInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1) return json(400, { error: 'Bad after or limit.' });
+      const rows = q.changesAfter.all(s.account_id, after, limit + 1);
+      const more = rows.length > limit;
+      const changes = rows.slice(0, limit).map((r) => ({ seq: r.seq, id: r.id, entity: r.entity, entityId: r.entity_id, op: r.op, at: r.at, iv: r.iv, ct: r.ct }));
+      return json(200, { changes, more, last: changes.at(-1)?.seq ?? after });
+    }
+
     if (url.pathname === '/api/unlock-uses' && req.method === 'GET') {
       return json(200, { uses: q.unlockUses.all(s.account_id).map((u) => ({ device: u.device, at: u.at })) });
     }
@@ -286,12 +377,12 @@ function cookies(req) {
   return out;
 }
 
-async function readJson(req) {
+async function readJson(req, limit = MAX_BODY) {
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > MAX_BODY) throw new Error('too big');
+    if (size > limit) throw new Error('too big');
     chunks.push(chunk);
   }
   const text = Buffer.concat(chunks).toString('utf8');
