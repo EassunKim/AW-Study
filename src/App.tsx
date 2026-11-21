@@ -16,7 +16,8 @@ import { StoreContext } from './ui/store-context';
 import { TasksScreen } from './ui/TasksScreen';
 import { UnlockScreen } from './ui/UnlockScreen';
 import { isUpdateReady, onUpdateChange, setActivity } from './ui/update';
-import { GOOGLE_SETUP_RETURN, GOOGLE_UNLOCK_RETURN } from './sync/client';
+import { GOOGLE_SETUP_RETURN, GOOGLE_UNLOCK_RETURN, JOIN_RETURN } from './sync/client';
+import { SyncRunner } from './sync/SyncRunner';
 import type { Vault, VaultStatus } from './ui/vault';
 
 // With PDF.js, so loaded only when slides are opened
@@ -30,13 +31,15 @@ const PlayScreen = lazy(() => import('./ui/PlayScreen'));
 // unlock.
 export default function App({ store, vault }: { store: StudyStore; vault: Vault }) {
   const route = useRoute();
+  // Bumped when another device's changes arrive (#105), so the pages that list things load again
+  const [dataVersion, setDataVersion] = useState(0);
   const [status, setStatus] = useState<VaultStatus>(() => vault.status());
   const refresh = () => setStatus(vault.status());
   // A new version waits while you're setting up or unlocked (src/ui/update.ts), and applies on locking
   useEffect(() => setActivity(status === 'unlocked' ? 'unlocked' : status === 'new' ? 'unlocking' : 'locked'), [status]);
   // Back from a Google sign-in for unlocking or setting up (#101): once open, on to Tasks
   useEffect(() => {
-    if (status === 'unlocked' && [GOOGLE_UNLOCK_RETURN, GOOGLE_SETUP_RETURN].some((r) => window.location.hash === r.slice(1))) {
+    if (status === 'unlocked' && [GOOGLE_UNLOCK_RETURN, GOOGLE_SETUP_RETURN, JOIN_RETURN].some((r) => window.location.hash === r.slice(1))) {
       go({ name: 'tasks' });
     }
   }, [status]);
@@ -73,7 +76,8 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
           {status === 'unlocked' && <BackupWatcher store={store} />}
           {status === 'unlocked' && <UpdateBanner />}
           {status === 'unlocked' && <BankJobsStatus />}
-          {status === 'unlocked' && <Screen route={route} onLock={lock} />}
+          {status === 'unlocked' && <SyncRunner onChanged={() => setDataVersion((v) => v + 1)} />}
+          {status === 'unlocked' && <Screen route={route} onLock={lock} dataVersion={dataVersion} onReplaced={() => setDataVersion((v) => v + 1)} />}
         </main>
         <Footer wide={wide} nav={page !== null} />
         {page && <NavBar current={page} />}
@@ -83,11 +87,21 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   );
 }
 
-function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock: () => void }) {
+function Screen({
+  route,
+  onLock,
+  dataVersion,
+  onReplaced,
+}: {
+  route: ReturnType<typeof useRoute>;
+  onLock: () => void;
+  dataVersion: number;
+  onReplaced: () => void;
+}) {
   return (
     <>
-      {route.name === 'tasks' && <TasksScreen />}
-      {route.name === 'classes' && <ClassesScreen />}
+      {route.name === 'tasks' && <TasksScreen key={dataVersion} />}
+      {route.name === 'classes' && <ClassesScreen key={dataVersion} />}
       {route.name === 'class' && <ClassScreen key={href(route)} courseId={route.courseId} part={route.part} cover={route.cover} />}
       {route.name === 'slides' && (
         <Suspense fallback={<p className="muted">Opening the slides…</p>}>
@@ -104,7 +118,7 @@ function Screen({ route, onLock }: { route: ReturnType<typeof useRoute>; onLock:
           <PlayScreen />
         </Suspense>
       )}
-      {route.name === 'settings' && <SettingsScreen onLock={onLock} />}
+      {route.name === 'settings' && <SettingsScreen onLock={onLock} onReplaced={onReplaced} />}
       {route.name === 'not-found' && (
         <section>
           <h2>Page not found</h2>

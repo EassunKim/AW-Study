@@ -26,6 +26,7 @@ import { annotationMethods } from './annotations';
 import { lectureMethods } from './lectures';
 import { planMethods } from './plan';
 import { quizMethods } from './quiz';
+import { syncMethods, type SyncState, type WireChange } from './sync';
 import { DB_VERSION, openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb, type RecordStore } from './schema';
 
 export type StoreStatus = 'new' | 'locked' | 'unlocked';
@@ -71,6 +72,29 @@ export interface StudyStore extends LectureStore, QuizStore, PlanStore, Annotati
 
   /** Change-log rows after `seq` (0 = all), oldest first. For v2's sync, and for tests. */
   changesSince(seq: number): Promise<ChangeRecord[]>;
+
+  // --- Sync (#105, src/db/sync.ts, docs/SECURITY.md "Accounts and sync") ---
+  getSyncState(): Promise<SyncState | null>;
+  setSyncState(state: SyncState | null): Promise<void>;
+  ownChangesSince(seq: number): Promise<ChangeRecord[]>;
+  latestSeq(): Promise<number>;
+  snapshotChanges(): Promise<ChangeRecord[]>;
+  sealForSync(changes: ChangeRecord[]): Promise<WireChange[]>;
+  openFromSync(wire: WireChange[]): Promise<ChangeRecord[]>;
+  applyRemote(changes: ChangeRecord[]): Promise<number>;
+  /** This device's key check (as stored; the account's must be the same). Null before setup. */
+  getKeycheck(): Promise<EncryptedRecord | null>;
+  /**
+   * Takes the account's keyring (a newer version from the server). Only one for the same data key: the key
+   * check must stay the same, and the keyring rule holds. Unlocked only.
+   */
+  adoptKeyring(keyring: Keyring): Promise<void>;
+  /**
+   * Joins the account on this device: replaces every record (if any) with nothing, and the keyring and key
+   * check with the account's, unlocked with `dataKey` (checked against the key check). The engine then
+   * downloads everything. Forgets a remembered unlock and the sync state.
+   */
+  joinAccount(keyring: Keyring, keycheck: EncryptedRecord, dataKey: CryptoKey): Promise<void>;
   close(): void;
 }
 
@@ -166,7 +190,16 @@ function checkKeyring(entries: KeyringEntry[]) {
 function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: boolean): StudyStore {
   let key: CryptoKey | null = null;
   let hasKeyring = keyringSaved;
-  const iso = () => deps.clock().toISOString();
+  // Change times only move forward past the latest change applied from another device (#105): an edit
+  // made after seeing another device's edit then wins over it, even with this device's clock a little behind.
+  let seenAt = 0;
+  const changeAt = () => {
+    const now = deps.clock().getTime();
+    return new Date(now > seenAt ? now : seenAt + 1).toISOString();
+  };
+  const loadSeenAt = async () => {
+    seenAt = Math.max(seenAt, ((await db.get('meta', 'sync'))?.value as SyncState | undefined)?.seenAt ?? 0);
+  };
   const status = (): StoreStatus => (!hasKeyring ? 'new' : key ? 'unlocked' : 'locked');
 
   const requireOpen = () => {
@@ -228,7 +261,7 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
 
   /** A change-log row, sealed, ready to add in the caller's write transaction. */
   const change = (entity: ChangeRecord['entity'], op: ChangeRecord['op'], entityId: string, data: ChangeRecord['data']) =>
-    seal('changes', { id: deps.newId(), deviceId: device, at: iso(), entity, entityId, op, data });
+    seal('changes', { id: deps.newId(), deviceId: device, at: changeAt(), entity, entityId, op, data });
 
   // --- Migration: seal every plain record (setUp, and an interrupted setUp finished by unlock) ---
 
@@ -308,6 +341,7 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
           throw new StoreError('wrong-key', 'That key doesn’t open this device’s data.');
         }
         key = dataKey;
+        await loadSeenAt();
         if ((await db.get('meta', 'migration')) !== undefined) await migrate();
       }),
 
@@ -400,6 +434,7 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
         await meta.put({ key: 'keycheck', value: snapshot.keycheck });
         await meta.delete('migration');
         await meta.delete('remembered'); // it was for the old data key (#99)
+        await meta.delete('sync'); // the data was replaced wholesale: syncing starts again (#105)
         await tx.done;
         hasKeyring = true;
         key = dataKey;
@@ -414,6 +449,60 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
       requireOpen();
       return openAll<ChangeRecord>('changes', await db.getAll('changes', IDBKeyRange.lowerBound(seq, true)));
     },
+
+    // --- Sync (#105): src/db/sync.ts ---
+    ...syncMethods({
+      db,
+      key: () => key,
+      device,
+      seal,
+      openAll,
+      exclusive,
+      newId: deps.newId,
+      changeAt,
+      seen: (at) => {
+        seenAt = Math.max(seenAt, at);
+        void db.get('meta', 'sync').then((row) => {
+          const state = row?.value as SyncState | undefined;
+          if (state && state.seenAt < seenAt) return db.put('meta', { key: 'sync', value: { ...state, seenAt } });
+        });
+      },
+    }),
+
+    async getKeycheck() {
+      return ((await db.get('meta', 'keycheck'))?.value as EncryptedRecord | undefined) ?? null;
+    },
+
+    adoptKeyring: (keyring) =>
+      exclusive(async () => {
+        if (status() !== 'unlocked' || !key) throw new StoreError('locked', 'Unlock first.');
+        if (keyring?.v !== 1 || !Array.isArray(keyring.entries)) throw new StoreError('invalid', 'Bad keyring.');
+        checkKeyring(keyring.entries);
+        await db.put('meta', { key: 'keyring', value: keyring });
+      }),
+
+    joinAccount: (keyring, keycheck, dataKey) =>
+      exclusive(async () => {
+        if (keyring?.v !== 1 || !Array.isArray(keyring.entries)) throw new StoreError('invalid', 'Bad keyring.');
+        checkKeyring(keyring.entries);
+        try {
+          await decryptRecord(dataKey, KEYCHECK_AAD, keycheck);
+        } catch {
+          throw new StoreError('wrong-key', 'That key doesn’t open the account’s data.');
+        }
+        const tx = db.transaction(['meta', ...RECORD_STORES], 'readwrite');
+        for (const name of RECORD_STORES) await tx.objectStore(name).clear();
+        const meta = tx.objectStore('meta');
+        await meta.put({ key: 'keyring', value: keyring });
+        await meta.put({ key: 'keycheck', value: keycheck });
+        await meta.delete('migration');
+        await meta.delete('remembered');
+        await meta.delete('sync');
+        await tx.done;
+        hasKeyring = true;
+        key = dataKey;
+        seenAt = 0;
+      }),
 
     close() {
       key = null;

@@ -19,7 +19,7 @@ import type { StudySession, StudySettings } from '../types/plan';
 import type { Question, QuizAttempt } from '../types/quiz';
 
 export const DB_NAME = 'honed';
-export const DB_VERSION = 7;
+export const DB_VERSION = 8;
 
 /**
  * One row of the change log: every write, in order, with the device that made it. v2's sync ships
@@ -135,9 +135,10 @@ export interface SealedAnnotation {
 }
 
 export interface HonedSchema extends DBSchema {
-  // deviceId (string), keyring (Keyring), keycheck (EncryptedRecord), migration ('running')
+  // deviceId (string), keyring (Keyring), keycheck (EncryptedRecord), migration ('running'),
+  // remembered (RememberedKey, #99), sync (SyncState, #105)
   meta: { key: string; value: { key: string; value: unknown } };
-  changes: { key: number; value: ChangeRecord | SealedChange };
+  changes: { key: number; value: ChangeRecord | SealedChange; indexes: { byId: string; byEntity: string } };
   courses: { key: string; value: Course | SealedCourse };
   exams: { key: string; value: Exam | SealedExam; indexes: { byCourse: string } };
   slideDecks: { key: string; value: SlideDeck | SealedSlideDeck; indexes: { byCourse: string } };
@@ -261,6 +262,13 @@ export async function openHonedDb(name: string = DB_NAME): Promise<HonedDb> {
         const annotations = db.createObjectStore('annotations', { keyPath: 'id' });
         annotations.createIndex('byCourse', 'courseId');
         annotations.createIndex('byDeck', 'deckId');
+      }
+      // Step 8 (Nov 20, 2026, #105): sync looks change-log rows up by the change's id (have we got it?) and
+      // by the record's id (which change of it is the latest?). Both fields are already readable.
+      if (oldVersion < 8) {
+        const changes = tx.objectStore('changes') as unknown as IDBObjectStore;
+        changes.createIndex('byId', 'id');
+        changes.createIndex('byEntity', 'entityId');
       }
     },
   });

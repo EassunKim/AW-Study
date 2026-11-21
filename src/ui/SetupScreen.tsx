@@ -8,12 +8,14 @@ import { RestoreBackup } from '../backup/RestoreBackup';
 import { APP_NAME } from '../brand';
 import { recallKey, rememberKey } from '../lib/crypto';
 import { createPasskey } from '../lib/passkey';
-import { GOOGLE_SETUP_RETURN, GoogleUnlockError, accountStatus, signInUrl, turnOnGoogleUnlock } from '../sync/client';
+import { GOOGLE_SETUP_RETURN, GoogleUnlockError, JOIN_RETURN, accountStatus, signInUrl, turnOnGoogleUnlock } from '../sync/client';
+import { fetchAccountKeyring, joinWithKey, type AccountKeyring } from '../sync/engine';
+import { JoinUnlock } from '../sync/JoinUnlock';
 import { makeKeys, passphraseProblem, unlockMessage, type NewKeys } from './keys';
 import { guessDeviceLabel, NewPassphraseFields, RecoveryKeySheet, RememberField, usePrfSupported, useVault } from './lock-parts';
 import { useStore } from './store-context';
 
-type Step = 'intro' | 'passphrase' | 'passkey' | 'google' | 'recovery' | 'saving' | 'restore';
+type Step = 'intro' | 'passphrase' | 'passkey' | 'google' | 'join' | 'recovery' | 'saving' | 'restore';
 
 export function SetupScreen({ onDone }: { onDone: () => void }) {
   const vault = useVault();
@@ -51,10 +53,15 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
   };
   const resumed = useRef(false);
   useEffect(() => {
-    if (resumed.current || window.location.hash !== GOOGLE_SETUP_RETURN.slice(1)) return;
-    resumed.current = true;
-    setStep('google');
-    void chooseGoogle(true);
+    if (resumed.current) return;
+    if (window.location.hash === GOOGLE_SETUP_RETURN.slice(1)) {
+      resumed.current = true;
+      setStep('google');
+      void chooseGoogle(true);
+    } else if (window.location.hash === JOIN_RETURN.slice(1)) {
+      resumed.current = true;
+      setStep('join');
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const choosePassphrase = async (e: FormEvent) => {
@@ -135,11 +142,17 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
             Use your Google account
           </button>
           <p className="muted small">Sign in with Google instead. The simplest, but our server could then read your data.</p>
+          <button type="button" onClick={() => setStep('join')}>
+            I already use {APP_NAME} on another device
+          </button>
+          <p className="muted small">Sign in with Google and bring your classes across (sync must be on on your other device).</p>
           <button type="button" className="link" onClick={() => setStep('restore')}>
             Moving from another device? Restore a backup
           </button>
         </div>
       )}
+
+      {step === 'join' && <JoinAccount onDone={onDone} onBack={() => setStep('intro')} />}
 
       {step === 'restore' && (
         <RestoreBackup store={store} replacing={false} onRestored={onDone} onCancel={() => setStep('intro')} />
@@ -222,5 +235,68 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * Setting up by joining the account (#105): signed in with Google (if not, off to Google and back to
+ * JOIN_RETURN), the account's keyring from the server, unlocked here, then everything downloaded.
+ */
+function JoinAccount({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+  const vault = useVault();
+  const store = useStore();
+  const [found, setFound] = useState<
+    { state: 'checking' } | { state: 'signed-out' } | { state: 'empty'; email: string } | { state: 'ready'; email: string; account: AccountKeyring } | { state: 'problem'; message: string }
+  >({ state: 'checking' });
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const me = await accountStatus();
+      if (!me.signedIn) return live && setFound({ state: 'signed-out' });
+      const account = await fetchAccountKeyring();
+      if (!live) return;
+      setFound(account ? { state: 'ready', email: me.email, account } : { state: 'empty', email: me.email });
+    })().catch((err: unknown) => live && setFound({ state: 'problem', message: err instanceof Error ? err.message : String(err) }));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  return (
+    <div className="stack" data-testid="join-account">
+      <p>Bring your classes, lectures, quizzes and notes from your other device. Slide PDFs come across in a later update.</p>
+      {found.state === 'checking' && <p className="muted">Checking your account…</p>}
+      {found.state === 'signed-out' && (
+        <a className="button primary" href={signInUrl(JOIN_RETURN)}>
+          Sign in with Google
+        </a>
+      )}
+      {found.state === 'empty' && (
+        <p role="status">
+          {found.email} has no {APP_NAME} data on the server yet. On your other device, turn on sync (Settings, Sync), then try again.
+        </p>
+      )}
+      {found.state === 'problem' && (
+        <p className="error" role="alert">
+          {found.message}
+        </p>
+      )}
+      {found.state === 'ready' && (
+        <JoinUnlock
+          keyring={found.account.keyring}
+          onOpened={async ({ key, remembered }) => {
+            await joinWithKey(store, found.email, found.account, key);
+            if (remembered) await vault.remember(remembered);
+            onDone();
+          }}
+        />
+      )}
+      <div className="row">
+        <button type="button" onClick={onBack}>
+          Back
+        </button>
+      </div>
+    </div>
   );
 }

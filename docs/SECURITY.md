@@ -14,8 +14,9 @@ cryptography.**
 - **Google unlock** (#101, **opt-in**): for people who turn it on, the server keeps a key that opens their data, so a
   Google sign-in can unlock instead of a passkey. For them, our server (or anyone who takes it over, or takes over
   their Google account) could read their data. For everyone else, nothing changes.
-- **Sync** of the data itself between devices is designed ("Accounts and sync") but **not built yet**: today the
-  server holds accounts, sessions and Google unlock keys, and none of anyone's classes or slides.
+- **Sync** (#105, opt-in in Settings): classes, lectures, quizzes, notes and settings travel between a person's
+  devices sealed with their data key; the server holds them but can't open them (unless that person turned on
+  Google unlock). Slide PDFs don't sync yet (step 3).
 
 ## What it protects against, and what it doesn't
 
@@ -202,8 +203,9 @@ It can sit in OneDrive, iCloud Drive or Google Drive.
 
 ## Accounts and sync (v2, #93)
 
-**Built so far:** sign-in, accounts and sessions (#95), remembering a device (#99) and Google unlock (#101).
-**Not built yet:** the keyring on the server, changes and files, so no data syncs. The testing phase runs on
+**Built so far:** sign-in, accounts and sessions (#95), remembering a device (#99), Google unlock (#101), and the
+keyring on the server, changes and joining a device (#105: `src/db/sync.ts`, `src/sync/engine.ts`, Settings > Sync,
+setup's "I already use Honed on another device"). **Not built yet:** files (slide PDFs). The testing phase runs on
 Nathan's home server, for Matt,
 Nathan and a few testers. Every piece is kept easy to move to Cloudflare (Workers, R2, D1) if Honed goes
 public. Sync is **opt-in**: a device that never signs in keeps working exactly as today.
@@ -417,6 +419,8 @@ as PRF).
 | `src/db/` (#16) | Uses them to encrypt records and keep the keyring |
 | `src/ui/` (#17) | Setup, unlock, recovery, Settings |
 | `src/backup/` (#18) | The `.honed` file format, making and restoring backups (see "Backups") |
-| `sync/` (v2) | The sync server, `honed-sync` (see "Accounts and sync"): Google sign-in, accounts and sessions (#95: `google.mjs`, `app.mjs`, `db.mjs`), Google unlock keys and their uses (#101, schema step 2); tests in `tests/sync/`. The keyring, changes and files not yet |
+| `sync/` (v2) | The sync server, `honed-sync` (see "Accounts and sync"): Google sign-in, accounts and sessions (#95: `google.mjs`, `app.mjs`, `db.mjs`), Google unlock keys and their uses (#101, schema step 2), the keyring and sealed changes (#105, schema step 3); tests in `tests/sync/`. Files not yet |
+| `src/db/sync.ts` (#105) | The store's side of sync: sealing for the server, opening and checking what comes back, applying it (the later change wins), the sync state, joining |
+| `src/sync/engine.ts`, `SyncRunner.tsx`, `SyncSettings.tsx`, `JoinUnlock.tsx` (#105) | The engine (keyring, up, down), running it while unlocked, Settings > Sync, unlocking the account's keyring to join |
 | `src/sync/` | The app's side: `client.ts` (the server's routes), Settings' Account box (#95) and Google unlock (#101, `GoogleUnlockSettings.tsx`) |
 | `src/ui/UnlockScreen.tsx`, `SetupScreen.tsx`, `ThisDevice.tsx` | Remembering a device (#99) and Unlock with Google / Use your Google account (#101) |

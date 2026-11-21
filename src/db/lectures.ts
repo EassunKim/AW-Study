@@ -125,6 +125,12 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
   const write = (puts: { store: RecordStore; row: Row }[], deletes: { store: RecordStore; id: string }[], logs: Row[]) =>
     writeRows(db, puts, deletes, logs);
 
+  /** A deck's PDF or page text isn't here: gone, or (#105) the deck came from another device and its PDF hasn't yet. */
+  const missingFile = async (id: string) =>
+    (await db.get('slideDecks', id)) !== undefined
+      ? new StoreError('not-found', 'These slides were added on another device. Bringing slide PDFs across comes in a later update: open them there for now.')
+      : new StoreError('not-found', 'That slide deck no longer exists.');
+
   const getCourseOrThrow = async (id: string): Promise<Course> => {
     const row = await db.get('courses', id);
     if (!row) throw new StoreError('not-found', 'That class no longer exists.');
@@ -379,14 +385,14 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
     async getSlideDeckFile(id) {
       requireOpen();
       const row = await db.get('deckFiles', id);
-      if (!row) throw new StoreError('not-found', 'That slide deck no longer exists.');
+      if (!row) throw await missingFile(id);
       return (await open<DeckFile>('deckFiles', row)).data;
     },
 
     async getSlideDeckPages(id) {
       requireOpen();
       const row = await db.get('deckPages', id);
-      if (!row) throw new StoreError('not-found', 'That slide deck no longer exists.');
+      if (!row) throw await missingFile(id);
       return (await open<DeckPages>('deckPages', row)).pages;
     },
 
