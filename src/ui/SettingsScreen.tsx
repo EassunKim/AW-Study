@@ -6,6 +6,7 @@
 import { useState, type FormEvent } from 'react';
 import { BackupSettings } from '../backup/BackupSettings';
 import { AccountSettings } from '../sync/AccountSettings';
+import { GoogleUnlockSettings } from '../sync/GoogleUnlockSettings';
 import { AiSettings } from './AiSettings';
 import { ThisDevice } from './ThisDevice';
 import { APP_NAME } from '../brand';
@@ -137,6 +138,8 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
       <AiSettings />
 
       <AccountSettings />
+
+      {keyring && <GoogleUnlockSettings keyring={keyring} onChanged={() => reload()} />}
 
       <BackupSettings store={store} onRestored={() => void reload()} />
 

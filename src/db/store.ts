@@ -154,8 +154,9 @@ async function loadDeviceId(db: HonedDb, deps: StoreDeps): Promise<string> {
 
 /** Always a passphrase or passkey (to unlock), and always a recovery key (for when you can't). */
 function checkKeyring(entries: KeyringEntry[]) {
-  if (!entries.some((e) => e.method === 'passphrase' || e.method === 'passkey')) {
-    throw new StoreError('invalid', 'Keep at least one passphrase or passkey, or you couldn’t unlock.');
+  // Google unlock counts as a way to unlock (#101); the recovery key is always kept as the safety net
+  if (!entries.some((e) => e.method === 'passphrase' || e.method === 'passkey' || e.method === 'google')) {
+    throw new StoreError('invalid', 'Keep at least one passphrase, passkey or Google unlock, or you couldn’t unlock.');
   }
   if (!entries.some((e) => e.method === 'recovery')) {
     throw new StoreError('invalid', 'Keep a recovery key, or a forgotten passphrase would lose everything.');

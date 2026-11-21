@@ -517,3 +517,88 @@ describe('device names', () => {
     expect(deviceName('')).toBe('A browser');
   });
 });
+
+describe('Google unlock (#101)', () => {
+  it('turning it on gives the account one key; any device of the account gets the same; others a different one', async () => {
+    const pc = browser();
+    await signIn(pc, NATHAN);
+    const first = await (await pc.send('POST', '/api/unlock-key')).json();
+    expect(first.key).toMatch(/^[\w-]{43}$/); // 32 bytes
+    const phone = browser(IPHONE);
+    await signIn(phone, NATHAN);
+    expect((await (await phone.send('POST', '/api/unlock-key')).json()).key).toBe(first.key);
+    const matt = browser();
+    await signIn(matt, MATT);
+    expect((await (await matt.send('POST', '/api/unlock-key')).json()).key).not.toBe(first.key);
+  });
+
+  it('gives the key only after a fresh Google sign-in, and records each time (never the key)', async () => {
+    const b = browser(IPHONE);
+    await signIn(b, NATHAN);
+    const { key } = await (await b.send('POST', '/api/unlock-key')).json();
+
+    const fresh = await b.go('/api/unlock-key');
+    expect(fresh.status).toBe(200);
+    expect((await fresh.json()).key).toBe(key);
+
+    clock.setTime(clock.getTime() + RECENT_SIGN_IN_MS + 1000);
+    const stale = await b.go('/api/unlock-key');
+    expect(stale.status).toBe(403);
+    expect(await stale.json()).toMatchObject({ needsSignIn: true });
+
+    await signIn(b, NATHAN, { fresh: true });
+    expect((await (await b.go('/api/unlock-key')).json()).key).toBe(key);
+
+    const { uses } = await (await b.go('/api/unlock-uses')).json();
+    expect(uses).toEqual([
+      { device: 'Safari on iPhone', at: clock.toISOString() },
+      { device: 'Safari on iPhone', at: new Date(clock.getTime() - RECENT_SIGN_IN_MS - 1000).toISOString() },
+    ]);
+    const stored = JSON.stringify(db.prepare('SELECT * FROM unlock_uses').all());
+    expect(stored).not.toContain(key);
+    expect(JSON.stringify(logs)).not.toContain(key);
+  });
+
+  it('turning it off deletes the key; turning it on again makes a new one', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    const { key } = await (await b.send('POST', '/api/unlock-key')).json();
+    expect((await b.send('DELETE', '/api/unlock-key')).status).toBe(200);
+    const off = await b.go('/api/unlock-key');
+    expect(off.status).toBe(404);
+    expect(await off.json()).toMatchObject({ off: true });
+    expect((await (await b.send('POST', '/api/unlock-key')).json()).key).not.toBe(key);
+  });
+
+  it('needs a signed-in request from our own site, and goes with the account', async () => {
+    expect((await browser().go('/api/unlock-key')).status).toBe(401);
+    expect((await browser().send('POST', '/api/unlock-key')).status).toBe(401);
+    const b = browser();
+    await signIn(b, NATHAN);
+    const evil = await b.go('/api/unlock-key', { method: 'POST', headers: { Origin: 'https://evil.example', 'Content-Type': 'application/json' }, body: '{}' });
+    expect(evil.status).toBe(403);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM unlock_keys').get().n).toBe(0);
+    await b.send('POST', '/api/unlock-key');
+    await b.go('/api/unlock-key');
+    await b.send('DELETE', '/api/account');
+    expect(db.prepare('SELECT COUNT(*) AS n FROM unlock_keys').get().n).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM unlock_uses').get().n).toBe(0);
+  });
+
+  it('upgrades a step-1 database without losing accounts', async () => {
+    const old = mkdtempSync(join(tmpdir(), 'honed-sync-step1-'));
+    const d = new DatabaseSync(join(old, 'sync.db'));
+    d.exec(`CREATE TABLE accounts (id TEXT PRIMARY KEY, google_sub TEXT NOT NULL UNIQUE, email TEXT NOT NULL, created_at TEXT NOT NULL, signed_in_at TEXT NOT NULL);
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, hash TEXT NOT NULL UNIQUE, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, device TEXT NOT NULL, created_at TEXT NOT NULL, used_at TEXT NOT NULL, signed_in_at TEXT NOT NULL);
+      CREATE INDEX sessions_account ON sessions(account_id);
+      INSERT INTO accounts VALUES ('a1', '1002', 'nathan@example.com', 'x', 'x');
+      PRAGMA user_version = 1;`);
+    d.close();
+    const upgraded = openDb(old);
+    expect(upgraded.prepare('PRAGMA user_version').get().user_version).toBe(SCHEMA_STEP);
+    expect(upgraded.prepare('SELECT email FROM accounts').all()).toEqual([{ email: 'nathan@example.com' }]);
+    expect(upgraded.prepare('SELECT COUNT(*) AS n FROM unlock_keys').get().n).toBe(0);
+    upgraded.close();
+    rmSync(old, { recursive: true, force: true });
+  });
+});

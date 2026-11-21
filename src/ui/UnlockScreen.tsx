@@ -9,7 +9,8 @@ import { recallKey, rememberKey, wrapWithPassphrase } from '../lib/crypto';
 import { getPasskeySecret } from '../lib/passkey';
 import { setActivity } from './update';
 import type { Keyring, UnlockSecret } from '../types/crypto';
-import { hasPassphrase, openKey, passkeyEntries, passphraseProblem, unlockForChange, unlockMessage, unlockWith } from './keys';
+import { GOOGLE_UNLOCK_RETURN, GoogleUnlockError, fetchGoogleKey, signInUrl } from '../sync/client';
+import { googleEntry, hasPassphrase, openKey, passkeyEntries, passphraseProblem, unlockForChange, unlockMessage, unlockWith } from './keys';
 import { NewPassphraseFields, RecoveryKeyField, RememberField, usePrfSupported, useVault } from './lock-parts';
 import { useLoad } from './useLoad';
 
@@ -61,7 +62,44 @@ function Unlock({ keyring, onUnlocked, rememberFailed }: { keyring: Keyring; onU
   const [recoveryKey, setRecoveryKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [rememberIt, setRememberIt] = useState(true);
+  const [rememberIt, setRememberIt] = useState(() => savedRememberChoice() ?? true);
+  const google = googleEntry(keyring);
+
+  // Unlock with Google (#101): the account's key needs a Google sign-in in the last 5 minutes. If there
+  // wasn't one, the page goes to Google and comes back at GOOGLE_UNLOCK_RETURN, which tries again by itself
+  // (`back`: never sends you round a second time).
+  const unlockWithGoogle = async (back: boolean) => {
+    setBusy(true);
+    setProblem(null);
+    setActivity('unlocking');
+    try {
+      let googleKey: Uint8Array;
+      try {
+        googleKey = await fetchGoogleKey();
+      } catch (err) {
+        if (err instanceof GoogleUnlockError && err.code === 'needs-sign-in' && !back) {
+          saveRememberChoice(rememberIt);
+          window.location.assign(signInUrl(GOOGLE_UNLOCK_RETURN));
+          return;
+        }
+        throw err;
+      }
+      const { key, remembered } = await openKey(keyring, { method: 'google', googleKey }, rememberIt);
+      await vault.unlock(key);
+      if (remembered) await vault.remember(remembered);
+      onUnlocked();
+    } catch (err) {
+      setProblem(err instanceof GoogleUnlockError ? err.message : unlockMessage(err, 'google'));
+      setBusy(false);
+      setActivity('locked');
+    }
+  };
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current || !google || window.location.hash !== GOOGLE_UNLOCK_RETURN.slice(1)) return;
+    resumed.current = true;
+    void unlockWithGoogle(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = async (secretFor: () => Promise<UnlockSecret>, method: UnlockSecret['method']) => {
     setBusy(true);
@@ -165,8 +203,13 @@ function Unlock({ keyring, onUnlocked, rememberFailed }: { keyring: Keyring; onU
         </p>
       )}
       <RememberField checked={rememberIt} onChange={setRememberIt} />
+      {google && (
+        <button type="button" className="primary" onClick={() => void unlockWithGoogle(false)} disabled={busy}>
+          Unlock with Google
+        </button>
+      )}
       {prf && passkeys.length > 0 && (
-        <button type="button" className="primary" onClick={usePasskey} disabled={busy}>
+        <button type="button" className={google ? '' : 'primary'} onClick={usePasskey} disabled={busy}>
           Unlock with a passkey
         </button>
       )}
@@ -186,7 +229,7 @@ function Unlock({ keyring, onUnlocked, rememberFailed }: { keyring: Keyring; onU
         ) : (
           <RecoveryKeyField value={secret} onChange={setSecret} />
         )}
-        <button type="submit" className={prf && passkeys.length > 0 ? '' : 'primary'} disabled={busy || secret.trim() === ''}>
+        <button type="submit" className={(prf && passkeys.length > 0) || google ? '' : 'primary'} disabled={busy || secret.trim() === ''}>
           {busy ? 'Unlocking…' : 'Unlock'}
         </button>
       </form>
@@ -209,4 +252,25 @@ function Unlock({ keyring, onUnlocked, rememberFailed }: { keyring: Keyring; onU
       )}
     </section>
   );
+}
+
+// The "Remember this device" choice survives the trip to Google and back (this tab only)
+const REMEMBER_CHOICE = 'honed-remember-choice';
+
+function saveRememberChoice(remember: boolean) {
+  try {
+    sessionStorage.setItem(REMEMBER_CHOICE, remember ? '1' : '0');
+  } catch {
+    // private mode: it's ticked again on return, the default
+  }
+}
+
+function savedRememberChoice(): boolean | null {
+  try {
+    const value = sessionStorage.getItem(REMEMBER_CHOICE);
+    sessionStorage.removeItem(REMEMBER_CHOICE);
+    return value === null ? null : value === '1';
+  } catch {
+    return null;
+  }
 }

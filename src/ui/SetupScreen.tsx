@@ -2,17 +2,18 @@
 // data already on this device with progress. Nothing is saved until the recovery
 // key has been confirmed, so closing the page half-way just starts setup again. "Remember this device"
 // (#99) is ticked unless the person unticks it: then Honed opens straight in from the next time.
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { askToPersist } from '../backup/persist';
 import { RestoreBackup } from '../backup/RestoreBackup';
 import { APP_NAME } from '../brand';
 import { recallKey, rememberKey } from '../lib/crypto';
 import { createPasskey } from '../lib/passkey';
+import { GOOGLE_SETUP_RETURN, GoogleUnlockError, accountStatus, signInUrl, turnOnGoogleUnlock } from '../sync/client';
 import { makeKeys, passphraseProblem, unlockMessage, type NewKeys } from './keys';
 import { guessDeviceLabel, NewPassphraseFields, RecoveryKeySheet, RememberField, usePrfSupported, useVault } from './lock-parts';
 import { useStore } from './store-context';
 
-type Step = 'intro' | 'passphrase' | 'passkey' | 'recovery' | 'saving' | 'restore';
+type Step = 'intro' | 'passphrase' | 'passkey' | 'google' | 'recovery' | 'saving' | 'restore';
 
 export function SetupScreen({ onDone }: { onDone: () => void }) {
   const vault = useVault();
@@ -27,6 +28,34 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [rememberIt, setRememberIt] = useState(true);
+
+  // Google unlock (#101): sign in with Google (leaving the page if not signed in yet), then the account's
+  // key wraps the new data key. Back from Google, the page opens at GOOGLE_SETUP_RETURN and carries on.
+  const chooseGoogle = async (back: boolean) => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const account = await accountStatus();
+      if (!account.signedIn) {
+        if (back) throw new GoogleUnlockError('needs-sign-in', 'The Google sign-in didn’t finish. Try again.');
+        window.location.assign(signInUrl(GOOGLE_SETUP_RETURN));
+        return;
+      }
+      setKeys(await makeKeys({ method: 'google', googleKey: await turnOnGoogleUnlock(), email: account.email }));
+      setStep('recovery');
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current || window.location.hash !== GOOGLE_SETUP_RETURN.slice(1)) return;
+    resumed.current = true;
+    setStep('google');
+    void chooseGoogle(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const choosePassphrase = async (e: FormEvent) => {
     e.preventDefault();
@@ -102,6 +131,10 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
           <button type="button" className={prf ? '' : 'primary'} onClick={() => setStep('passphrase')}>
             Use a passphrase
           </button>
+          <button type="button" onClick={() => setStep('google')}>
+            Use your Google account
+          </button>
+          <p className="muted small">Sign in with Google instead. The simplest, but our server could then read your data.</p>
           <button type="button" className="link" onClick={() => setStep('restore')}>
             Moving from another device? Restore a backup
           </button>
@@ -110,6 +143,26 @@ export function SetupScreen({ onDone }: { onDone: () => void }) {
 
       {step === 'restore' && (
         <RestoreBackup store={store} replacing={false} onRestored={onDone} onCancel={() => setStep('intro')} />
+      )}
+
+      {step === 'google' && (
+        <div className="stack">
+          <p>
+            Unlock {APP_NAME} by signing in with Google: nothing to remember, and a new device needs only your Google account.
+          </p>
+          <p data-testid="google-unlock-warning">
+            <strong>The cost:</strong> our server keeps a key that opens your data. So our server, or anyone who broke into it or into your Google account,
+            could read your classes, slides and scores. With a passkey or passphrase, only you can.
+          </p>
+          <div className="row">
+            <button type="button" className="primary" onClick={() => void chooseGoogle(false)} disabled={busy}>
+              {busy ? 'Making your keys…' : 'Continue with Google'}
+            </button>
+            <button type="button" onClick={() => setStep('intro')} disabled={busy}>
+              Back
+            </button>
+          </div>
+        </div>
       )}
 
       {step === 'passphrase' && (

@@ -16,6 +16,7 @@ import { StoreContext } from './ui/store-context';
 import { TasksScreen } from './ui/TasksScreen';
 import { UnlockScreen } from './ui/UnlockScreen';
 import { isUpdateReady, onUpdateChange, setActivity } from './ui/update';
+import { GOOGLE_SETUP_RETURN, GOOGLE_UNLOCK_RETURN } from './sync/client';
 import type { Vault, VaultStatus } from './ui/vault';
 
 // With PDF.js, so loaded only when slides are opened
@@ -33,6 +34,12 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   const refresh = () => setStatus(vault.status());
   // A new version waits while you're setting up or unlocked (src/ui/update.ts), and applies on locking
   useEffect(() => setActivity(status === 'unlocked' ? 'unlocked' : status === 'new' ? 'unlocking' : 'locked'), [status]);
+  // Back from a Google sign-in for unlocking or setting up (#101): once open, on to Tasks
+  useEffect(() => {
+    if (status === 'unlocked' && [GOOGLE_UNLOCK_RETURN, GOOGLE_SETUP_RETURN].some((r) => window.location.hash === r.slice(1))) {
+      go({ name: 'tasks' });
+    }
+  }, [status]);
   // The slides use the whole window (app.css .wide); header and footer line up with them
   const wide = status === 'unlocked' && (route.name === 'slides' || route.name === 'play');
   // Lock also forgets this device's remembered unlock (#99), so the next open asks again. Forgotten
