@@ -1,7 +1,7 @@
 // The sync server's data (#95): one SQLite file, sync.db, in the data folder, through Node's own
 // node:sqlite. Numbered schema steps (PRAGMA user_version): never edit a step that has shipped, add one.
 //
-// Step 1: accounts and sessions. What's readable here is exactly docs/SECURITY.md's "What the sync
+// Step 1: accounts and sessions. Step 2: Google unlock keys and when they were used. What's readable here is exactly docs/SECURITY.md's "What the sync
 // server holds": the Google account id and email, and sessions as SHA-256 hashes, never the tokens.
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
@@ -25,6 +25,21 @@ const STEPS = [
      signed_in_at TEXT NOT NULL                 -- the Google sign-in behind it (deleting the account needs a recent one)
    );
    CREATE INDEX sessions_account ON sessions(account_id);`,
+  // Step 2 (Nov 20, 2026, #101): Google unlock (docs/SECURITY.md "Google unlock"), opt-in per account. The key
+  // opens that account's data: it's only ever given to a session with a fresh Google sign-in, and each time
+  // is recorded (never the key itself).
+  `CREATE TABLE unlock_keys (
+     account_id  TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+     key         BLOB NOT NULL,                 -- 32 random bytes
+     created_at  TEXT NOT NULL
+   );
+   CREATE TABLE unlock_uses (
+     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+     account_id  TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     device      TEXT NOT NULL,
+     at          TEXT NOT NULL
+   );
+   CREATE INDEX unlock_uses_account ON unlock_uses(account_id, at);`,
 ];
 
 /** Opens (and if needed creates or upgrades) the database in `dir`, or in memory for ':memory:'. */

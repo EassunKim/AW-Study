@@ -8,6 +8,10 @@
 //   POST   /api/auth/signout                        sign this device out
 //   POST   /api/devices/signout  { id } | { all: true }   sign another device, or every device, out
 //   DELETE /api/account                             delete the account (needs a sign-in in the last 5 minutes)
+//   POST   /api/unlock-key                          Google unlock on (#101): the account's key, made the first time
+//   GET    /api/unlock-key                          the key, for unlocking (needs a sign-in in the last 5 minutes; recorded)
+//   DELETE /api/unlock-key                          Google unlock off: the key is deleted
+//   GET    /api/unlock-uses                         when and on which device the key was given out
 //   GET    /healthz                                 for the container's health check
 //
 // Requests that change something must come from our own site (Origin) as JSON. Answers are never
@@ -55,6 +59,11 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
     deleteAccountSession: db.prepare('DELETE FROM sessions WHERE id = ? AND account_id = ?'),
     deleteAccountSessions: db.prepare('DELETE FROM sessions WHERE account_id = ?'),
     devices: db.prepare('SELECT id, device, created_at, used_at FROM sessions WHERE account_id = ? ORDER BY used_at DESC'),
+    unlockKey: db.prepare('SELECT key FROM unlock_keys WHERE account_id = ?'),
+    addUnlockKey: db.prepare('INSERT INTO unlock_keys (account_id, key, created_at) VALUES (?, ?, ?)'),
+    deleteUnlockKey: db.prepare('DELETE FROM unlock_keys WHERE account_id = ?'),
+    addUnlockUse: db.prepare('INSERT INTO unlock_uses (account_id, device, at) VALUES (?, ?, ?)'),
+    unlockUses: db.prepare('SELECT device, at FROM unlock_uses WHERE account_id = ? ORDER BY at DESC LIMIT 20'),
   };
 
   /** The signed-in session for this request, or null (an expired or no-longer-allowed one is removed). */
@@ -215,6 +224,38 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
       }
       q.deleteAccount.run(s.account_id); // its sessions go with it (ON DELETE CASCADE)
       return json(200, { deleted: true, signedIn: false }, { 'Set-Cookie': signOutCookie });
+    }
+
+    // --- Google unlock (#101, docs/SECURITY.md "Google unlock") ---
+
+    if (url.pathname === '/api/unlock-key' && req.method === 'POST') {
+      // Turning it on: the device has just proved it's you (passphrase, passkey or recovery key) before asking.
+      // One key per account, so every device of the account wraps its data key with the same one.
+      let row = q.unlockKey.get(s.account_id);
+      if (!row) {
+        q.addUnlockKey.run(s.account_id, randomBytes(32), now().toISOString());
+        row = q.unlockKey.get(s.account_id);
+      }
+      return json(200, { key: Buffer.from(row.key).toString('base64url') });
+    }
+
+    if (url.pathname === '/api/unlock-key' && req.method === 'GET') {
+      if (now().getTime() - Date.parse(s.signed_in_at) > RECENT_SIGN_IN_MS) {
+        return json(403, { error: 'Sign in with Google again to unlock.', needsSignIn: true });
+      }
+      const row = q.unlockKey.get(s.account_id);
+      if (!row) return json(404, { error: 'Google unlock is off for this account.', off: true });
+      q.addUnlockUse.run(s.account_id, s.device, now().toISOString());
+      return json(200, { key: Buffer.from(row.key).toString('base64url') });
+    }
+
+    if (url.pathname === '/api/unlock-key' && req.method === 'DELETE') {
+      q.deleteUnlockKey.run(s.account_id);
+      return json(200, { off: true });
+    }
+
+    if (url.pathname === '/api/unlock-uses' && req.method === 'GET') {
+      return json(200, { uses: q.unlockUses.all(s.account_id).map((u) => ({ device: u.device, at: u.at })) });
     }
 
     return json(404, { error: 'Not found.' });

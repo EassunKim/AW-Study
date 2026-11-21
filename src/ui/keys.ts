@@ -7,6 +7,7 @@ import {
   recallKey,
   rememberKey,
   unlock,
+  wrapWithGoogleKey,
   wrapWithPasskey,
   wrapWithPassphrase,
   wrapWithRecoveryKey,
@@ -28,7 +29,10 @@ export interface PasskeyInput {
   label: string;
 }
 
-export type FirstMethod = { method: 'passphrase'; passphrase: string } | { method: 'passkey'; passkey: PasskeyInput };
+export type FirstMethod =
+  | { method: 'passphrase'; passphrase: string }
+  | { method: 'passkey'; passkey: PasskeyInput }
+  | { method: 'google'; googleKey: Uint8Array; email: string }; // Google unlock (#101)
 
 /** `iterations` is for tests only, as in wrapWithPassphrase. */
 export interface KeyOptions {
@@ -45,7 +49,9 @@ export async function makeKeys(first: FirstMethod, options: KeyOptions = {}): Pr
   const entries: KeyringEntry[] = [
     first.method === 'passphrase'
       ? await wrapWithPassphrase(dataKey, first.passphrase, options)
-      : await wrapWithPasskey(dataKey, first.passkey),
+      : first.method === 'google'
+        ? await wrapWithGoogleKey(dataKey, first.googleKey, first.email)
+        : await wrapWithPasskey(dataKey, first.passkey),
     await wrapWithRecoveryKey(dataKey, recoveryKey),
   ];
   return { keyring: { v: 1, entries }, dataKey, recoveryKey };
@@ -73,6 +79,11 @@ export async function openKey(keyring: Keyring, secret: UnlockSecret, remember: 
   if (!remember) return { key: await unlockWith(keyring, secret), remembered: null };
   const remembered = await rememberKey(await unlockForChange(keyring, secret));
   return { key: await recallKey(remembered), remembered };
+}
+
+/** This keyring's Google unlock entry (#101), if it has one. */
+export function googleEntry(keyring: Keyring | null) {
+  return (keyring?.entries ?? []).find((e): e is Extract<KeyringEntry, { method: 'google' }> => e.method === 'google') ?? null;
 }
 
 /** The keyring's passkeys, for the unlock screen's button and the Settings list. */
@@ -167,7 +178,9 @@ export function unlockMessage(err: unknown, method: UnlockSecret['method']): str
           ? 'That passphrase doesn’t unlock this device’s cards. Check it and try again.'
           : method === 'recovery'
             ? 'That recovery key doesn’t unlock this device’s cards.'
-            : 'That passkey isn’t one set up for this device’s cards.';
+            : method === 'google'
+              ? 'Your Google account’s unlock doesn’t open this device’s data (it may have been turned off and on again). Use your recovery key.'
+              : 'That passkey isn’t one set up for this device’s cards.';
       case 'invalid':
         return 'That recovery key isn’t quite right: check for a typo.';
       case 'unsupported':

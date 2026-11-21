@@ -20,7 +20,7 @@ import {
 /** PBKDF2-HMAC-SHA-256 iterations for new passphrase entries (OWASP's figure since 2023). */
 export const PBKDF2_ITERATIONS = 600_000;
 
-const INFO = { recovery: 'honed:v1:recovery', passkey: 'honed:v1:passkey' } as const;
+const INFO = { recovery: 'honed:v1:recovery', passkey: 'honed:v1:passkey', google: 'honed:v1:google' } as const;
 const subtle = () => globalThis.crypto.subtle;
 const utf8 = new TextEncoder();
 
@@ -129,12 +129,20 @@ export async function wrapWithPasskey(
   };
 }
 
+/** Google unlock (#101): the data key wrapped under the account's Google unlock key (32 bytes, from the sync server). */
+export async function wrapWithGoogleKey(dataKey: CryptoKey, googleKey: Uint8Array, email: string): Promise<KeyringEntry> {
+  if (googleKey.length !== 32) throw new CryptoError('invalid', 'A Google unlock key is 32 bytes.');
+  const kdf: HkdfParams = { name: 'HKDF', hash: 'SHA-256', salt: random(16), info: INFO.google };
+  return { ...entryBase(await wrapUnder(dataKey, await hkdfKek(googleKey, kdf))), method: 'google', kdf, email };
+}
+
 // --- Unlocking ---
 
 const WRONG: Record<UnlockSecret['method'], string> = {
   passphrase: `That passphrase doesn’t unlock ${APP_NAME} on this device.`,
   recovery: `That recovery key doesn’t unlock ${APP_NAME} on this device.`,
   passkey: `That passkey doesn’t unlock ${APP_NAME} on this device.`,
+  google: `Your Google account’s unlock doesn’t open ${APP_NAME} on this device.`,
 };
 
 export async function unlock(keyring: Keyring, secret: UnlockSecret, options?: { extractable?: boolean }): Promise<CryptoKey> {
@@ -153,6 +161,12 @@ export async function unlock(keyring: Keyring, secret: UnlockSecret, options?: {
     for (const entry of keyring.entries) {
       if (entry.method !== 'passphrase') continue;
       const key = await unwrapUnder(entry, await passphraseKek(secret.passphrase, entry.kdf), extractable);
+      if (key) return key;
+    }
+  } else if (secret.method === 'google') {
+    for (const entry of keyring.entries) {
+      if (entry.method !== 'google') continue;
+      const key = await unwrapUnder(entry, await hkdfKek(secret.googleKey, entry.kdf), extractable);
       if (key) return key;
     }
   } else {

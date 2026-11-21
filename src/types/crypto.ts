@@ -6,7 +6,7 @@
 // Bytes are Uint8Array: IndexedDB stores them as they are; backups (#18) encode them as base64url.
 
 /** Every way of unlocking. */
-export type UnlockMethod = 'passphrase' | 'passkey' | 'recovery';
+export type UnlockMethod = 'passphrase' | 'passkey' | 'recovery' | 'google';
 
 /** Key derivation for a passphrase: PBKDF2-HMAC-SHA-256. */
 export interface Pbkdf2Params {
@@ -41,6 +41,13 @@ export type KeyringEntry =
       credentialId: Uint8Array; // which passkey
       prfSalt: Uint8Array; // the 32 bytes the passkey's PRF is evaluated on
       label: string; // shown in Settings, e.g. "iPhone" (the user can edit it)
+    })
+  | (EntryBase & {
+      // Google unlock (#101, docs/SECURITY.md "Google unlock"): wrapped under the account's key, which the
+      // sync server keeps and gives out only after a fresh Google sign-in. Opt-in.
+      method: 'google';
+      kdf: HkdfParams;
+      email: string; // the Google account, shown in Settings
     });
 
 /** All the ways this user can unlock. Stored in `meta` (#16) and in backups (#18). */
@@ -73,7 +80,8 @@ export interface RememberedKey {
 export type UnlockSecret =
   | { method: 'passphrase'; passphrase: string }
   | { method: 'recovery'; recoveryKey: string }
-  | { method: 'passkey'; credentialId: Uint8Array; prfOutput: Uint8Array };
+  | { method: 'passkey'; credentialId: Uint8Array; prfOutput: Uint8Array }
+  | { method: 'google'; googleKey: Uint8Array }; // the account's Google unlock key, from the sync server
 
 export type CryptoErrorCode =
   | 'wrong-secret' // doesn't unlock this keyring

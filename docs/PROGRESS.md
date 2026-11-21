@@ -55,6 +55,7 @@ slides" and "M6: AI helper and quizzes":
 | Sync step 1: the `honed-sync` server's Google sign-in and accounts, Settings' Account box | #95 | Nathan's Claude | `sync/`, `tests/sync/`, the `sync-image` CI job, `/api/` in `vite.config.ts` and `app.spec.ts`, `src/sync/`, one line of `SettingsScreen.tsx`, `tests/browsers/account.spec.ts` | **Done** (this PR). Live once Nathan sets up the server side (Google client, dataset, app, tunnel route) |
 | Remember this device, and opt-in Google unlock: **design first** | #97 | Nathan's Claude | `docs/SECURITY.md` ("Remembering a device", "Google unlock", the threat table), a line of `docs/DESIGN.md` | Design PR open for Matt to read; then remembering a device (its own PR), Google unlock with sync step 2 |
 | Remember this device: unlock once, then open straight in | #99 | Nathan's Claude | `RememberedKey` in `src/types/crypto.ts`, `rememberKey`/`recallKey` in `src/lib/crypto.ts`, `getRemembered`/`remember`/`forget` in `src/db/store.ts` and `src/ui/vault.ts`, `openKey` in `src/ui/keys.ts`, the unlock and setup screens, Lock in `src/App.tsx`, `src/ui/ThisDevice.tsx` (Settings), the test helpers (unticked by default) | **Done** (this PR). Try on a real phone after deploy |
+| Google unlock: a Google sign-in opens Honed instead of a passkey (opt-in) | #101 | Nathan's Claude | `sync/` (schema step 2, `/api/unlock-key`, `/api/unlock-uses`), the `google` keyring method (`src/types/crypto.ts`, `wrapWithGoogleKey` in `src/lib/crypto.ts`, the keyring rule in `src/db/store.ts`), `src/sync/client.ts`, `src/sync/GoogleUnlockSettings.tsx`, the unlock and setup screens, ProveItsYou, `src/App.tsx` (the return addresses) | **Done** (this PR). Needs both images deployed (honed-sync and site-honed) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -131,6 +132,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 20 (#101):** **Google unlock** built (opt-in; docs/SECURITY.md "Google unlock"), ahead of sync because it already
+  replaces the passkey: Settings turns it on (prove it's you, the plain warning), the unlock screen's Unlock with Google
+  (signs in again when the last Google sign-in is over 5 minutes old, and comes back by itself), setup's Use your Google
+  account, Prove it's you with Google. The keyring rule is now one of passphrase, passkey or Google, plus always a recovery
+  key, so passkeys can be removed. Server: one key per account, given out only after a fresh sign-in, each use recorded.
+  12 deliberate breaks, all caught. A new device still needs sync (step 2) to get its data.
 
 - **Nov 20 (#99):** **Remember this device** built: ticked by default at setup and unlock, so Honed opens straight in after
   the first unlock; Lock and Settings > This device > Forget make it ask again; a damaged remembered unlock is forgotten and

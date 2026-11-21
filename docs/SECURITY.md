@@ -322,7 +322,7 @@ time, save that log in after that").
   profile. That's how every app that stays signed in works; the device's own lock and disk encryption are
   the protection. A device that doesn't remember keeps today's protection.
 
-### Google unlock (opt-in, #97, design only; built with sync)
+### Google unlock (opt-in, #97, built in #101)
 
 For people who'd rather never type a passphrase or use a passkey: their Google account can unlock Honed
 on a new device. **Off unless the person turns it on, and for them "signing in never unlocks" no longer
@@ -332,7 +332,14 @@ holds.**
   passphrase, passkey or recovery key like any change to how you unlock) makes a random 256-bit **Google
   unlock key**, gives it to the sync server, which stores it with the account, and adds a keyring entry,
   method `google`, wrapping the data key with it (AES-KW, as the other methods).
-- **A new device:** sign in with Google; the device gets the keyring (sync); it asks the server for the
+- **Built before sync (#101)**, because it already replaces the passkey on a device that has its data: the
+  unlock screen's **Unlock with Google** asks the server for the key (`GET /api/unlock-key`); without a
+  Google sign-in in the last 5 minutes it goes to Google and back (`/#/google-unlock`) and tries again
+  once. Setup offers **Use your Google account** (sign in, then the key wraps the new data key; the recovery
+  key is still made). "Prove it's you" in Settings accepts it too. The server makes one key per account
+  (`POST`), deletes it on `DELETE`, and lists uses at `/api/unlock-uses`. The `google` entry's
+  key-encryption key is HKDF-SHA-256 of the account's key (info `honed:v1:google`), as for the recovery key.
+- **A new device:** sign in with Google; the device gets the keyring (sync, step 2); it asks the server for the
   Google unlock key, which the server gives only to a session whose Google sign-in was in the last 5
   minutes; the device unwraps the data key and (by default) remembers it as above.
 - **What it costs:** our server holds both the key and (with sync) the encrypted data, so the server, or

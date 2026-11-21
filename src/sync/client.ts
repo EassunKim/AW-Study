@@ -46,3 +46,81 @@ export async function signOut(fetcher: typeof fetch = fetch): Promise<void> {
   }
   if (!res.ok) throw new SyncUnavailable('Couldn’t sign out. Try again.');
 }
+
+// --- Google unlock (#101, docs/SECURITY.md "Google unlock") ---
+
+/** Why the Google unlock key couldn't be had: sign in with Google again first, or it's turned off. */
+export class GoogleUnlockError extends Error {
+  constructor(
+    readonly code: 'needs-sign-in' | 'off' | 'unavailable',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'GoogleUnlockError';
+  }
+}
+
+function fromBase64url(text: string): Uint8Array {
+  const b64 = text.replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+async function keyFrom(res: Response): Promise<Uint8Array> {
+  const body = (await res.json().catch(() => null)) as { key?: unknown } | null;
+  if (typeof body?.key !== 'string') throw new GoogleUnlockError('unavailable', 'The sync server sent something unexpected.');
+  let key: Uint8Array;
+  try {
+    key = fromBase64url(body.key);
+  } catch {
+    throw new GoogleUnlockError('unavailable', 'The sync server sent something unexpected.');
+  }
+  if (key.length !== 32) throw new GoogleUnlockError('unavailable', 'The sync server sent something unexpected.');
+  return key;
+}
+
+async function call(fetcher: typeof fetch, path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetcher(path, { cache: 'no-store', ...init });
+  } catch {
+    throw new GoogleUnlockError('unavailable', 'Couldn’t reach the sync server. Are you offline?');
+  }
+}
+
+const SEND = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } as const;
+
+/** Turning Google unlock on: the account's key (made on the server the first time). Signed in only. */
+export async function turnOnGoogleUnlock(fetcher: typeof fetch = fetch): Promise<Uint8Array> {
+  const res = await call(fetcher, '/api/unlock-key', SEND);
+  if (res.status === 401) throw new GoogleUnlockError('needs-sign-in', 'Sign in with Google first (Account, above).');
+  if (!res.ok) throw new GoogleUnlockError('unavailable', 'Couldn’t turn on Google unlock. Try again.');
+  return keyFrom(res);
+}
+
+/** The account's Google unlock key, for unlocking: needs a Google sign-in in the last 5 minutes. */
+export async function fetchGoogleKey(fetcher: typeof fetch = fetch): Promise<Uint8Array> {
+  const res = await call(fetcher, '/api/unlock-key', { headers: { Accept: 'application/json' } });
+  if (res.status === 401 || res.status === 403) throw new GoogleUnlockError('needs-sign-in', 'Sign in with Google to unlock.');
+  if (res.status === 404) throw new GoogleUnlockError('off', 'Google unlock has been turned off for your account. Use your recovery key.');
+  if (!res.ok) throw new GoogleUnlockError('unavailable', 'Couldn’t reach the sync server. Try again.');
+  return keyFrom(res);
+}
+
+/** Turning Google unlock off for the account (every device): the server deletes its key. */
+export async function turnOffGoogleUnlock(fetcher: typeof fetch = fetch): Promise<void> {
+  const res = await call(fetcher, '/api/unlock-key', { ...SEND, method: 'DELETE' });
+  if (!res.ok && res.status !== 401) throw new GoogleUnlockError('unavailable', 'Couldn’t reach the sync server to turn it off there. Try again.');
+}
+
+/** When and on which device the key was given out (newest first). */
+export async function googleUnlockUses(fetcher: typeof fetch = fetch): Promise<{ device: string; at: string }[]> {
+  const res = await call(fetcher, '/api/unlock-uses', { headers: { Accept: 'application/json' } });
+  if (!res.ok) return [];
+  const body = (await res.json().catch(() => null)) as { uses?: { device: string; at: string }[] } | null;
+  return Array.isArray(body?.uses) ? body.uses : [];
+}
+
+/** Where a Google sign-in for unlocking comes back to: the unlock screen picks it up from there. */
+export const GOOGLE_UNLOCK_RETURN = '/#/google-unlock';
+/** Where a Google sign-in for setting up comes back to. */
+export const GOOGLE_SETUP_RETURN = '/#/google-setup';

@@ -5,8 +5,10 @@ import { APP_NAME } from '../brand';
 import { isRecoveryKey } from '../lib/crypto';
 import { getPasskeySecret, isPrfSupported } from '../lib/passkey';
 import type { Keyring } from '../types/crypto';
+import { GoogleUnlockError, fetchGoogleKey } from '../sync/client';
 import {
   confirmsGroup,
+  googleEntry,
   hasPassphrase,
   passkeyEntries,
   passphraseStrength,
@@ -277,13 +279,19 @@ export function ProveItsYou({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const attempt = async (run: () => Promise<CryptoKey>, method: 'passphrase' | 'recovery' | 'passkey') => {
+  const attempt = async (run: () => Promise<CryptoKey>, method: 'passphrase' | 'recovery' | 'passkey' | 'google') => {
     setBusy(true);
     setProblem(null);
     try {
       onProved(await run());
     } catch (err) {
-      setProblem(unlockMessage(err, method));
+      setProblem(
+        err instanceof GoogleUnlockError && err.code === 'needs-sign-in'
+          ? 'Sign in with Google again (Account, above), then try this within 5 minutes.'
+          : err instanceof GoogleUnlockError
+            ? err.message
+            : unlockMessage(err, method),
+      );
       setBusy(false);
     }
   };
@@ -314,6 +322,15 @@ export function ProveItsYou({
       {prf && passkeys.length > 0 && (
         <button type="button" onClick={usePasskey} disabled={busy}>
           Use a passkey
+        </button>
+      )}
+      {googleEntry(keyring) && (
+        <button
+          type="button"
+          onClick={() => void attempt(async () => unlockForChange(keyring, { method: 'google', googleKey: await fetchGoogleKey() }), 'google')}
+          disabled={busy}
+        >
+          Use your Google account
         </button>
       )}
       <form className="stack" onSubmit={submit}>
