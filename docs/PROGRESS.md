@@ -133,6 +133,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 20 (#103):** Docs: SECURITY.md's intro (an "In short"), key diagram, threat table, keyring rule, the server's holdings and
+  "Where it lives" brought up to date with #95, #99 and #101; the README has a Privacy section and a current status.
+
 - **Nov 20 (#101):** **Google unlock** built (opt-in; docs/SECURITY.md "Google unlock"), ahead of sync because it already
   replaces the passkey: Settings turns it on (prove it's you, the plain warning), the unlock screen's Unlock with Google
   (signs in again when the last Google sign-in is over 5 minutes old, and comes back by itself), setup's Use your Google
