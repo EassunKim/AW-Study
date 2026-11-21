@@ -1,31 +1,50 @@
 # Security design
 
-How Honed keeps a user's classes and slides private on their own device. This is the design milestone 3 (#15-#18)
-builds; change it here first, in its own PR, before changing the code. **Only standard building
-blocks from the browser's WebCrypto, with standard parameters. No home-made cryptography.**
+How Honed keeps a user's classes and slides private. Change it here first, in its own PR, before changing the
+code. **Only standard building blocks from the browser's WebCrypto, with standard parameters. No home-made
+cryptography.**
+
+**In short (Nov 20, 2026):**
+- **On the device:** everything is encrypted with a data key that only a passkey, a passphrase or the recovery key
+  opens (milestone 3, #15-#18). Backups hold only ciphertext.
+- **Remember this device** (#99, on by default): after one unlock, a device opens straight in. The key it keeps
+  can't be read out by the page, and never leaves the device; the device's own lock protects it from there.
+- **Accounts** (#95): Google sign-in to our sync server says *which account* a device belongs to. On its own it
+  never unlocks anything.
+- **Google unlock** (#101, **opt-in**): for people who turn it on, the server keeps a key that opens their data, so a
+  Google sign-in can unlock instead of a passkey. For them, our server (or anyone who takes it over, or takes over
+  their Google account) could read their data. For everyone else, nothing changes.
+- **Sync** of the data itself between devices is designed ("Accounts and sync") but **not built yet**: today the
+  server holds accounts, sessions and Google unlock keys, and none of anyone's classes or slides.
 
 ## What it protects against, and what it doesn't
 
 | Threat | Protected? | How |
 | --- | --- | --- |
 | Our server, or anyone who takes it over, reading your classes and slides | **Yes**, at rest | The server stores none of them. The one exception is AI requests (below): a section's slide text passes through the AI helper on its way to Anthropic, and nothing is kept. With sync (v2, "Accounts and sync") it stores only ciphertext it has no key for. |
-| Google, or someone who takes over the Google account, opening the data (v2) | **Yes** | Signing in only says which account it is; it never unlocks ("Accounts and sync"). They could see the account exists and, through our server, download ciphertext. |
+| Google, or someone who takes over the Google account, opening the data | **Yes**, unless that person turned on Google unlock | Signing in only says which account it is ("Accounts and sync"). With Google unlock on, a Google sign-in plus our server's key opens it ("Google unlock"). |
+| Someone who steals a session cookie | Partly | A session can't unlock anything by itself. With Google unlock on, it can fetch the key only within 5 minutes of a Google sign-in, and each fetch is recorded and shown in Settings. Sessions end after 30 days unused. |
 | The sync server withholding or rolling back changes (v2) | **No** (it can't read, forge or alter them) | Every device keeps its own full copy, so sync stops; nothing is lost from a device. |
 | A backup file (`.honed`) found in someone's cloud drive | **Yes** | Backups hold only ciphertext and wrapped keys (#18). |
 | Another person using the same computer account, or copying the browser's files | **Yes**, while Honed is locked **and the device doesn't remember the unlock** | Records are encrypted at rest; the key is only ever in memory while unlocked. A device that remembers the unlock (#97, "Remembering a device") opens without asking, so there the device's own lock is the protection. |
 | Our server reading the data of someone who turned on Google unlock (#97) | **No**, for that person only | They chose to let their Google account unlock Honed, so the server holds a key that opens it ("Google unlock"). Everyone else is unaffected. |
 | A lost phone or laptop | By the device | The device's own lock and disk encryption. Honed adds the points above. |
 | Malicious code running inside the page while it's unlocked | **No** (encryption can't) | Prevented instead by the strict Content-Security-Policy, no outside scripts, few dependencies. |
-| Forgetting the passphrase **and** losing the recovery key | **No: the data is gone** | Nobody else can unlock them; that is the point. The setup screen says so plainly. |
+| Losing every way to unlock (passphrase, passkeys, Google unlock if on) **and** the recovery key | **No: the data is gone** | Nobody else can unlock them; that is the point. The setup screen says so plainly. |
 | Guessing a weak passphrase from stolen browser files | Slowed | PBKDF2 makes every guess cost about half a second. A strong passphrase or a passkey is the real protection. |
 
 ## Keys
 
 ```
-              ┌── passphrase ──PBKDF2──▶ KEK ─┐
-user secret ──┼── passkey ─────PRF+HKDF─▶ KEK ─┼──AES-KW──▶ wrapped data key (one per method, in the keyring)
-              └── recovery key ──HKDF───▶ KEK ─┘
-                                                     data key ──AES-GCM──▶ every record
+              ┌── passphrase ──────PBKDF2───▶ KEK ─┐
+              ├── passkey ─────────PRF+HKDF─▶ KEK ─┤
+user secret ──┼── recovery key ────HKDF─────▶ KEK ─┼──AES-KW──▶ wrapped data key (one per method, in the keyring)
+              └── Google unlock* ──HKDF─────▶ KEK ─┘
+                                                         data key ──AES-GCM──▶ every record
+
+  * opt-in: the 32-byte key is kept by the sync server, given out after a fresh Google sign-in
+
+  remembered device (#99):  device key (non-extractable, this device only) ──AES-GCM──▶ wrapped data key
 ```
 
 - **Data key:** 256-bit AES-GCM key, made once per user (`crypto.subtle.generateKey`). It
@@ -42,12 +61,18 @@ user secret ──┼── passkey ─────PRF+HKDF─▶ KEK ─┼─�
     supports PRF (`isPrfSupported`); a passphrase is always possible.
   - **Recovery key:** 128 random bits shown once at setup; HKDF-SHA-256 turns them into the KEK.
     It already has full strength, so no slow function is needed.
+  - **Google unlock** (#101, opt-in): 256 random bits the sync server keeps for the account and gives out
+    only after a fresh Google sign-in; HKDF-SHA-256 (info `honed:v1:google`) turns them into the KEK. See
+    "Google unlock" for what it costs.
+- **A remembered device** (#99) also keeps the data key wrapped, by a device key that can't be read out of
+  the page and never leaves the device. It isn't in the keyring. See "Remembering a device".
 - **The keyring** is the list of wrapped copies, stored in the database's `meta` store (#16) and
   in backups (#18). Each entry records its method and every parameter used, so iterations or
   methods can change later without breaking old entries.
-- **Changing how you unlock** (new passphrase, adding or removing a passkey, a new recovery key)
-  rewraps the same data key: no record is re-encrypted. Doing it needs the data key in a form that
-  can be wrapped, so Settings asks for the current passphrase or recovery key (or a passkey) first,
+- **Changing how you unlock** (new passphrase, adding or removing a passkey, a new recovery key,
+  turning Google unlock on or off) rewraps the same data key: no record is re-encrypted. Doing it needs
+  the data key in a form that can be wrapped, so Settings asks for the current passphrase, recovery key,
+  a passkey, or Google (when it's on) first,
   and only then holds an extractable copy for that one operation. For everyday use the data key is
   unwrapped as **non-extractable**: code in the page can use it but never read its bytes.
 - **Replacing the data key itself** (re-encrypting everything) isn't needed for anything in
@@ -128,9 +153,9 @@ AI is the one time data leaves the device. Everything else in this document is a
   once) and a "migration running" flag, then seals every plain record (every store, the
   change log included), in batches, and clears the flag. If the page closes half-way, the
   store opens `'locked'` and the next `unlock` finishes the job.
-- **The keyring always keeps** at least one passphrase or passkey (to unlock) and at least one
-  recovery key; the store refuses changes that would break that. Keyring changes never rewrite a
-  record.
+- **The keyring always keeps** at least one way to unlock (a passphrase, a passkey, or Google unlock,
+  #101) and at least one recovery key; the store refuses changes that would break that. Keyring changes
+  never rewrite a record.
 - **Schema step 2** bumps the database version, so a milestone 2 tab still open elsewhere can't
   read sealed records as plain or write plain ones among them.
 
@@ -177,7 +202,9 @@ It can sit in OneDrive, iCloud Drive or Google Drive.
 
 ## Accounts and sync (v2, #93)
 
-**Design only: nothing here is built yet.** The testing phase runs on Nathan's home server, for Matt,
+**Built so far:** sign-in, accounts and sessions (#95), remembering a device (#99) and Google unlock (#101).
+**Not built yet:** the keyring on the server, changes and files, so no data syncs. The testing phase runs on
+Nathan's home server, for Matt,
 Nathan and a few testers. Every piece is kept easy to move to Cloudflare (Workers, R2, D1) if Honed goes
 public. Sync is **opt-in**: a device that never signs in keeps working exactly as today.
 
@@ -187,7 +214,8 @@ Google sign-in tells our server **which account** a device belongs to. It never 
 key is still opened only by a passkey, passphrase or recovery key, on the device, as in "Keys". So the
 server, Google, or anyone who takes either over gets ciphertext and wrapped keys, nothing they can open.
 The model is 1Password's, Bitwarden's and Proton's: one sign-in for the account, a separate secret for
-the vault.
+the vault. **The one exception is opt-in:** someone who turns on Google unlock lets a Google sign-in open
+their data ("Google unlock").
 
 ### What the sync server holds, and what it can see
 
@@ -198,6 +226,7 @@ the vault.
 | The keyring and key check | the methods (passphrase, passkey, recovery key) and their parameters (salts, iterations, credential ids), a version number | the wrapped data keys (useless without the user's secret) |
 | Changes | a server sequence number, the change id, size, upload time, and the hints below | everything about the record |
 | Files (slide PDFs, their page text) | the deck id, size, upload time | the whole file |
+| Google unlock key (#101, only for accounts that turned it on) | **the key itself**: it opens that account's data, so the server could too. When and on which signed-in device it was given out | — |
 
 **Hints:** each change also carries `entity`, `entityId`, `op` and `at` in the clear, as the local change
 log does today, so the server could later keep only each record's latest change. They show *how many*
@@ -388,5 +417,6 @@ as PRF).
 | `src/db/` (#16) | Uses them to encrypt records and keep the keyring |
 | `src/ui/` (#17) | Setup, unlock, recovery, Settings |
 | `src/backup/` (#18) | The `.honed` file format, making and restoring backups (see "Backups") |
-| `sync/` (v2) | The sync server, `honed-sync` (see "Accounts and sync"): Google sign-in, accounts and sessions built (#95: `google.mjs`, `app.mjs`, `db.mjs`, tests in `tests/sync/`); the keyring, changes and files not yet |
-| `src/sync/` (#95) | The app's side: Settings' Account box (sign in, check, sign out); asks the server only when you press a button |
+| `sync/` (v2) | The sync server, `honed-sync` (see "Accounts and sync"): Google sign-in, accounts and sessions (#95: `google.mjs`, `app.mjs`, `db.mjs`), Google unlock keys and their uses (#101, schema step 2); tests in `tests/sync/`. The keyring, changes and files not yet |
+| `src/sync/` | The app's side: `client.ts` (the server's routes), Settings' Account box (#95) and Google unlock (#101, `GoogleUnlockSettings.tsx`) |
+| `src/ui/UnlockScreen.tsx`, `SetupScreen.tsx`, `ThisDevice.tsx` | Remembering a device (#99) and Unlock with Google / Use your Google account (#101) |
