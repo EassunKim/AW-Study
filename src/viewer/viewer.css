@@ -43,6 +43,22 @@
   color: var(--muted);
 }
 
+/* Always as wide as "Outside this section: …" (its data-wide, drawn invisibly in the same cell), so the
+   controls after it never move when the label changes (#110) */
+.sv-range {
+  display: inline-grid;
+}
+
+.sv-range > span,
+.sv-range::after {
+  grid-area: 1 / 1;
+}
+
+.sv-range::after {
+  content: attr(data-wide);
+  visibility: hidden;
+}
+
 .sv-range.in {
   border-color: var(--accent);
   color: var(--accent);
@@ -200,4 +216,27 @@
 
 .sv-page .textLayer br::selection {
   background: transparent;
+}
+
+/* Phones (#110): a swipe or the thumbnails move between slides and a pinch zooms, so the bar keeps only
+   what has no gesture (Whole page / Page width, and Notes), on one line, at its end. The position is
+   still read out by screen readers. The section is marked by the thumbnails' underline. */
+@media (hover: none) and (pointer: coarse) {
+  .sv-bar {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+  .sv-step,
+  .sv-range,
+  .sv-zoom {
+    display: none;
+  }
+  .sv-position {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

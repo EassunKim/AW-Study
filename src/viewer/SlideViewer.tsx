@@ -190,18 +190,21 @@ export function SlideViewer({ pdf, page: wanted = 1, range, onPageChange, overla
       onKeyDown={onKeyDown}
     >
       <div className="sv-bar">
-        <button type="button" onClick={() => go(shown - 1)} disabled={!count || shown <= 1} aria-label="Previous slide">
+        <button type="button" className="sv-step" onClick={() => go(shown - 1)} disabled={!count || shown <= 1} aria-label="Previous slide">
           ‹
         </button>
         <span className="sv-position" data-testid="slide-position" aria-live="polite">
           {count ? `Slide ${shown} of ${count}` : 'Opening…'}
         </span>
-        <button type="button" onClick={() => go(shown + 1)} disabled={!count || shown >= count} aria-label="Next slide">
+        <button type="button" className="sv-step" onClick={() => go(shown + 1)} disabled={!count || shown >= count} aria-label="Next slide">
           ›
         </button>
         {range && (
-          <span className={`sv-range ${inRange ? 'in' : 'out'}`} data-testid="slide-range">
-            {inRange ? 'This section' : 'Outside this section'}: slides {range.first}–{range.last}
+          // As wide as the longer label always (viewer.css), so nothing after it moves when it changes (#110)
+          <span className={`sv-range ${inRange ? 'in' : 'out'}`} data-testid="slide-range" data-wide={`Outside this section: slides ${range.first}–${range.last}`}>
+            <span>
+              {inRange ? 'This section' : 'Outside this section'}: slides {range.first}–{range.last}
+            </span>
           </span>
         )}
         <span className="sv-zoom">

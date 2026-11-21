@@ -33,10 +33,10 @@ export default function SlidesScreen({ courseId, deckId, first, last }: { course
 
   return (
     <section className="slides-screen">
-      <p>
+      <p className="slides-back">
         <a className="back" href={href({ name: 'class', courseId })}>← {course.name}</a>
       </p>
-      <h2>
+      <h2 className="slides-title">
         {deck.title}
         {range && <span className="muted small"> · {slidesLabel(range.first, range.last)}</span>}
       </h2>
