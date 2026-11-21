@@ -7,6 +7,7 @@ import { useState, type FormEvent } from 'react';
 import { BackupSettings } from '../backup/BackupSettings';
 import { AccountSettings } from '../sync/AccountSettings';
 import { GoogleUnlockSettings } from '../sync/GoogleUnlockSettings';
+import { SyncSettings } from '../sync/SyncSettings';
 import { AiSettings } from './AiSettings';
 import { ThisDevice } from './ThisDevice';
 import { APP_NAME } from '../brand';
@@ -36,7 +37,7 @@ const WHY: Record<Task, string> = {
   recovery: 'Making a new recovery key needs your current passphrase, a passkey or your recovery key.',
 };
 
-export function SettingsScreen({ onLock }: { onLock: () => void }) {
+export function SettingsScreen({ onLock, onReplaced = () => {} }: { onLock: () => void; onReplaced?: () => void }) {
   const vault = useVault();
   const store = useStore();
   const prf = usePrfSupported();
@@ -140,6 +141,13 @@ export function SettingsScreen({ onLock }: { onLock: () => void }) {
       <AccountSettings />
 
       {keyring && <GoogleUnlockSettings keyring={keyring} onChanged={() => reload()} />}
+
+      <SyncSettings
+        onReplaced={() => {
+          void reload();
+          onReplaced();
+        }}
+      />
 
       <BackupSettings store={store} onRestored={() => void reload()} />
 

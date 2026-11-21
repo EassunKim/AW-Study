@@ -56,7 +56,7 @@ slides" and "M6: AI helper and quizzes":
 | Remember this device, and opt-in Google unlock: **design first** | #97 | Nathan's Claude | `docs/SECURITY.md` ("Remembering a device", "Google unlock", the threat table), a line of `docs/DESIGN.md` | Design PR open for Matt to read; then remembering a device (its own PR), Google unlock with sync step 2 |
 | Remember this device: unlock once, then open straight in | #99 | Nathan's Claude | `RememberedKey` in `src/types/crypto.ts`, `rememberKey`/`recallKey` in `src/lib/crypto.ts`, `getRemembered`/`remember`/`forget` in `src/db/store.ts` and `src/ui/vault.ts`, `openKey` in `src/ui/keys.ts`, the unlock and setup screens, Lock in `src/App.tsx`, `src/ui/ThisDevice.tsx` (Settings), the test helpers (unticked by default) | **Done** (this PR). Try on a real phone after deploy |
 | Google unlock: a Google sign-in opens Honed instead of a passkey (opt-in) | #101 | Nathan's Claude | `sync/` (schema step 2, `/api/unlock-key`, `/api/unlock-uses`), the `google` keyring method (`src/types/crypto.ts`, `wrapWithGoogleKey` in `src/lib/crypto.ts`, the keyring rule in `src/db/store.ts`), `src/sync/client.ts`, `src/sync/GoogleUnlockSettings.tsx`, the unlock and setup screens, ProveItsYou, `src/App.tsx` (the return addresses) | **Done** (this PR). Needs both images deployed (honed-sync and site-honed) |
-| Sync step 2: classes, lectures, quizzes and notes between devices | #105 | Nathan's Claude | server: `sync/` (schema step 3, `/api/keyring`, `/api/changes`), `tests/sync/`; app: `src/db/store.ts` and `schema.ts` (step 8: change-log indexes), `src/sync/`, Settings and setup | Server **done** (PR 1); the app next (PR 2) |
+| Sync step 2: classes, lectures, quizzes and notes between devices | #105 | Nathan's Claude | server: `sync/` (schema step 3, `/api/keyring`, `/api/changes`), `tests/sync/`; app: `src/db/store.ts` and `schema.ts` (step 8: change-log indexes), `src/sync/`, Settings and setup | **Done** (server PR #106, app this PR). Slide PDFs are step 3 |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -133,6 +133,16 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 20 (#105, part 2):** **Sync between devices** built: Settings > Sync (turn on, last synced, Sync now, turn off), setup's
+  "I already use Honed on another device" (sign in with Google, unlock the account's keyring with Google unlock, a synced
+  passkey, the passphrase or the recovery key, download everything), and a device with its own data is asked before it's
+  replaced. The store applies other devices' changes (the later `at` wins, the device id breaks ties, deletes stay deleted, a
+  change arrives once, hints that disagree are refused), its change clock moves past what it applied, and schema step 8 indexes
+  the change log by change and record id. Sync runs while unlocked: at once, every 30 s, on coming back into view or online.
+  Slide PDFs stay where they were added (a synced deck says so). Tests: store (11), the engine through the real server (6), and two
+  browsers syncing through it (2, all three devices); 10 deliberate breaks caught (one, re-downloading from the start, needed a
+  new check: it wastes data but changes nothing visible).
 
 - **Nov 20 (#105, part 1):** The sync server stores the account's keyring (compare and swap; a different key check is refused) and
   an append-only list of sealed changes (each id once, in arrival order, numbers may skip; 500 a batch, 1 MB a change, 200 MB an

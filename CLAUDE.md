@@ -138,6 +138,10 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   Google sign-in (`google.mjs`), accounts and sessions (`app.mjs`, `db.mjs`, numbered schema steps). Tests in `tests/sync/`
   with a fake Google; never real Google credentials in tests or CI. The app's side is `src/sync/` (Settings' Account box).
   Design: `docs/SECURITY.md`, "Accounts and sync". The service worker must leave `/api/` to the network.
+  Sync (#105): `src/db/sync.ts` (the store's side: seal for the server, open and check, apply with the later change
+  winning, the sync state in `meta`), `src/sync/engine.ts` (keyring, up, down; never sees the data key),
+  `SyncRunner` (while unlocked), `SyncSettings`, `JoinUnlock`. Tests: `src/db/sync.test.ts`,
+  `tests/sync/engine.test.mjs` (the real server over HTTP), `tests/browsers/sync.spec.ts` (two browsers through it).
 - `server/`: the production server (Node's own modules only): serves `dist/`, `/healthz`, and every
   security header (`server/headers.mjs`).
 - `tests/server.test.mjs`: the server. `tests/browsers/`: Playwright against the built app. Browser tests

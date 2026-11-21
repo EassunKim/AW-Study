@@ -124,3 +124,5 @@ export async function googleUnlockUses(fetcher: typeof fetch = fetch): Promise<{
 export const GOOGLE_UNLOCK_RETURN = '/#/google-unlock';
 /** Where a Google sign-in for setting up comes back to. */
 export const GOOGLE_SETUP_RETURN = '/#/google-setup';
+/** Where a Google sign-in for joining the account on a new device comes back to (#105). */
+export const JOIN_RETURN = '/#/join';
