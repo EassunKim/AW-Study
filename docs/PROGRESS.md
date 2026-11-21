@@ -57,6 +57,7 @@ slides" and "M6: AI helper and quizzes":
 | Remember this device: unlock once, then open straight in | #99 | Nathan's Claude | `RememberedKey` in `src/types/crypto.ts`, `rememberKey`/`recallKey` in `src/lib/crypto.ts`, `getRemembered`/`remember`/`forget` in `src/db/store.ts` and `src/ui/vault.ts`, `openKey` in `src/ui/keys.ts`, the unlock and setup screens, Lock in `src/App.tsx`, `src/ui/ThisDevice.tsx` (Settings), the test helpers (unticked by default) | **Done** (this PR). Try on a real phone after deploy |
 | Google unlock: a Google sign-in opens Honed instead of a passkey (opt-in) | #101 | Nathan's Claude | `sync/` (schema step 2, `/api/unlock-key`, `/api/unlock-uses`), the `google` keyring method (`src/types/crypto.ts`, `wrapWithGoogleKey` in `src/lib/crypto.ts`, the keyring rule in `src/db/store.ts`), `src/sync/client.ts`, `src/sync/GoogleUnlockSettings.tsx`, the unlock and setup screens, ProveItsYou, `src/App.tsx` (the return addresses) | **Done** (this PR). Needs both images deployed (honed-sync and site-honed) |
 | Sync step 2: classes, lectures, quizzes and notes between devices | #105 | Nathan's Claude | server: `sync/` (schema step 3, `/api/keyring`, `/api/changes`), `tests/sync/`; app: `src/db/store.ts` and `schema.ts` (step 8: change-log indexes), `src/sync/`, Settings and setup | **Done** (server PR #106, app this PR). Slide PDFs are step 3 |
+| Sync step 3: slide PDFs on demand | #108 | Nathan's Claude | `sync/` (schema step 4, `/api/files/`), `getSlideDeckFile`/`Pages` in `src/db/lectures.ts`, `src/db/sync.ts`, `src/sync/engine.ts`, `SyncRunner.tsx`, tests | **Done** (this PR) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -133,6 +134,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 21 (#108):** **Slide PDFs sync.** A deck's PDF and page text go up once, sealed as stored (nothing decrypted); a device
+  fetches them only when it opens the deck (the store asks the sync server for a missing file, opens it with its key, refuses
+  one sealed with another key, keeps it), so the viewer, Play and quizzes work unchanged. The server keeps them as files
+  (written whole or not at all), removes a deck's when its delete arrives and an account's when it's deleted; 100 MB a file,
+  5 GB an account. Tests: server (4 new), engine through the real server (3 new), browsers (a deck added on the PC opens in
+  the phone's viewer, all three devices); 8 deliberate breaks caught.
 
 - **Nov 20 (#105, part 2):** **Sync between devices** built: Settings > Sync (turn on, last synced, Sync now, turn off), setup's
   "I already use Honed on another device" (sign in with Google, unlock the account's keyring with Google unlock, a synced

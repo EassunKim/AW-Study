@@ -2,7 +2,7 @@
 // node:sqlite. Numbered schema steps (PRAGMA user_version): never edit a step that has shipped, add one.
 //
 // Step 1: accounts and sessions. Step 2: Google unlock keys and when they were used. Step 3: sync
-// (the keyring and the sealed changes). What's readable here is exactly docs/SECURITY.md's "What the sync
+// (the keyring and the sealed changes). Step 4: which slide files are kept (the bytes are files beside it). What's readable here is exactly docs/SECURITY.md's "What the sync
 // server holds": the Google account id and email, and sessions as SHA-256 hashes, never the tokens.
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
@@ -66,6 +66,16 @@ const STEPS = [
      UNIQUE (account_id, id)
    );
    CREATE INDEX changes_account_seq ON changes(account_id, seq);`,
+  // Step 4 (Nov 21, 2026, #108): slide PDFs and their page text, sealed exactly as the device stores them. The
+  // bytes are files in the data folder (files/<account id>/<deck id>.<pdf|pages>); this table says which exist.
+  `CREATE TABLE files (
+     account_id  TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     deck_id     TEXT NOT NULL,
+     kind        TEXT NOT NULL,                 -- 'pdf' or 'pages'
+     size        INTEGER NOT NULL,
+     uploaded_at TEXT NOT NULL,
+     PRIMARY KEY (account_id, deck_id, kind)
+   );`,
 ];
 
 /** Opens (and if needed creates or upgrades) the database in `dir`, or in memory for ':memory:'. */

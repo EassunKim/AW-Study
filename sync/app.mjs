@@ -16,11 +16,18 @@
 //   PUT    /api/keyring  { version, keyring, keycheck }  compare and swap; the key check never changes
 //   POST   /api/changes  { changes: [...] }          sealed changes, added (the same id twice is kept once)
 //   GET    /api/changes?after=N[&limit=M]           the changes after number N, oldest first
+//   PUT    /api/files/<deckId>/<pdf|pages>         a deck's file, sealed, as raw bytes (#108)
+//   GET    /api/files/<deckId>/<pdf|pages>         the same bytes back
 //   GET    /healthz                                 for the container's health check
 //
 // Requests that change something must come from our own site (Origin) as JSON. Answers are never
 // cached. Logs are routes, statuses and times: never emails, tokens or codes.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { mkdir, rename, rm, unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { randomToken, SignInError } from './google.mjs';
 
 export const SESSION_COOKIE = 'honed_session';
@@ -37,6 +44,9 @@ export const MAX_BATCH = 500;
 export const MAX_CHANGE_BYTES = 1024 * 1024; // one sealed change, base64url (records are small; PDFs aren't changes)
 export const MAX_ACCOUNT_BYTES = 200 * 1024 * 1024; // all of an account's changes, in the testing phase
 export const MAX_KEYRING_BYTES = 64 * 1024;
+export const MAX_FILE_BYTES = 110 * 1024 * 1024; // a sealed 100 MB PDF (Honed's limit, and Cloudflare's upload limit) and a little
+export const MAX_ACCOUNT_FILE_BYTES = 5 * 1024 * 1024 * 1024; // in the testing phase
+const FILE_PATH = /^\/api\/files\/([\w-]{1,64})\/(pdf|pages)$/;
 const ENTITIES = new Set(['course', 'exam', 'slideDeck', 'lecture', 'section', 'question', 'quizAttempt', 'studySession', 'settings', 'annotation']);
 const ID = /^[\w-]{1,64}$/;
 const B64URL = /^[\w-]*$/;
@@ -50,10 +60,11 @@ const hashToken = (token) => createHash('sha256').update(token).digest('base64ur
  * @param {ReturnType<typeof import('./google.mjs').googleClient>} options.google
  * @param {string[]} options.allowedEmails  who may have an account (testing phase); empty lets nobody in
  * @param {string} options.appOrigin  https://honed.pacificfish.ca
+ * @param {string} [options.filesDir]  where slide files are kept (#108): DATA_DIR/files
  * @param {(line: object) => void} [options.log]
  * @param {() => Date} [options.now]
  */
-export function createSync({ db, google, allowedEmails, appOrigin, log = (line) => console.log(JSON.stringify(line)), now = () => new Date() }) {
+export function createSync({ db, google, allowedEmails, appOrigin, filesDir, log = (line) => console.log(JSON.stringify(line)), now = () => new Date() }) {
   const allowed = new Set(allowedEmails.map((e) => e.trim().toLowerCase()).filter(Boolean));
   const pending = new Map(); // state -> { nonce, verifier, then, at }
   const secure = appOrigin.startsWith('https:') ? '; Secure' : '';
@@ -85,6 +96,12 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
     changesAfter: db.prepare('SELECT seq, id, entity, entity_id, op, at, iv, ct FROM changes WHERE account_id = ? AND seq > ? ORDER BY seq LIMIT ?'),
     lastChange: db.prepare('SELECT COALESCE(MAX(seq), 0) AS last FROM changes WHERE account_id = ?'),
     accountBytes: db.prepare('SELECT COALESCE(SUM(size), 0) AS bytes FROM changes WHERE account_id = ?'),
+    file: db.prepare('SELECT size FROM files WHERE account_id = ? AND deck_id = ? AND kind = ?'),
+    putFile: db.prepare(
+      'INSERT INTO files (account_id, deck_id, kind, size, uploaded_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (account_id, deck_id, kind) DO UPDATE SET size = excluded.size, uploaded_at = excluded.uploaded_at',
+    ),
+    deleteDeckFiles: db.prepare('DELETE FROM files WHERE account_id = ? AND deck_id = ?'),
+    fileBytes: db.prepare('SELECT COALESCE(SUM(size), 0) AS bytes FROM files WHERE account_id = ?'),
   };
 
   /** The signed-in session for this request, or null (an expired or no-longer-allowed one is removed). */
@@ -200,6 +217,54 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
 
     if (!url.pathname.startsWith('/api/')) return json(404, { error: 'Not found.' });
 
+    // --- Slide files (#108, docs/SECURITY.md "Files (slide PDFs)"): raw bytes, sealed by the device ---
+    const fileMatch = FILE_PATH.exec(url.pathname);
+    if (fileMatch) {
+      if (!filesDir) return json(503, { error: 'Files aren’t set up on this server.' });
+      if (req.method !== 'GET' && req.method !== 'PUT') return json(405, { error: 'GET or PUT.' });
+      if (req.method === 'PUT') {
+        if (req.headers.origin !== appOrigin) return json(403, { error: 'Requests must come from Honed itself.' });
+        if (!/^application\/octet-stream\b/i.test(req.headers['content-type'] ?? '')) return json(415, { error: 'Send the bytes.' });
+      }
+      const owner = sessionOf(req);
+      if (!owner) return json(401, { error: 'Not signed in.' }); // checked before a byte is read
+      const [, deckId, kind] = fileMatch;
+      const path = join(filesDir, owner.account_id, `${deckId}.${kind}`);
+
+      if (req.method === 'GET') {
+        const row = q.file.get(owner.account_id, deckId, kind);
+        if (!row) return json(404, { error: 'Not uploaded yet.', missing: true });
+        res.writeHead(200, { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(row.size) });
+        await pipeline(createReadStream(path), res);
+        return done(200);
+      }
+
+      const length = Number(req.headers['content-length']);
+      if (!Number.isInteger(length) || length < 1) return json(411, { error: 'Say how big it is.' });
+      if (length > MAX_FILE_BYTES) return json(413, { error: 'That file is too big.' });
+      const had = q.file.get(owner.account_id, deckId, kind)?.size ?? 0;
+      if (q.fileBytes.get(owner.account_id).bytes - had + length > MAX_ACCOUNT_FILE_BYTES) return json(413, { error: 'This account is full for now.', full: true });
+      await mkdir(join(filesDir, owner.account_id), { recursive: true });
+      const part = `${path}.${randomBytes(6).toString('hex')}.part`;
+      let got = 0;
+      const count = new Transform({
+        transform(chunk, _enc, next) {
+          got += chunk.length;
+          next(got > length ? new Error('more than it said') : null, chunk);
+        },
+      });
+      try {
+        await pipeline(req, count, createWriteStream(part));
+        if (got !== length) throw new Error('less than it said');
+      } catch {
+        await unlink(part).catch(() => {});
+        return json(400, { error: 'The upload didn’t arrive whole.' });
+      }
+      await rename(part, path); // whole or not at all: a reader never sees half a file
+      q.putFile.run(owner.account_id, deckId, kind, length, now().toISOString());
+      return json(200, { size: length });
+    }
+
     // Everything below changes something, or is private: our own site only, signed in
     const changing = req.method !== 'GET';
     if (changing) {
@@ -244,6 +309,7 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
         return json(403, { error: 'Sign in with Google again first, then delete the account within 5 minutes.', needsSignIn: true });
       }
       q.deleteAccount.run(s.account_id); // its sessions go with it (ON DELETE CASCADE)
+      if (filesDir) await rm(join(filesDir, s.account_id), { recursive: true, force: true }); // and its slide files
       return json(200, { deleted: true, signedIn: false }, { 'Set-Cookie': signOutCookie });
     }
 
@@ -331,6 +397,13 @@ export function createSync({ db, google, allowedEmails, appOrigin, log = (line) 
       } catch (err) {
         db.exec('ROLLBACK');
         throw err;
+      }
+      // A deck deleted on a device: its files go too (#108). (The hint is all the server can read; at worst a
+      // wrong one removes this account's own files, which the device that has them uploads again.)
+      for (const c of list) {
+        if (c.entity !== 'slideDeck' || c.op !== 'delete' || !filesDir) continue;
+        q.deleteDeckFiles.run(s.account_id, c.entityId);
+        for (const kind of ['pdf', 'pages']) await unlink(join(filesDir, s.account_id, `${c.entityId}.${kind}`)).catch(() => {});
       }
       return json(200, { stored, last: q.lastChange.get(s.account_id).last });
     }

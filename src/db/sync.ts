@@ -84,9 +84,34 @@ export function syncMethods({ db, key, device, seal, openAll, exclusive, newId, 
     },
 
     async setSyncState(state: SyncState | null): Promise<void> {
-      if (state === null) await db.delete('meta', 'sync');
-      else await db.put('meta', { key: 'sync', value: state });
+      if (state === null) {
+        await db.delete('meta', 'sync');
+        await db.delete('meta', 'syncFiles'); // sync off: on again, every deck's files are checked again
+      } else await db.put('meta', { key: 'sync', value: state });
     },
+
+    /** Decks whose files are here but not yet on the server (#108). */
+    async filesToUpload(): Promise<string[]> {
+      const up = new Set(((await db.get('meta', 'syncFiles'))?.value as string[] | undefined) ?? []);
+      return ((await db.getAllKeys('deckFiles')) as string[]).filter((id) => !up.has(id));
+    },
+
+    /** A deck's files as stored here, sealed (nothing is decrypted), to send as they are (#108). */
+    async sealedDeckFiles(deckId: string): Promise<{ pdf: EncryptedRecord; pages: EncryptedRecord | null } | null> {
+      requireKey();
+      const pdf = (await db.get('deckFiles', deckId)) as { enc?: EncryptedRecord } | undefined;
+      if (!pdf?.enc) return null;
+      const pages = (await db.get('deckPages', deckId)) as { enc?: EncryptedRecord } | undefined;
+      return { pdf: pdf.enc, pages: pages?.enc ?? null };
+    },
+
+    /** Notes that a deck's files are on the server (sent from here, or fetched from there) (#108). */
+    markFilesUp: (deckId: string) =>
+      exclusive(async () => {
+        const up = new Set(((await db.get('meta', 'syncFiles'))?.value as string[] | undefined) ?? []);
+        up.add(deckId);
+        await db.put('meta', { key: 'syncFiles', value: [...up] });
+      }),
 
     /** This device's change-log rows after `seq` that it made itself (not ones applied from elsewhere). */
     async ownChangesSince(seq: number): Promise<ChangeRecord[]> {

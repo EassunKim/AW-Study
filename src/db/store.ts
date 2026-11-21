@@ -23,7 +23,7 @@ import type { AnnotationStore } from '../types/annotation';
 import type { PlanStore } from '../types/plan';
 import type { QuizStore } from '../types/quiz';
 import { annotationMethods } from './annotations';
-import { lectureMethods } from './lectures';
+import { lectureMethods, type FileSource } from './lectures';
 import { planMethods } from './plan';
 import { quizMethods } from './quiz';
 import { syncMethods, type SyncState, type WireChange } from './sync';
@@ -82,6 +82,11 @@ export interface StudyStore extends LectureStore, QuizStore, PlanStore, Annotati
   sealForSync(changes: ChangeRecord[]): Promise<WireChange[]>;
   openFromSync(wire: WireChange[]): Promise<ChangeRecord[]>;
   applyRemote(changes: ChangeRecord[]): Promise<number>;
+  filesToUpload(): Promise<string[]>;
+  sealedDeckFiles(deckId: string): Promise<{ pdf: EncryptedRecord; pages: EncryptedRecord | null } | null>;
+  markFilesUp(deckId: string): Promise<void>;
+  /** Where a deck's files come from when they aren't here (#108: the sync server), or null for nowhere. */
+  setFileSource(source: FileSource | null): void;
   /** This device's key check (as stored; the account's must be the same). Null before setup. */
   getKeycheck(): Promise<EncryptedRecord | null>;
   /**
@@ -298,9 +303,40 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
       await db.put('meta', { key: 'keyring', value: { v: 1, entries } satisfies Keyring });
     });
 
-  return {
-    // Classes, exams, slide decks, lectures and sections (#24): src/db/lectures.ts
-    ...lectureMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
+  // Sync (#105, src/db/sync.ts), and where missing slide files come from (#108)
+  let fileSource: FileSource | null = null;
+  const syncPart = syncMethods({
+    db,
+    key: () => key,
+    device,
+    seal,
+    openAll,
+    exclusive,
+    newId: deps.newId,
+    changeAt,
+    seen: (at) => {
+      seenAt = Math.max(seenAt, at);
+      void db.get('meta', 'sync').then((row) => {
+        const state = row?.value as SyncState | undefined;
+        if (state && state.seenAt < seenAt) return db.put('meta', { key: 'sync', value: { ...state, seenAt } });
+      });
+    },
+  });
+
+  return {    // Classes, exams, slide decks, lectures and sections (#24): src/db/lectures.ts
+    ...lectureMethods({
+      db,
+      clock: deps.clock,
+      newId: deps.newId,
+      seal,
+      open,
+      openAll,
+      change,
+      exclusive,
+      requireOpen,
+      fileSource: () => fileSource,
+      filesHere: (deckId) => syncPart.markFilesUp(deckId),
+    }),
     // Question banks and quiz attempts (#40): src/db/quiz.ts
     ...quizMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
     // Study sessions and settings (#47): src/db/plan.ts
@@ -435,6 +471,7 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
         await meta.delete('migration');
         await meta.delete('remembered'); // it was for the old data key (#99)
         await meta.delete('sync'); // the data was replaced wholesale: syncing starts again (#105)
+        await meta.delete('syncFiles');
         await tx.done;
         hasKeyring = true;
         key = dataKey;
@@ -451,23 +488,11 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
     },
 
     // --- Sync (#105): src/db/sync.ts ---
-    ...syncMethods({
-      db,
-      key: () => key,
-      device,
-      seal,
-      openAll,
-      exclusive,
-      newId: deps.newId,
-      changeAt,
-      seen: (at) => {
-        seenAt = Math.max(seenAt, at);
-        void db.get('meta', 'sync').then((row) => {
-          const state = row?.value as SyncState | undefined;
-          if (state && state.seenAt < seenAt) return db.put('meta', { key: 'sync', value: { ...state, seenAt } });
-        });
-      },
-    }),
+    ...syncPart,
+
+    setFileSource(source) {
+      fileSource = source;
+    },
 
     async getKeycheck() {
       return ((await db.get('meta', 'keycheck'))?.value as EncryptedRecord | undefined) ?? null;
@@ -498,6 +523,7 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
         await meta.delete('migration');
         await meta.delete('remembered');
         await meta.delete('sync');
+        await meta.delete('syncFiles');
         await tx.done;
         hasKeyring = true;
         key = dataKey;

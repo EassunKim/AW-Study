@@ -17,6 +17,7 @@ import type {
 } from '../types/lecture';
 import type { ChangeRecord, DeckFile, DeckPages, HonedDb, RecordStore } from './schema';
 import { StoreError } from './store';
+import type { EncryptedRecord } from '../types/crypto';
 
 export const COURSE_NAME_MAX = 100;
 export const EXAM_TITLE_MAX = 100;
@@ -40,7 +41,14 @@ export interface StoreContext {
   change(entity: ChangeRecord['entity'], op: ChangeRecord['op'], entityId: string, data: ChangeRecord['data']): Promise<Row>;
   exclusive<T>(fn: () => Promise<T>): Promise<T>;
   requireOpen(): void;
+  /** Where a deck's sealed file comes from when it isn't on this device (#108: the sync server), or null. */
+  fileSource?: () => FileSource | null;
+  /** Called when a deck's files came from elsewhere, so they're never sent back up (#108). */
+  filesHere?: (deckId: string) => Promise<void>;
 }
+
+/** Gives a deck's file sealed exactly as another device stores it, or null if there's none (#108). */
+export type FileSource = (deckId: string, kind: 'pdf' | 'pages') => Promise<EncryptedRecord | null>;
 
 // --- Validation (messages are shown to the user as they are) ---
 
@@ -125,11 +133,35 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
   const write = (puts: { store: RecordStore; row: Row }[], deletes: { store: RecordStore; id: string }[], logs: Row[]) =>
     writeRows(db, puts, deletes, logs);
 
-  /** A deck's PDF or page text isn't here: gone, or (#105) the deck came from another device and its PDF hasn't yet. */
+  /** A deck's PDF or page text isn't here: gone, or the deck came from another device (#105) and its file hasn't. */
   const missingFile = async (id: string) =>
-    (await db.get('slideDecks', id)) !== undefined
-      ? new StoreError('not-found', 'These slides were added on another device. Bringing slide PDFs across comes in a later update: open them there for now.')
-      : new StoreError('not-found', 'That slide deck no longer exists.');
+    (await db.get('slideDecks', id)) === undefined
+      ? new StoreError('not-found', 'That slide deck no longer exists.')
+      : ctx.fileSource?.()
+        ? new StoreError('not-found', 'These slides were added on another device and haven’t reached the server yet. Open Honed on that device (with sync on), then try again.')
+        : new StoreError('not-found', 'These slides were added on another device. Turn on sync (Settings) to bring them here.');
+
+  /**
+   * A deck's file from elsewhere (#108): fetched sealed, opened here (so a file sealed with another key, or
+   * changed, is refused: its additional data names the store and the deck), then kept as it came.
+   */
+  const fromElsewhere = async <T>(id: string, kind: 'pdf' | 'pages'): Promise<T | null> => {
+    const source = ctx.fileSource?.();
+    if (!source || (await db.get('slideDecks', id)) === undefined) return null;
+    const enc = await source(id, kind);
+    if (!enc) return null;
+    const store = kind === 'pdf' ? 'deckFiles' : 'deckPages';
+    const row = { id, enc };
+    let opened: T;
+    try {
+      opened = await open<T>(store, row);
+    } catch {
+      throw new StoreError('invalid', 'The slides from the server can’t be opened with this device’s key.');
+    }
+    await db.put(store, row as never);
+    if (kind === 'pdf') await ctx.filesHere?.(id);
+    return opened;
+  };
 
   const getCourseOrThrow = async (id: string): Promise<Course> => {
     const row = await db.get('courses', id);
@@ -385,14 +417,22 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
     async getSlideDeckFile(id) {
       requireOpen();
       const row = await db.get('deckFiles', id);
-      if (!row) throw await missingFile(id);
+      if (!row) {
+        const got = await fromElsewhere<DeckFile>(id, 'pdf');
+        if (got) return got.data;
+        throw await missingFile(id);
+      }
       return (await open<DeckFile>('deckFiles', row)).data;
     },
 
     async getSlideDeckPages(id) {
       requireOpen();
       const row = await db.get('deckPages', id);
-      if (!row) throw await missingFile(id);
+      if (!row) {
+        const got = await fromElsewhere<DeckPages>(id, 'pages');
+        if (got) return got.pages;
+        throw await missingFile(id);
+      }
       return (await open<DeckPages>('deckPages', row)).pages;
     },
 

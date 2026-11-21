@@ -7,6 +7,7 @@
 //   DATA_DIR              /data (default): sync.db goes here
 //   PORT                  3002 (default)
 import { createServer } from 'node:http';
+import { join } from 'node:path';
 import { createSync } from './app.mjs';
 import { openDb } from './db.mjs';
 import { googleClient } from './google.mjs';
@@ -16,8 +17,10 @@ const appOrigin = (env.APP_ORIGIN ?? 'https://honed.pacificfish.ca').replace(/\/
 const allowedEmails = (env.ALLOWED_EMAILS ?? '').split(',').map((e) => e.trim()).filter(Boolean);
 if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) throw new Error('Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.');
 
+const dataDir = env.DATA_DIR ?? '/data';
 const handle = createSync({
-  db: openDb(env.DATA_DIR ?? '/data'),
+  db: openDb(dataDir),
+  filesDir: join(dataDir, 'files'),
   google: googleClient({ clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, redirectUri: `${appOrigin}/api/auth/callback` }),
   allowedEmails,
   appOrigin,

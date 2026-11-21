@@ -1,9 +1,9 @@
-// Runs sync while Honed is unlocked and on screen (#105): at once, every 30 seconds, and when the page comes back
+// Runs sync while Honed is unlocked and on screen (#105), and lets the store fetch slide files it doesn't have (#108): at once, every 30 seconds, and when the page comes back
 // into view or online. Does nothing (and sends nothing) on a device where sync is off. When another device's
 // changes arrive, `onChanged` lets the app redraw the pages that list things.
 import { useEffect, useRef } from 'react';
 import { useStore } from '../ui/store-context';
-import { syncOnce } from './engine';
+import { fetchSealedFile, syncOnce } from './engine';
 
 export const SYNC_EVERY_MS = 30_000;
 
@@ -11,6 +11,12 @@ export function SyncRunner({ onChanged }: { onChanged: () => void }) {
   const store = useStore();
   const changed = useRef(onChanged);
   changed.current = onChanged;
+
+  // A deck's file that isn't here comes from the sync server when it's opened (#108; nothing if sync is off)
+  useEffect(() => {
+    store.setFileSource((deckId, kind) => fetchSealedFile(store, deckId, kind));
+    return () => store.setFileSource(null);
+  }, [store]);
 
   useEffect(() => {
     let stopped = false;
