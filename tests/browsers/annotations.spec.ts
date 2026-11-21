@@ -144,10 +144,10 @@ test('highlight words, box part of a slide and pin a note; they stay in place af
   await form.getByRole('button', { name: 'Save note' }).click();
   await expect(notes.getByTestId('annotation')).toHaveCount(3);
   await expect(page.getByTestId('pin')).toHaveCount(1);
-  // The panel, beside or under the slides, never runs into the page's footer
+  // The panel, beside or under the slides, never runs into the page's footer (phones have none here, #110)
   const panelBox = (await notes.boundingBox())!;
-  const footer = (await page.getByRole('contentinfo').boundingBox())!;
-  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(footer.y + 1);
+  const footer = await page.locator('footer').boundingBox(); // null when hidden
+  if (footer) expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(footer.y + 1);
 
   const before = {
     mark: await onSlide(page, '[data-testid="mark"]', 0),
@@ -157,11 +157,11 @@ test('highlight words, box part of a slide and pin a note; they stay in place af
   expectNear(before.box, { x: 0.1, y: 0.5, w: 0.5, h: 0.4 }, 0.02);
 
   // Another slide has none of them; back on slide 2 they're there
-  await page.getByRole('button', { name: 'Next slide' }).click();
+  await page.getByRole('button', { name: 'Slide 3', exact: true }).click();
   await shown(page, 3);
   await expect(page.getByTestId('mark')).toHaveCount(0);
   await expect(notes.getByTestId('annotation')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Previous slide' }).click();
+  await page.getByRole('button', { name: 'Slide 2', exact: true }).click();
   await shown(page, 2);
 
   // After a reload (encrypted on the device, so unlocking again), all in the same place
@@ -176,12 +176,14 @@ test('highlight words, box part of a slide and pin a note; they stay in place af
   expectNear(before.pin, { x: 0.8, y: 0.2, w: 0, h: 0 }, 0.02);
 
   // Zoomed in, the marks grow with the slide and stay on the same words
-  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await page.getByRole('region', { name: 'Slides' }).focus();
+  await page.keyboard.press('+'); // phones have no zoom buttons (#110): a pinch, or here a key
   await expect(page.getByTestId('zoom-level')).toHaveText('125%');
   await expect(page.getByTestId('slide-page')).toHaveAttribute('data-rendered', '2');
   expectNear(await onSlide(page, '[data-testid="mark"]', 0), before.mark);
   expectNear(await onSlide(page, '[data-testid="mark"]', 1), before.box);
-  await page.getByRole('button', { name: 'Fit' }).click();
+  await page.keyboard.press('0');
+  await expect(page.getByTestId('zoom-level')).toHaveText('100%');
 
   // Change a colour, write a note on the highlight, delete the box
   const highlight = again.getByTestId('annotation').filter({ hasText: 'Fixture text 2' });
@@ -218,7 +220,7 @@ test('Explain this and Ask about this send only the words and nearby slides, and
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: 'Because slides are numbered.' }) });
   });
   await openSection(page);
-  await page.getByRole('button', { name: 'Next slide' }).click();
+  await page.getByRole('button', { name: 'Slide 3', exact: true }).click();
   await shown(page, 3);
   const notes = await panel(page);
 
@@ -302,5 +304,45 @@ test('dragging across words selects them instead of turning the slide', async ({
   expect(end - box.x).toBeGreaterThan(60); // longer than a swipe
   await expect(page.getByRole('group', { name: 'Selected words' })).toContainText('Fixture te'); // where a drag stops varies
   await shown(page, 2);
+  expect(await problems()).toEqual([]);
+});
+
+test('on a phone the Slides page is just the slides; on a computer nothing moves when you leave the section (#110)', async ({ page }, info) => {
+  const problems = await watchProblems(page);
+  await openSection(page);
+  const bar = (name: string) => page.getByRole('button', { name, exact: true });
+  if (info.project.name !== 'desktop') {
+    // No header (name, Lock), no footer, no step or zoom buttons, no section label
+    await expect(page.getByRole('banner')).toBeHidden();
+    await expect(page.getByRole('contentinfo')).toBeHidden();
+    for (const name of ['Previous slide', 'Next slide', 'Zoom in', 'Zoom out']) await expect(bar(name)).toBeHidden();
+    await expect(page.getByTestId('slide-range')).toBeHidden();
+    // Still there for screen readers: the deck's name and where you are
+    await expect(page.getByRole('heading', { name: /Cells/ })).toHaveCount(1);
+    await expect(page.getByTestId('slide-position')).toHaveText('Slide 2 of 4');
+    // The back link and Notes share one line, and the slides and thumbnails fit on the screen
+    const back = (await page.getByRole('link', { name: '← BIO 110' }).boundingBox())!;
+    const notes = (await page.getByRole('button', { name: /^Notes/ }).boundingBox())!;
+    expect(Math.abs(back.y + back.height / 2 - (notes.y + notes.height / 2))).toBeLessThan(4);
+    expect(notes.x).toBeGreaterThan(back.x + back.width);
+    const thumbs = (await page.getByRole('list', { name: 'All slides' }).boundingBox())!;
+    expect(thumbs.y + thumbs.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+    // Other pages keep their header and footer
+    await page.getByRole('link', { name: '← BIO 110' }).click();
+    await expect(page.getByRole('banner')).toBeVisible();
+  } else {
+    await expect(page.getByRole('banner')).toBeVisible();
+    await expect(page.getByRole('contentinfo')).toBeVisible();
+    // Leaving the section changes the label but not its width, so nothing after it moves or wraps
+    const label = page.getByTestId('slide-range');
+    const before = { label: (await label.boundingBox())!.width, zoom: await bar('Zoom out').boundingBox() };
+    await page.getByRole('button', { name: 'Slide 1', exact: true }).click();
+    await shown(page, 1);
+    await expect(page.getByTestId('slide-range')).toHaveText('Outside this section: slides 2–4');
+    expect((await label.boundingBox())!.width).toBeCloseTo(before.label, 0); // within half a pixel
+    const zoom = (await bar('Zoom out').boundingBox())!;
+    expect(zoom.x).toBeCloseTo(before.zoom!.x, 0);
+    expect(zoom.y).toBeCloseTo(before.zoom!.y, 0);
+  }
   expect(await problems()).toEqual([]);
 });

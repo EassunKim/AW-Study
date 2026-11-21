@@ -57,7 +57,8 @@ slides" and "M6: AI helper and quizzes":
 | Remember this device: unlock once, then open straight in | #99 | Nathan's Claude | `RememberedKey` in `src/types/crypto.ts`, `rememberKey`/`recallKey` in `src/lib/crypto.ts`, `getRemembered`/`remember`/`forget` in `src/db/store.ts` and `src/ui/vault.ts`, `openKey` in `src/ui/keys.ts`, the unlock and setup screens, Lock in `src/App.tsx`, `src/ui/ThisDevice.tsx` (Settings), the test helpers (unticked by default) | **Done** (this PR). Try on a real phone after deploy |
 | Google unlock: a Google sign-in opens Honed instead of a passkey (opt-in) | #101 | Nathan's Claude | `sync/` (schema step 2, `/api/unlock-key`, `/api/unlock-uses`), the `google` keyring method (`src/types/crypto.ts`, `wrapWithGoogleKey` in `src/lib/crypto.ts`, the keyring rule in `src/db/store.ts`), `src/sync/client.ts`, `src/sync/GoogleUnlockSettings.tsx`, the unlock and setup screens, ProveItsYou, `src/App.tsx` (the return addresses) | **Done** (this PR). Needs both images deployed (honed-sync and site-honed) |
 | Sync step 2: classes, lectures, quizzes and notes between devices | #105 | Nathan's Claude | server: `sync/` (schema step 3, `/api/keyring`, `/api/changes`), `tests/sync/`; app: `src/db/store.ts` and `schema.ts` (step 8: change-log indexes), `src/sync/`, Settings and setup | **Done** (server PR #106, app this PR). Slide PDFs are step 3 |
-| Sync step 3: slide PDFs on demand | #108 | Nathan's Claude | `sync/` (schema step 4, `/api/files/`), `getSlideDeckFile`/`Pages` in `src/db/lectures.ts`, `src/db/sync.ts`, `src/sync/engine.ts`, `SyncRunner.tsx`, tests | **Done** (this PR) |
+| Sync step 3: slide PDFs on demand | #108 | Nathan's Claude | `sync/` (schema step 4, `/api/files/`), `getSlideDeckFile`/`Pages` in `src/db/lectures.ts`, `src/db/sync.ts`, `src/sync/engine.ts`, `SyncRunner.tsx`, tests | **Done** (PR #109) |
+| Phone slide page: just the slides | #110 | Nathan's Claude | `src/App.tsx`, `src/ui/SlidesScreen.tsx`, `src/viewer/SlideViewer.tsx`, `src/app.css`, `src/viewer/viewer.css`, tests | **Done** (this PR) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -134,6 +135,8 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 21 (#110):** **Slides on a phone are just the slides.** After using synced slides on his iPhone, Nathan found the bar cluttered and jumpy ("This section" turning into the longer "Outside this section" pushed zoom, Whole page and Notes onto another row). On touch screens the Slides page now drops the header, footer, step and zoom buttons and the section label: one line with the back link and Whole page / Notes, then the slides and thumbnails. The computer keeps everything; its section label keeps one width. Tests: a new one on all three devices; phones' older tests use thumbnails and keys; 7 deliberate breaks caught.
 
 - **Nov 21 (#108):** **Slide PDFs sync.** A deck's PDF and page text go up once, sealed as stored (nothing decrypted); a device
   fetches them only when it opens the deck (the store asks the sync server for a missing file, opens it with its key, refuses

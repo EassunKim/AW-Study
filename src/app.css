@@ -526,6 +526,55 @@ label.file input {
   margin: 0.5rem 0 1rem;
 }
 
+/* Phones (#110): the Slides page is just the slides. No header (name, Lock) or footer; the back link
+   shares one line with the viewer's buttons; the title is kept for screen readers only. The viewer
+   takes the rest of the screen. */
+@media (hover: none) and (pointer: coarse) {
+  .top.slides-page,
+  .foot.slides-page {
+    display: none;
+  }
+  .app.slides-page {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .slides-screen {
+    position: relative;
+  }
+  .slides-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+    max-width: calc(100% - 15rem);
+    min-height: 44px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+  }
+  .slides-back .back {
+    display: block;
+    line-height: 44px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .slides-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    margin: 0;
+  }
+  .slides-screen .av-main {
+    height: max(20rem, calc(100dvh - max(0.5rem, env(safe-area-inset-top)) - max(0.5rem, env(safe-area-inset-bottom))));
+  }
+  .slides-screen .slides-frame {
+    margin: 0;
+  }
+}
+
 /* --- Quizzes (#40) --- */
 
 .quiz .question {

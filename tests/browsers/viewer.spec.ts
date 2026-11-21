@@ -38,7 +38,8 @@ async function slideHasInk(page: Page): Promise<boolean> {
     });
 }
 
-test('shows slides and moves through them by keys, buttons, swipes and thumbnails; zooms; marks the range', async ({ page }) => {
+test('shows slides and moves through them by keys, buttons, swipes and thumbnails; zooms; marks the range', async ({ page }, info) => {
+  const phone = info.project.name !== 'desktop'; // no step or zoom buttons on a phone (#110)
   const problems = await watchProblems(page);
   // Every request goes to our own site, and PDF.js's worker loads from it
   const requests: { url: string; status: number }[] = [];
@@ -64,8 +65,9 @@ test('shows slides and moves through them by keys, buttons, swipes and thumbnail
   await expect(page.getByTestId('slide-range')).toHaveText('This section: slides 2–3');
   await expect(slide(page).locator('.textLayer')).toContainText('Slide 2');
 
-  // Buttons
-  await page.getByRole('button', { name: 'Next slide' }).click();
+  // Buttons (a phone has none: the thumbnails)
+  if (phone) await page.getByRole('button', { name: 'Slide 3', exact: true }).click();
+  else await page.getByRole('button', { name: 'Next slide' }).click();
   await expect(position(page)).toHaveText('Slide 3 of 5');
 
   // A swipe to the left: the next slide
@@ -88,11 +90,13 @@ test('shows slides and moves through them by keys, buttons, swipes and thumbnail
   await page.getByRole('button', { name: 'Slide 1', exact: true }).click();
   await expect(position(page)).toHaveText('Slide 1 of 5');
   await expect(page.getByRole('button', { name: 'Slide 1', exact: true })).toHaveAttribute('aria-current', 'true');
-  await expect(page.getByRole('button', { name: 'Previous slide' })).toBeDisabled();
+  if (!phone) await expect(page.getByRole('button', { name: 'Previous slide' })).toBeDisabled();
 
   // Zoom: buttons and keys, and the slide is drawn bigger
   const fitWidth = (await slide(page).boundingBox())!.width;
-  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await page.getByRole('region', { name: 'Slides' }).focus();
+  if (phone) await page.keyboard.press('+');
+  else await page.getByRole('button', { name: 'Zoom in' }).click();
   await expect(page.getByTestId('zoom-level')).toHaveText('125%');
   await page.getByRole('region', { name: 'Slides' }).focus();
   await page.keyboard.press('+');
@@ -104,7 +108,7 @@ test('shows slides and moves through them by keys, buttons, swipes and thumbnail
   // End, and every move was reported once
   await page.keyboard.press('End');
   await expect(position(page)).toHaveText('Slide 5 of 5');
-  await expect(page.getByRole('button', { name: 'Next slide' })).toBeDisabled();
+  if (!phone) await expect(page.getByRole('button', { name: 'Next slide' })).toBeDisabled();
   await expect(page.getByTestId('page-changes')).toHaveText('Moved to: 2, 3, 4, 1, 5');
 
   // Text extraction in the browser
@@ -192,7 +196,7 @@ test('a portrait page fits the width and scrolls; keys scroll, then move; Whole 
   await expect(page.getByTestId('fit-switch')).toHaveText('Page width');
   await expect.poll(async () => (await slide(page).boundingBox())!.height).toBeLessThanOrEqual((await stageSize()).height + 1);
   expect((await slide(page).boundingBox())!.width).toBeLessThan(wide.width / 1.2);
-  await page.getByRole('button', { name: 'Previous slide' }).click();
+  await page.getByRole('button', { name: 'Slide 2', exact: true }).click();
   await expect(position(page)).toHaveText('Slide 2 of 3');
   await expect(stage).toHaveAttribute('data-fit', 'page');
   // Arrow down moves straight on again

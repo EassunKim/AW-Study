@@ -45,6 +45,9 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
   }, [status]);
   // The slides use the whole window (app.css .wide); header and footer line up with them
   const wide = status === 'unlocked' && (route.name === 'slides' || route.name === 'play');
+  // On a phone the Slides page is just the slides: no header or footer (app.css .slides-page, #110)
+  const slidesPage = status === 'unlocked' && route.name === 'slides';
+  const frame = (base: string) => [base, wide && 'wide', slidesPage && 'slides-page'].filter(Boolean).join(' ');
   // Lock also forgets this device's remembered unlock (#99), so the next open asks again. Forgotten
   // first: the unlock screen tries a remembered unlock as soon as it appears.
   const lock = async () => {
@@ -60,7 +63,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
       <StoreContext value={store}>
         <BankJobsProvider store={store}>
         <StopJobsWhenLocked unlocked={status === 'unlocked'} />
-        <header className={wide ? 'top wide' : 'top'}>
+        <header className={frame('top')}>
           <h1>
             <a href={href({ name: 'tasks' })}>{APP_NAME}</a>
           </h1>
@@ -70,7 +73,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
             </button>
           )}
         </header>
-        <main className={wide ? 'app wide' : 'app'}>
+        <main className={frame('app')}>
           {status === 'new' && <SetupScreen onDone={refresh} />}
           {status === 'locked' && <UnlockScreen onUnlocked={refresh} />}
           {status === 'unlocked' && <BackupWatcher store={store} />}
@@ -79,7 +82,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
           {status === 'unlocked' && <SyncRunner onChanged={() => setDataVersion((v) => v + 1)} />}
           {status === 'unlocked' && <Screen route={route} onLock={lock} dataVersion={dataVersion} onReplaced={() => setDataVersion((v) => v + 1)} />}
         </main>
-        <Footer wide={wide} nav={page !== null} />
+        <Footer wide={wide} slidesPage={slidesPage} nav={page !== null} />
         {page && <NavBar current={page} />}
         </BankJobsProvider>
       </StoreContext>
@@ -157,7 +160,7 @@ function StopJobsWhenLocked({ unlocked }: { unlocked: boolean }) {
   return null;
 }
 
-function Footer({ wide, nav }: { wide: boolean; nav: boolean }) {
+function Footer({ wide, slidesPage, nav }: { wide: boolean; slidesPage: boolean; nav: boolean }) {
   const [now, setNow] = useState(() => new Date());
   const [offlineReady, setOfflineReady] = useState(false);
 
@@ -172,7 +175,7 @@ function Footer({ wide, nav }: { wide: boolean; nav: boolean }) {
   }, []);
 
   return (
-    <footer className={['foot muted small', wide && 'wide', nav && 'above-nav'].filter(Boolean).join(' ')}>
+    <footer className={['foot muted small', wide && 'wide', slidesPage && 'slides-page', nav && 'above-nav'].filter(Boolean).join(' ')}>
       <span>
         Study day <span data-testid="study-day">{studyDay(now, deviceTimeZone(), DAY_START_HOUR)}</span>
       </span>
