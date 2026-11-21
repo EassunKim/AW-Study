@@ -3,10 +3,14 @@
 // are passed to it with that device's session, as the tunnel would. Signing in to Google is the one thing
 // not shown: the sessions are made in the database.
 import { createHash, randomBytes } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { expect, test, type Page } from './fixtures';
-import { addClassAndReturn, navBar } from './class-helpers';
+import { addClass, addClassAndReturn, navBar, pdfFile } from './class-helpers';
+import { numberedSlides } from '../../src/viewer/test-pdf';
 import { PASSPHRASE, setUpWithPassphrase } from './lock-helpers';
 // @ts-expect-error: plain JavaScript (the server's own modules), no types
 import { createSync } from '../../sync/app.mjs';
@@ -19,7 +23,8 @@ type Db = { prepare(sql: string): { run(...a: unknown[]): unknown; get(...a: unk
 
 async function syncServer(appOrigin: string) {
   const db: Db = openDb(':memory:');
-  const handle = createSync({ db, google: {}, allowedEmails: ['nathan@example.com'], appOrigin, log: () => {} });
+  const filesDir = mkdtempSync(join(tmpdir(), 'honed-files-'));
+  const handle = createSync({ db, google: {}, allowedEmails: ['nathan@example.com'], appOrigin, filesDir, log: () => {} });
   const server: Server = createServer((req, res) => void handle(req, res));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -43,10 +48,16 @@ async function syncServer(appOrigin: string) {
       await page.route('**/api/**', async (route) => {
         const req = route.request();
         const url = new URL(req.url());
+        const body = ['GET', 'HEAD'].includes(req.method()) ? undefined : (req.postDataBuffer() ?? undefined);
         const res = await fetch(base + url.pathname + url.search, {
           method: req.method(),
-          headers: { 'Content-Type': req.headers()['content-type'] ?? 'application/json', Origin: appOrigin, Cookie: `honed_session=${token}` },
-          body: ['GET', 'HEAD'].includes(req.method()) ? undefined : (req.postDataBuffer() ?? undefined),
+          headers: {
+            'Content-Type': req.headers()['content-type'] ?? 'application/json',
+            Origin: appOrigin,
+            Cookie: `honed_session=${token}`,
+            ...(body ? { 'Content-Length': String(body.length) } : {}),
+          },
+          body,
         });
         await route.fulfill({ status: res.status, headers: { 'Content-Type': res.headers.get('content-type') ?? 'application/json' }, body: Buffer.from(await res.arrayBuffer()) });
       });
@@ -54,6 +65,7 @@ async function syncServer(appOrigin: string) {
     async close() {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       db.close();
+      rmSync(filesDir, { recursive: true, force: true });
     },
   };
 }
@@ -171,6 +183,57 @@ test('a device with its own data is asked before it’s replaced with the accoun
     await join.getByRole('button', { name: 'Replace this device’s data' }).click();
     await expect(box.getByTestId('sync-message')).toContainText('now has your account’s data');
     expect(await classNames(other)).toEqual(['From the PC']);
+  } finally {
+    await server.close();
+  }
+});
+
+test('slides added on the PC open on the phone: the PDF comes across when they’re opened (#108)', async ({ page, browser }, info) => {
+  const origin = new URL(info.project.use.baseURL ?? 'http://127.0.0.1:4173').origin;
+  const server = await syncServer(origin);
+  try {
+    const pcErrors = watchErrors(page);
+    await server.connect(page);
+    await page.goto('/');
+    await setUpWithPassphrase(page);
+    // A lecture with slides on the PC
+    await addClass(page, 'BIO 110');
+    await page.getByRole('button', { name: 'What was covered?' }).click();
+    const form = page.getByRole('form', { name: 'What was covered?' });
+    await form.getByLabel('Upload the slides (PDF)').setInputFiles(pdfFile('Cells.pdf', numberedSlides(3)));
+    await form.getByLabel('Lecture date').fill('2026-11-16');
+    await form.getByLabel('Minutes').fill('50');
+    await form.getByLabel('First slide').fill('1');
+    await form.getByLabel('Last slide').fill('3');
+    await form.getByLabel(/Make quiz questions now/).uncheck();
+    await form.getByRole('button', { name: 'Save lecture' }).click();
+    await expect(page.getByRole('link', { name: 'Cells, slides 1–3', exact: true })).toBeVisible();
+    await page.evaluate(() => (location.hash = '#/settings')); // the class page has no nav bar
+    await expect(page.getByRole('heading', { level: 2, name: 'Settings', exact: true })).toBeVisible();
+    await page.getByRole('group', { name: 'Sync' }).getByRole('button', { name: 'Turn on sync' }).click();
+    await expect(page.getByTestId('sync-message')).toContainText('Sync is on');
+    await expect.poll(() => server.db.prepare('SELECT COUNT(*) AS n FROM files').get()).toEqual({ n: 2 });
+
+    // The phone joins and opens the slides: the PDF is fetched then, and the viewer shows it
+    const phoneContext = await browser.newContext({ ...info.project.use, serviceWorkers: 'block' });
+    const phone = await phoneContext.newPage();
+    const phoneErrors = watchErrors(phone);
+    await server.connect(phone);
+    await phone.goto('/');
+    await phone.getByRole('button', { name: 'I already use Honed on another device' }).click();
+    const join = phone.getByRole('group', { name: 'Unlock your account’s data' });
+    await join.getByLabel('Your passphrase').fill(PASSPHRASE);
+    await join.getByRole('button', { name: 'Unlock and download' }).click();
+    await expect(phone.getByRole('banner').getByRole('button', { name: 'Lock', exact: true })).toBeVisible();
+    await navBar(phone).getByRole('link', { name: 'Classes' }).click();
+    await phone.getByRole('link', { name: 'BIO 110' }).click();
+    await phone.getByRole('link', { name: 'Cells, slides 1–3', exact: true }).click();
+    await expect(phone.getByTestId('slide-position')).toHaveText('Slide 1 of 3');
+    await expect(phone.getByTestId('slide-page')).toHaveAttribute('data-rendered', '1');
+    await expect(phone.getByTestId('slide-page').locator('.textLayer')).toContainText('Slide 1');
+    expect(pcErrors).toEqual([]);
+    expect(phoneErrors).toEqual([]);
+    await phoneContext.close();
   } finally {
     await server.close();
   }

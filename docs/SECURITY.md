@@ -14,9 +14,9 @@ cryptography.**
 - **Google unlock** (#101, **opt-in**): for people who turn it on, the server keeps a key that opens their data, so a
   Google sign-in can unlock instead of a passkey. For them, our server (or anyone who takes it over, or takes over
   their Google account) could read their data. For everyone else, nothing changes.
-- **Sync** (#105, opt-in in Settings): classes, lectures, quizzes, notes and settings travel between a person's
-  devices sealed with their data key; the server holds them but can't open them (unless that person turned on
-  Google unlock). Slide PDFs don't sync yet (step 3).
+- **Sync** (#105, #108, opt-in in Settings): classes, lectures, quizzes, notes, settings and slide PDFs travel
+  between a person's devices sealed with their data key; the server holds them but can't open them (unless that
+  person turned on Google unlock). A deck's PDF comes down only when a device opens it.
 
 ## What it protects against, and what it doesn't
 
@@ -205,7 +205,7 @@ It can sit in OneDrive, iCloud Drive or Google Drive.
 
 **Built so far:** sign-in, accounts and sessions (#95), remembering a device (#99), Google unlock (#101), and the
 keyring on the server, changes and joining a device (#105: `src/db/sync.ts`, `src/sync/engine.ts`, Settings > Sync,
-setup's "I already use Honed on another device"). **Not built yet:** files (slide PDFs). The testing phase runs on
+setup's "I already use Honed on another device") and slide files (#108). The testing phase runs on
 Nathan's home server, for Matt,
 Nathan and a few testers. Every piece is kept easy to move to Cloudflare (Workers, R2, D1) if Honed goes
 public. Sync is **opt-in**: a device that never signs in keeps working exactly as today.
@@ -306,11 +306,19 @@ gone) after a deletion.
   device.
 - **Sync runs only while unlocked:** applying changes needs the data key.
 
-### Files (slide PDFs)
+### Files (slide PDFs) (built in #108)
 
 - A deck's PDF and its page text are uploaded once, sealed exactly as they're stored locally
-  (`deckFiles`, `deckPages`: their additional data covers the whole content), and downloaded only when a
-  device opens that deck. Until then the device shows the deck with "Download the slides".
+  (`deckFiles`, `deckPages`: their additional data covers the whole content, so nothing is decrypted to
+  send them), and downloaded only when a device opens that deck. There's no button: the store fetches a
+  missing file when a screen asks for it (`setFileSource`), opens it with this device's key (a file sealed
+  with another key, or changed, is refused and not kept), and keeps it as it came.
+- On the wire: raw bytes, `1` (the version), the 12-byte IV, the ciphertext. The server keeps them as files
+  (`files/<account>/<deck>.<pdf|pages>`), written whole or not at all.
+- A deck's files leave the server when a `slideDeck` delete arrives (the hint is all the server reads; at
+  worst a wrong one removes the account's own copy, which a device that has the deck sends again), and all of
+  an account's when the account is deleted.
+- A device never sends back a deck it fetched (`syncFiles` in its `meta`).
 - Limits in the testing phase: 100 MB a file (Cloudflare's upload limit and Honed's PDF limit) and
   5 GB an account.
 
@@ -419,7 +427,7 @@ as PRF).
 | `src/db/` (#16) | Uses them to encrypt records and keep the keyring |
 | `src/ui/` (#17) | Setup, unlock, recovery, Settings |
 | `src/backup/` (#18) | The `.honed` file format, making and restoring backups (see "Backups") |
-| `sync/` (v2) | The sync server, `honed-sync` (see "Accounts and sync"): Google sign-in, accounts and sessions (#95: `google.mjs`, `app.mjs`, `db.mjs`), Google unlock keys and their uses (#101, schema step 2), the keyring and sealed changes (#105, schema step 3); tests in `tests/sync/`. Files not yet |
+| `sync/` (v2) | The sync server, `honed-sync` (see "Accounts and sync"): Google sign-in, accounts and sessions (#95: `google.mjs`, `app.mjs`, `db.mjs`), Google unlock keys and their uses (#101, schema step 2), the keyring and sealed changes (#105, schema step 3), slide files (#108, schema step 4, kept in `files/`); tests in `tests/sync/` |
 | `src/db/sync.ts` (#105) | The store's side of sync: sealing for the server, opening and checking what comes back, applying it (the later change wins), the sync state, joining |
 | `src/sync/engine.ts`, `SyncRunner.tsx`, `SyncSettings.tsx`, `JoinUnlock.tsx` (#105) | The engine (keyring, up, down), running it while unlocked, Settings > Sync, unlocking the account's keyring to join |
 | `src/sync/` | The app's side: `client.ts` (the server's routes), Settings' Account box (#95) and Google unlock (#101, `GoogleUnlockSettings.tsx`) |

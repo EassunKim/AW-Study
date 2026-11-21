@@ -13,14 +13,14 @@ key opens. A device can remember you after one unlock, so it opens straight in. 
 (testers only for now), which on its own never unlocks anything. If you choose **Google unlock**, a Google
 sign-in can open Honed instead of a passkey, but then our server keeps a key that could open your data: it's off
 unless you turn it on. AI features send only the text they need to our own helper, which keeps nothing. Syncing
-between your devices (classes, lectures, quizzes and notes; slide PDFs not yet) is opt-in and encrypted the same way. The details, including what each piece can and can't see, are
+between your devices (classes, lectures, quizzes, notes and slide PDFs) is opt-in and encrypted the same way. The details, including what each piece can and can't see, are
 in [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Status
 
 Live for testers: classes, slides and lectures, the planner and daily Tasks with Play, AI-made quizzes, exams
-that pull their sections forward, the slide viewer with notes and highlights, backups, accounts with Google unlock, and sync between devices.
-Next: slide PDFs in sync. The plan is in [docs/DESIGN.md](docs/DESIGN.md) and progress in [docs/PROGRESS.md](docs/PROGRESS.md).
+that pull their sections forward, the slide viewer with notes and highlights, backups, accounts with Google unlock, and sync between devices
+(slide PDFs included). The plan is in [docs/DESIGN.md](docs/DESIGN.md) and progress in [docs/PROGRESS.md](docs/PROGRESS.md).
 
 ## Run it
 

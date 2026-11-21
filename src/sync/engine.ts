@@ -121,6 +121,57 @@ async function* pullChanges(fetcher: Fetch, after: number): AsyncGenerator<{ wir
 
 const sameKeycheck = (a: EncryptedRecord | null, b: EncryptedRecord | null) => !!a && !!b && encode(a) === encode(b);
 
+// --- Slide files (#108): sealed as stored, sent as raw bytes: 1 (the version), the 12-byte IV, the ciphertext ---
+
+export function sealedToBytes(sealed: EncryptedRecord): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(1 + 12 + sealed.ct.length);
+  out[0] = 1;
+  out.set(sealed.iv, 1);
+  out.set(sealed.ct, 13);
+  return out;
+}
+
+export function bytesToSealed(data: Uint8Array): EncryptedRecord {
+  if (data.length < 13 + 16 || data[0] !== 1) throw new SyncError('server', 'The sync server sent a damaged file.');
+  return { v: 1, iv: data.slice(1, 13), ct: data.slice(13) };
+}
+
+async function putFile(fetcher: Fetch, deckId: string, kind: 'pdf' | 'pages', sealed: EncryptedRecord): Promise<void> {
+  const res = await call(fetcher, `/api/files/${encodeURIComponent(deckId)}/${kind}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: sealedToBytes(sealed),
+  });
+  if (res.status === 413) throw new SyncError('full', 'Your account on the sync server is full for now (or a file is too big).');
+  if (!res.ok) throw new SyncError('server', 'The sync server didn’t take a slide file. Try again.');
+}
+
+/** Sends the files of decks this device has and the server doesn't yet, one deck at a time. */
+export async function uploadFiles(store: StudyStore, fetcher: Fetch = fetch): Promise<number> {
+  let sent = 0;
+  for (const deckId of await store.filesToUpload()) {
+    const files = await store.sealedDeckFiles(deckId);
+    if (!files) continue;
+    await putFile(fetcher, deckId, 'pdf', files.pdf);
+    if (files.pages) await putFile(fetcher, deckId, 'pages', files.pages);
+    await store.markFilesUp(deckId);
+    sent++;
+  }
+  return sent;
+}
+
+/**
+ * A deck's file from the server, sealed (the store opens it), or null if it isn't there yet or sync is off on
+ * this device. The store calls this when a deck's file isn't here (store.setFileSource).
+ */
+export async function fetchSealedFile(store: StudyStore, deckId: string, kind: 'pdf' | 'pages', fetcher: Fetch = fetch): Promise<EncryptedRecord | null> {
+  if (!(await store.getSyncState())) return null;
+  const res = await call(fetcher, `/api/files/${encodeURIComponent(deckId)}/${kind}`, { headers: { Accept: 'application/octet-stream' } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new SyncError('server', 'The sync server didn’t send the slides. Try again.');
+  return bytesToSealed(new Uint8Array(await res.arrayBuffer()));
+}
+
 // --- Rounds ---
 
 /** What a round did: null if sync is off on this device. `changed`: records changed here by other devices. */
@@ -166,6 +217,9 @@ export async function syncOnce(store: StudyStore, fetcher: Fetch = fetch, now: (
       if (page.wire.length) changed += await store.applyRemote(await store.openFromSync(page.wire));
       await save({ pulled: page.last });
     }
+
+    // Slide files this device has and the server doesn't (#108)
+    await uploadFiles(store, fetcher);
     await save({ lastSyncAt: now().toISOString(), lastError: null });
   } catch (err) {
     await save({ lastError: err instanceof Error ? err.message : String(err) });

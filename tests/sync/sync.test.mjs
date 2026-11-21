@@ -2,13 +2,13 @@
 // Google made here (its token endpoint checks the client secret, the redirect address and PKCE, and
 // signs ID tokens with a key made here). Nothing reaches Google.
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createSync, deviceName, RECENT_SIGN_IN_MS, safePath, SESSION_COOKIE, SESSION_IDLE_MS, SESSION_MAX_MS, SIGN_IN_WAIT_MS, SIGNIN_COOKIE } from '../../sync/app.mjs';
+import { createSync, deviceName, MAX_FILE_BYTES, RECENT_SIGN_IN_MS, safePath, SESSION_COOKIE, SESSION_IDLE_MS, SESSION_MAX_MS, SIGN_IN_WAIT_MS, SIGNIN_COOKIE } from '../../sync/app.mjs';
 import { openDb, SCHEMA_STEP } from '../../sync/db.mjs';
 import { googleClient, SignInError } from '../../sync/google.mjs';
 
@@ -108,6 +108,7 @@ async function start() {
     google: googleClient({ clientId: CLIENT_ID, clientSecret: SECRET, redirectUri: REDIRECT, endpoints: ENDPOINTS, fetch: google.fetch, now: () => clock.getTime() }),
     allowedEmails: allowed,
     appOrigin: ORIGIN,
+    filesDir: join(dir, 'files'),
     log: (line) => logs.push(line),
     now: () => new Date(clock),
   });
@@ -734,5 +735,89 @@ describe('sync: changes (#105)', () => {
     await b.send('POST', '/api/changes', { changes: [change(7, { ct: 'secretcipher' })] });
     await b.go('/api/changes?after=0');
     expect(JSON.stringify(logs)).not.toContain('secretcipher');
+  });
+});
+
+describe('sync: slide files (#108)', () => {
+  const bytes = (n, fill = 7) => new Uint8Array(n).fill(fill);
+  /** A PUT that only says how big it is, as a raw HTTP request; gives the status. */
+  const rawPut = (b, path, length) =>
+    new Promise((resolve, reject) => {
+      const req = httpRequest(base + path, {
+        method: 'PUT',
+        headers: { Origin: ORIGIN, 'Content-Type': 'application/octet-stream', 'Content-Length': String(length), Cookie: [...b.jar].map(([k, v]) => k + '=' + v).join('; ') },
+      });
+      req.on('response', (res) => { resolve(res.statusCode); res.resume(); req.destroy(); });
+      req.on('error', () => {});
+      req.flushHeaders();
+    });
+  const put = (b, path, body, headers = {}) =>
+    b.go(path, { method: 'PUT', headers: { Origin: ORIGIN, 'Content-Type': 'application/octet-stream', ...headers }, body });
+
+  it('keeps a deck’s files as sent and gives them back, to the same account only', async () => {
+    const pc = browser();
+    await signIn(pc, NATHAN);
+    expect((await pc.go('/api/files/deck1/pdf')).status).toBe(404);
+    const pdf = bytes(300_000, 3);
+    expect(await (await put(pc, '/api/files/deck1/pdf', pdf)).json()).toEqual({ size: 300_000 });
+    expect((await put(pc, '/api/files/deck1/pages', bytes(500, 9))).status).toBe(200);
+
+    const phone = browser(IPHONE);
+    await signIn(phone, NATHAN);
+    const got = await phone.go('/api/files/deck1/pdf');
+    expect(got.status).toBe(200);
+    expect(got.headers.get('content-type')).toBe('application/octet-stream');
+    expect(got.headers.get('cache-control')).toBe('no-store');
+    expect(new Uint8Array(await got.arrayBuffer())).toEqual(pdf);
+    // Sent again (a retry): replaced, not doubled
+    await put(phone, '/api/files/deck1/pdf', bytes(10, 1));
+    expect(new Uint8Array(await (await pc.go('/api/files/deck1/pdf')).arrayBuffer())).toEqual(bytes(10, 1));
+    expect(db.prepare('SELECT COUNT(*) AS n FROM files').get().n).toBe(2);
+
+    const matt = browser();
+    await signIn(matt, MATT);
+    expect((await matt.go('/api/files/deck1/pdf')).status).toBe(404);
+  });
+
+  it('refuses the wrong kind, a bad deck id, another site, not bytes, no size, too big, or signed out', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    // Not a file address at all: refused (as a request that isn't JSON)
+    expect((await put(b, '/api/files/deck1/exe', bytes(5))).status).toBeGreaterThanOrEqual(400);
+    expect((await put(b, '/api/files/..%2Fsecret/pdf', bytes(5))).status).toBeGreaterThanOrEqual(400);
+    expect((await put(b, '/api/files/deck1/pdf', bytes(5), { Origin: 'https://evil.example' })).status).toBe(403);
+    expect((await put(b, '/api/files/deck1/pdf', bytes(5), { 'Content-Type': 'application/json' })).status).toBe(415);
+    // Says it's bigger than the limit: refused before anything is read (a raw request: fetch won't send a size that isn't true)
+    expect(await rawPut(b, '/api/files/deck1/pdf', MAX_FILE_BYTES + 1)).toBe(413);
+    expect((await browser().go('/api/files/deck1/pdf', { method: 'PUT', headers: { Origin: ORIGIN, 'Content-Type': 'application/octet-stream' }, body: bytes(5) })).status).toBe(401);
+    expect((await browser().go('/api/files/deck1/pdf')).status).toBe(401);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM files').get().n).toBe(0);
+  });
+
+  it('a deck deleted on a device takes its files with it; so does deleting the account', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    await put(b, '/api/files/deck1/pdf', bytes(50));
+    await put(b, '/api/files/deck1/pages', bytes(5));
+    await put(b, '/api/files/deck2/pdf', bytes(50));
+    const del = { id: 'del1', entity: 'slideDeck', entityId: 'deck1', op: 'delete', at: '2026-11-21T01:00:00.000Z', iv: 'aaaaaaaaaaaaaaaa', ct: 'sealed' };
+    await b.send('POST', '/api/changes', { changes: [del] });
+    expect((await b.go('/api/files/deck1/pdf')).status).toBe(404);
+    expect((await b.go('/api/files/deck1/pages')).status).toBe(404);
+    expect((await b.go('/api/files/deck2/pdf')).status).toBe(200);
+    const account = db.prepare('SELECT id FROM accounts').get().id;
+    expect(readdirSync(join(dir, 'files', account)).sort()).toEqual(['deck2.pdf']);
+
+    await b.send('DELETE', '/api/account');
+    expect(existsSync(join(dir, 'files', account))).toBe(false);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM files').get().n).toBe(0);
+  });
+
+  it('logs no file contents', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    await put(b, '/api/files/deck1/pdf', new TextEncoder().encode('secret-slide-bytes'));
+    await b.go('/api/files/deck1/pdf');
+    expect(JSON.stringify(logs)).not.toContain('secret-slide-bytes');
   });
 });
